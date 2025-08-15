@@ -67,7 +67,7 @@ char* read_while(Lexer* l, bool (*is_ok) (char)) {
         read_char(l);
         len++;
     }
-    char* ident = malloc(len * sizeof(char));
+    char* ident = malloc((len + 1) * sizeof(char));
     int i = 0;
     for (; i < len; i++) {
         ident[i] = l->input[position + i];

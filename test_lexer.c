@@ -127,6 +127,7 @@ if (5 < 10) {\
 
         free(tok.literal);
     }
+    lexer_destroy(l);
 }
 
 int main(void) {

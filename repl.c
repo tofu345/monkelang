@@ -5,15 +5,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-int start(FILE* in, FILE* out) {
-    char* input = NULL;
-    size_t len = 0;
+void start(FILE* in, FILE* out) {
     while (1) {
         fprintf(out, ">> ");
-        getline(&input, &len, in);
-        if (input == NULL) {
-            printf("getline fail\n");
-            return 1;
+        char* input = NULL;
+        size_t len = 0;
+        if (getline(&input, &len, in) == -1) {
+            return;
         }
 
         Lexer* l = lexer_new(input, strlen(input));
@@ -24,9 +22,6 @@ int start(FILE* in, FILE* out) {
                     show_token_type(tok.type), tok.literal);
             free(tok.literal);
         }
-        fflush(out);
+        free(input);
     }
-
-    free(input);
-    return 0;
 }

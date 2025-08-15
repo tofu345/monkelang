@@ -11,6 +11,8 @@ typedef struct Lexer Lexer;
 // freed while in use.
 Lexer* lexer_new(char* input, size_t len);
 
+void lexer_destroy(Lexer* l);
+
 Token lexer_next_token(Lexer* l);
 
 #endif
