@@ -1,6 +1,11 @@
-FILES = test_lexer.c
-OUTFILE = test_lexer
-CFLAGS = -g -Wall -Wextra -Werror -o ${OUTFILE}
+CFLAGS := -g -Wall -Wextra
 
-test_lexer: ${FILES} Makefile
-	@ gcc ${CFLAGS} ${FILES}
+main: .FORCE
+	@ gcc ${CFLAGS} -o main.out \
+		main.c repl.c lexer.c token.c
+
+test_lexer: .FORCE
+	@ gcc ${CFLAGS} -o test_lexer.out \
+		unity/* test_lexer.c lexer.c token.c
+
+.FORCE:

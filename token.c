@@ -1,38 +1,63 @@
-enum TokenType {
-    Illegal,
-    Eof,
-    // identifiers + literals
-    Ident,
-	Int,
-    // Operators
-	Assign,
-	Plus,
-	Minus,
-	Bang,
-	Asterisk,
-	Slash,
-	Lt,
-	Gt,
-	Eq,
-	Not_eq,
-    // Delimeters
-	Comma,
-	Semicolon,
-	Lparen,
-	Rparen,
-	Lbrace,
-	Rbrace,
-    // Keywords
-	Function,
-	Let,
-	True,
-	False,
-	If,
-	Else,
-	Return,
+#include "token.h"
+
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+
+struct Keyword {
+    char* name;
+    TokenType tok_typ;
+} keywords[] = {
+    {"fn", Function},
+    {"let", Let},
+    {"true", True},
+    {"false", False},
+    {"if", If},
+    {"else", Else},
+    {"return",  Return},
 };
 
-typedef struct {
-    enum TokenType type;
-    char *literal;
-} Token;
+TokenType lookup_ident(char* ident) {
+    size_t len = sizeof(keywords) / sizeof(keywords[0]);
+    for (size_t i = 0; i < len; i++) {
+        if (strcmp(keywords[i].name, ident) == 0) {
+            return keywords[i].tok_typ;
+        }
+    }
+    return Ident;
+}
+
+// for printing
+char* token_types[] = {
+    "Illegal",
+    "Eof",
+    "Ident",
+	"Int",
+	"Assign",
+	"Plus",
+	"Minus",
+	"Bang",
+	"Asterisk",
+	"Slash",
+	"Lt",
+	"Gt",
+	"Eq",
+	"Not_eq",
+	"Comma",
+	"Semicolon",
+	"Lparen",
+	"Rparen",
+	"Lbrace",
+	"Rbrace",
+	"Function",
+	"Let",
+	"True",
+	"False",
+	"If",
+	"Else",
+	"Return",
+};
+
+char* show_token_type(TokenType t) {
+    return token_types[t - 1];
+}
