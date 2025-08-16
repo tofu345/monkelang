@@ -1,18 +1,9 @@
 #include "lexer.h"
 #include "token.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-
-struct Lexer {
-    // TODO: maybe read from a FILE directly?
-    char* input;
-    size_t input_len;
-
-    size_t position;      // current position in input (points to current char)
-    size_t read_position; // current reading position in input (after current char)
-    char ch;
-};
 
 static void read_char(Lexer* l) {
     if (l->read_position >= l->input_len) {
@@ -24,18 +15,12 @@ static void read_char(Lexer* l) {
     l->read_position += 1;
 }
 
-Lexer* lexer_new(char* input, size_t len) {
-    Lexer* l = malloc(sizeof(Lexer));
-    l->position = 0;
-    l->read_position = 0;
-    l->input = input;
-    l->input_len = len;
-    read_char(l);
+Lexer lexer_new(char* input, size_t len) {
+    Lexer l = {};
+    l.input = input;
+    l.input_len = len;
+    read_char(&l);
     return l;
-}
-
-void lexer_destroy(Lexer* l) {
-    free(l);
 }
 
 static Token new_token(TokenType type, char ch) {
@@ -97,9 +82,9 @@ Token lexer_next_token(Lexer* l) {
             lit[0] = ch;
             lit[1] = l->ch;
             lit[2] = '\0';
-            tok = (Token){ Eq, lit };
+            tok = (Token){ t_Eq, lit };
         } else {
-            tok = new_token(Assign, l->ch);
+            tok = new_token(t_Assign, l->ch);
         }
         break;
     case '!':
@@ -110,51 +95,51 @@ Token lexer_next_token(Lexer* l) {
             lit[0] = ch;
             lit[1] = l->ch;
             lit[2] = '\0';
-            tok = (Token){ Not_eq, lit };
+            tok = (Token){ t_Not_eq, lit };
         } else {
-            tok = new_token(Bang, l->ch);
+            tok = new_token(t_Bang, l->ch);
         }
         break;
     case '+':
-        tok = new_token(Plus, l->ch);
+        tok = new_token(t_Plus, l->ch);
         break;
     case '-':
-        tok = new_token(Minus, l->ch);
+        tok = new_token(t_Minus, l->ch);
         break;
     case '/':
-        tok = new_token(Slash, l->ch);
+        tok = new_token(t_Slash, l->ch);
         break;
     case '*':
-        tok = new_token(Asterisk, l->ch);
+        tok = new_token(t_Asterisk, l->ch);
         break;
     case '<':
-        tok = new_token(Lt, l->ch);
+        tok = new_token(t_Lt, l->ch);
         break;
     case '>':
-        tok = new_token(Gt, l->ch);
+        tok = new_token(t_Gt, l->ch);
         break;
     case ';':
-        tok = new_token(Semicolon, l->ch);
+        tok = new_token(t_Semicolon, l->ch);
         break;
     case ',':
-        tok = new_token(Comma, l->ch);
+        tok = new_token(t_Comma, l->ch);
         break;
     case '(':
-        tok = new_token(Lparen, l->ch);
+        tok = new_token(t_Lparen, l->ch);
         break;
     case ')':
-        tok = new_token(Rparen, l->ch);
+        tok = new_token(t_Rparen, l->ch);
         break;
     case '{':
-        tok = new_token(Lbrace, l->ch);
+        tok = new_token(t_Lbrace, l->ch);
         break;
     case '}':
-        tok = new_token(Rbrace, l->ch);
+        tok = new_token(t_Rbrace, l->ch);
         break;
     case 0:
         tok.literal = malloc(sizeof(char));
         tok.literal[0] = '\0';
-        tok.type = Eof;
+        tok.type = t_Eof;
         break;
     default:
         if (is_letter(l->ch)) {
@@ -162,11 +147,11 @@ Token lexer_next_token(Lexer* l) {
             tok.type = lookup_ident(tok.literal);
             return tok;
         } else if (is_digit(l->ch)) {
-            tok.type = Int;
+            tok.type = t_Int;
             tok.literal = read_while(l, is_digit);
             return tok;
         } else {
-            tok = new_token(Illegal, l->ch);
+            tok = new_token(t_Illegal, l->ch);
         }
     }
 

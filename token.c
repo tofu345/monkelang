@@ -8,13 +8,13 @@ struct Keyword {
     char* name;
     TokenType tok_typ;
 } keywords[] = {
-    {"fn", Function},
-    {"let", Let},
-    {"true", True},
-    {"false", False},
-    {"if", If},
-    {"else", Else},
-    {"return",  Return},
+    {"fn", t_Function},
+    {"let", t_Let},
+    {"true", t_True},
+    {"false", t_False},
+    {"if", t_If},
+    {"else", t_Else},
+    {"return", t_Return},
 };
 
 TokenType lookup_ident(char* ident) {
@@ -24,7 +24,7 @@ TokenType lookup_ident(char* ident) {
             return keywords[i].tok_typ;
         }
     }
-    return Ident;
+    return t_Ident;
 }
 
 // for printing

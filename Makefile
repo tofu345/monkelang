@@ -8,4 +8,8 @@ test_lexer: .FORCE
 	@ gcc ${CFLAGS} -o test_lexer.out \
 		unity/* test_lexer.c lexer.c token.c
 
+test_parser: .FORCE
+	@ gcc ${CFLAGS} -o test_parser.out \
+		unity/* test_parser.c parser.c ast.c lexer.c token.c
+
 .FORCE:

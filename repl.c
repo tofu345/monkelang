@@ -14,10 +14,10 @@ void start(FILE* in, FILE* out) {
             return;
         }
 
-        Lexer* l = lexer_new(input, strlen(input));
+        Lexer l = lexer_new(input, strlen(input));
 
-        for (Token tok = lexer_next_token(l);
-                tok.type != Eof; tok = lexer_next_token(l)) {
+        for (Token tok = lexer_next_token(&l);
+                tok.type != t_Eof; tok = lexer_next_token(&l)) {
             fprintf(out, "{token_type = %s; literal = \"%s\"}\n",
                     show_token_type(tok.type), tok.literal);
             free(tok.literal);
