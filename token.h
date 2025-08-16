@@ -40,7 +40,7 @@ typedef struct {
     char *literal; // a malloced string
 } Token;
 
-TokenType lookup_ident(char* ident);
+TokenType lookup_ident(const char* ident);
 
 char* show_token_type(TokenType t);
 

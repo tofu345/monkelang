@@ -15,7 +15,7 @@ static void read_char(Lexer* l) {
     l->read_position += 1;
 }
 
-Lexer lexer_new(char* input, size_t len) {
+Lexer lexer_new(const char* input, size_t len) {
     Lexer l = {};
     l.input = input;
     l.input_len = len;

@@ -17,7 +17,7 @@ struct Keyword {
     {"return", t_Return},
 };
 
-TokenType lookup_ident(char* ident) {
+TokenType lookup_ident(const char* ident) {
     size_t len = sizeof(keywords) / sizeof(keywords[0]);
     for (size_t i = 0; i < len; i++) {
         if (strcmp(keywords[i].name, ident) == 0) {

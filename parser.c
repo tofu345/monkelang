@@ -57,11 +57,11 @@ void parser_destroy(Parser* p) {
     free(p->errors);
 }
 
-static bool cur_token_is(Parser* p, TokenType t) {
+static bool cur_token_is(const Parser* p, TokenType t) {
     return p->cur_token.type == t;
 }
 
-static bool peek_token_is(Parser* p, TokenType t) {
+static bool peek_token_is(const Parser* p, TokenType t) {
     return p->peek_token.type == t;
 }
 
@@ -79,11 +79,10 @@ static Node parse_let_statement(Parser* p) {
     LetStatement* stmt = malloc(sizeof(LetStatement));
     if (stmt == NULL) exit_nomem();
     stmt->tok = p->cur_token;
-    stmt->value = (Node){};
     Node n = { n_LetStatement, stmt };
 
     if (!expect_peek(p, t_Ident)) {
-        node_destroy(&n);
+        node_destroy(n);
         return (Node){};
     }
 
@@ -93,10 +92,11 @@ static Node parse_let_statement(Parser* p) {
     stmt->name->value = p->cur_token.literal;
 
     if (!expect_peek(p, t_Assign)) {
-        node_destroy(&n);
+        node_destroy(n);
         return (Node){};
     }
 
+    stmt->value = (Node){};
     // TODO: the boss says we are skipping expressions until we
     // encounter a semicolon
     while (!cur_token_is(p, t_Semicolon)) {
@@ -107,11 +107,30 @@ static Node parse_let_statement(Parser* p) {
     return n;
 }
 
+static Node parse_return_statement(Parser* p) {
+    ReturnStatement* stmt = malloc(sizeof(ReturnStatement));
+    if (stmt == NULL) exit_nomem();
+    stmt->tok = p->cur_token;
+
+    next_token(p);
+
+    stmt->return_value = (Node){};
+    // TODO: skipping the expressions until we encounter a semicolon
+    while (!cur_token_is(p, t_Semicolon)) {
+        next_token(p);
+        free(p->cur_token.literal);
+    }
+
+    return (Node){ n_ReturnStatement, stmt };
+}
+
 // on failure returns a Node with `n.typ` and `n.obj` == 0
 static Node parse_statement(Parser* p) {
     switch (p->cur_token.type) {
     case t_Let:
         return parse_let_statement(p);
+    case t_Return:
+        return parse_return_statement(p);
     default:
         return (Node){};
     }
