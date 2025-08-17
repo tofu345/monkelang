@@ -119,7 +119,7 @@ if (5 < 10) {\
     for (size_t i = 0; i < len_tests; i++) {
         char* msg = NULL;
         if (asprintf(&msg, "tests[%d]", (int)i) == -1) {
-            TEST_FAIL_MESSAGE("malloc msg");
+            TEST_FAIL_MESSAGE("no memory");
         };
 
         struct Test t = tests[i];

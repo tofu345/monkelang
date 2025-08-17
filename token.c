@@ -28,7 +28,7 @@ TokenType lookup_ident(const char* ident) {
 }
 
 // for printing
-char* token_types[] = {
+const char* token_types[] = {
     "Illegal",
     "Eof",
     "Ident",
@@ -58,6 +58,6 @@ char* token_types[] = {
 	"Return",
 };
 
-char* show_token_type(TokenType t) {
+const char* show_token_type(TokenType t) {
     return token_types[t - 1];
 }

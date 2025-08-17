@@ -11,6 +11,9 @@
 enum NodeType {
     // Expressions
     n_Identifier = 1,
+    n_IntegerLiteral,
+    n_PrefixExpression,
+    n_InfixExpression,
 
     // Statements
     n_LetStatement,
@@ -30,7 +33,8 @@ bool is_statement(Node n);
 // `Token` as its first field
 char* token_literal(Node n);
 
-void node_print(const Node n, FILE* fp);
+// Returns -1 on write to FILE err
+int node_fprint(const Node n, FILE* fp);
 
 // free `n.obj`
 void node_destroy(Node n);
@@ -44,11 +48,14 @@ typedef struct {
 
 char* program_token_literal(const Program* p);
 void program_destroy(Program* p);
-void program_print(const Program* p, FILE* fp);
+
+// Returns -1 on write to FILE err
+// TODO: return index of statement where fprint failed on to resume later
+int program_fprint(const Program* p, FILE* fp);
 
 typedef struct {
     Token tok; // the 't_Ident' token
-    char* value;
+    char* value; // same as tok.literal
 } Identifier;
 
 typedef struct {
@@ -66,5 +73,23 @@ typedef struct {
     Token tok; // the first token of the expression
     Node expression;
 } ExpressionStatement;
+
+typedef struct {
+    Token tok;
+    long value;
+} IntegerLiteral;
+
+typedef struct {
+    Token tok; // the prefix token, e.g !
+    char* op; // same as tok.literal
+    Node right;
+} PrefixExpression;
+
+typedef struct {
+    Token tok; // the prefix token, e.g *
+    Node left;
+    char* op; // same as tok.literal
+    Node right;
+} InfixExpression;
 
 #endif

@@ -32,7 +32,7 @@ typedef enum {
 	t_False,
 	t_If,
 	t_Else,
-	t_Return,
+	t_Return, // this must remain the last enum element
 } TokenType;
 
 typedef struct {
@@ -42,6 +42,6 @@ typedef struct {
 
 TokenType lookup_ident(const char* ident);
 
-char* show_token_type(TokenType t);
+const char* show_token_type(TokenType t);
 
 #endif

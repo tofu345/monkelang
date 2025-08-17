@@ -10,7 +10,7 @@ test_lexer: .FORCE
 
 test_parser: .FORCE
 	@ gcc ${CFLAGS} -o test_parser.out \
-		unity/* test_parser.c parser.c ast.c lexer.c token.c
+		unity/* test_parser.c parser.c parser_tracing.c ast.c lexer.c token.c
 
 test_ast: .FORCE
 	@ gcc ${CFLAGS} -o test_ast.out \

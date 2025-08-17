@@ -36,21 +36,21 @@ void test_print(void) {
 
     char* expected = "let myVar = anotherVar;";
     size_t len = strlen(expected) + 2; // in case of stupidity
-    char buf[len];
+    char* buf = malloc(len * sizeof(char));
     FILE* fp = fmemopen(buf, len, "w");
     if (fp == NULL) {
         fprintf(stderr, "no memory");
         exit(1);
     }
 
-    program_print(&prog, fp);
+    TEST_ASSERT_MESSAGE(program_fprint(&prog, fp) != -1, "program_fprint fail");
     fflush(fp);
+
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            expected, buf, "program_print wrong");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-            strlen(expected), strlen(buf), "program_print wrong len");
+            expected, buf, "program_fprint wrong");
 
     fclose(fp);
+    free(buf);
 }
 
 int main(void) {
