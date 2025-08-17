@@ -150,11 +150,13 @@ void node_destroy(Node n) {
             }
 
         default:
-            free(n.obj);
-            // since first field of `n.obj` is `Token`
-            Token* tok = n.obj;
-            free(tok->literal);
-            break;
+            {
+                // since first field of `n.obj` is `Token`
+                Token* tok = n.obj;
+                free(tok->literal);
+                free(n.obj);
+                break;
+            }
     }
 }
 
