@@ -29,6 +29,7 @@ struct Parser {
 Parser* parser_new(Lexer* l);
 
 void parser_destroy(Parser* p);
+void program_destroy(Program* p);
 
 enum Precedence {
     p_Lowest = 1,

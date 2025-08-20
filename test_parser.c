@@ -140,6 +140,7 @@ test_integer_literal(Node n, long value) {
 
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
             expected, il->tok.literal, "assert IntegerLiteral.tok.literal");
+    free(expected);
 }
 
 void test_integer_literal_expression(void) {

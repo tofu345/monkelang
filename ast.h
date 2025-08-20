@@ -48,7 +48,6 @@ typedef struct {
 } Program;
 
 char* program_token_literal(const Program* p);
-void program_destroy(Program* p);
 
 // Returns -1 on write to FILE err
 // TODO: return index of statement where fprint failed on to resume later

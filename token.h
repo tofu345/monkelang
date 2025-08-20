@@ -41,6 +41,8 @@ typedef struct {
     char *literal; // a malloced string
 } Token;
 
+void token_destroy(Token* t);
+
 TokenType lookup_ident(const char* ident);
 
 const char* show_token_type(TokenType t);

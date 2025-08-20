@@ -137,8 +137,7 @@ Token lexer_next_token(Lexer* l) {
         tok = new_token(t_Rbrace, l->ch);
         break;
     case 0:
-        tok.literal = malloc(sizeof(char));
-        tok.literal[0] = '\0';
+        tok.literal = NULL;
         tok.type = t_Eof;
         break;
     default:

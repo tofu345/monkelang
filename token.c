@@ -2,7 +2,15 @@
 
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+void token_destroy(Token* t) {
+    // see `lexer_next_token`
+    if (t->type != t_Eof) {
+        free(t->literal);
+    }
+}
 
 struct Keyword {
     char* name;

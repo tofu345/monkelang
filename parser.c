@@ -206,12 +206,13 @@ parse_boolean(Parser* p) {
 
 static Node
 parse_grouped_expression(Parser* p) {
-    free(p->cur_token.literal); // free '(' token
+    token_destroy(&p->cur_token); // free '(' token
     next_token(p);
     Node n = parse_expression(p, p_Lowest);
     if (!expect_peek(p, t_Rparen)) {
         return (Node){};
     }
+    token_destroy(&p->cur_token); // free ')' token
     return n;
 }
 
@@ -220,10 +221,9 @@ parse_let_statement(Parser* p) {
     LetStatement* stmt = malloc(sizeof(LetStatement));
     if (stmt == NULL) exit_nomem();
     stmt->tok = p->cur_token;
-    Node n = { n_LetStatement, stmt };
 
     if (!expect_peek(p, t_Ident)) {
-        free(stmt->tok.literal);
+        token_destroy(&stmt->tok);
         free(stmt);
         return (Node){};
     }
@@ -233,20 +233,24 @@ parse_let_statement(Parser* p) {
     stmt->name->tok = p->cur_token;
     stmt->name->value = p->cur_token.literal;
 
-    stmt->value = (Node){};
     if (!expect_peek(p, t_Assign)) {
-        node_destroy(n);
+        token_destroy(&stmt->tok);
+        token_destroy(&stmt->name->tok);
+        free(stmt->name);
+        free(stmt);
         return (Node){};
     }
+    token_destroy(&p->cur_token);
 
+    stmt->value = (Node){};
     // TODO: the boss says we are skipping expressions until we
     // encounter a semicolon
     while (!cur_token_is(p, t_Semicolon)) {
-        free(p->cur_token.literal);
         next_token(p);
+        token_destroy(&p->cur_token);
     }
 
-    return n;
+    return (Node){ n_LetStatement, stmt };
 }
 
 static Node
@@ -260,9 +264,10 @@ parse_return_statement(Parser* p) {
     stmt->return_value = (Node){};
     // TODO: skipping the expressions until we encounter a semicolon
     while (!cur_token_is(p, t_Semicolon)) {
-        free(p->cur_token.literal);
+        token_destroy(&p->cur_token);
         next_token(p);
     }
+    token_destroy(&p->cur_token);
 
     return (Node){ n_ReturnStatement, stmt };
 }
@@ -277,7 +282,7 @@ parse_expression_statement(Parser* p) {
 
     if (peek_token_is(p, t_Semicolon)) {
         next_token(p);
-        free(p->cur_token.literal);
+        token_destroy(&p->cur_token);
     }
 
     untrace("parse_expression_statement");
@@ -331,7 +336,7 @@ void parser_destroy(Parser* p) {
         free(p->errors[i]);
     }
     free(p->errors);
-    free(p->peek_token.literal);
+    token_destroy(&p->peek_token);
     free(p);
 }
 
@@ -362,3 +367,11 @@ Program parse_program(Parser* p) {
 
     return prog;
 }
+
+void program_destroy(Program* p) {
+    for (size_t i = 0; i < p->len; i++) {
+        node_destroy(p->statements[i]);
+    }
+    free(p->statements);
+}
+

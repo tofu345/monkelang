@@ -1,4 +1,5 @@
 #include "ast.h"
+#include "token.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,7 +19,7 @@ bool is_statement(const Node n) {
 }
 
 char* token_literal(const Node n) {
-    // since the first element of every node is a token.
+    // since the first element of every `node.obj` is a token.
     Token* tok = n.obj;
     return tok->literal;
 }
@@ -112,7 +113,7 @@ void node_destroy(Node n) {
         case n_PrefixExpression:
             {
                 PrefixExpression* pe = n.obj;
-                free(pe->tok.literal);
+                token_destroy(&pe->tok);
                 node_destroy(pe->right);
                 free(pe);
                 break;
@@ -121,7 +122,7 @@ void node_destroy(Node n) {
         case n_InfixExpression:
             {
                 InfixExpression* ie = n.obj;
-                free(ie->tok.literal);
+                token_destroy(&ie->tok);
                 node_destroy(ie->left);
                 node_destroy(ie->right);
                 free(ie);
@@ -131,10 +132,10 @@ void node_destroy(Node n) {
         case n_LetStatement:
             {
                 LetStatement* ls = n.obj;
-                free(ls->tok.literal);
+                token_destroy(&ls->tok);
                 node_destroy(ls->value);
                 if (ls->name != NULL)
-                    free(ls->name->value);
+                    token_destroy(&ls->name->tok);
                 free(ls);
                 break;
             }
@@ -142,7 +143,7 @@ void node_destroy(Node n) {
         case n_ReturnStatement:
             {
                 ReturnStatement* rs = n.obj;
-                free(rs->tok.literal);
+                token_destroy(&rs->tok);
                 node_destroy(rs->return_value);
                 free(rs);
                 break;
@@ -159,8 +160,7 @@ void node_destroy(Node n) {
         default:
             {
                 // since first field of `n.obj` is `Token`
-                Token* tok = n.obj;
-                free(tok->literal);
+                token_destroy(n.obj);
                 free(n.obj);
                 break;
             }
@@ -172,12 +172,6 @@ char* program_token_literal(const Program* p) {
         return token_literal(p->statements[0]);
     } else {
         return "";
-    }
-}
-
-void program_destroy(Program* p) {
-    for (size_t i = 0; i < p->len; i++) {
-        node_destroy(p->statements[i]);
     }
 }
 

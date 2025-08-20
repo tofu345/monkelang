@@ -126,10 +126,14 @@ if (5 < 10) {\
         Token tok = lexer_next_token(&l);
         TEST_ASSERT_EQUAL_STRING_MESSAGE(
                 show_token_type(t.exp_typ), show_token_type(tok.type), msg);
-        TEST_ASSERT_EQUAL_STRING_MESSAGE(t.exp_lit, tok.literal, msg);
+        if (t.exp_typ == t_Eof) {
+            TEST_ASSERT_NULL(tok.literal);
+        } else {
+            TEST_ASSERT_EQUAL_STRING_MESSAGE(t.exp_lit, tok.literal, msg);
+        }
 
         free(msg);
-        free(tok.literal);
+        token_destroy(&tok);
     }
 }
 
