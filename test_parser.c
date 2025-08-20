@@ -49,8 +49,7 @@ let foobar = 838383;\
     Lexer l = lexer_new(input, input_len);
     Parser* p = parser_new(&l);
     Program prog = parse_program(p);
-    if (prog.statements == NULL)
-        TEST_FAIL_MESSAGE("program.statements NULL");
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.statements, "program.statements NULL");
 
     check_parser_errors(p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(3, prog.len, "prog.statements length");
@@ -81,8 +80,7 @@ return 993322;\
     Lexer l = lexer_new(input, input_len);
     Parser* p = parser_new(&l);
     Program prog = parse_program(p);
-    if (prog.statements == NULL)
-        TEST_FAIL_MESSAGE("program.statements NULL");
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.statements, "program.statements NULL");
 
     check_parser_errors(p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(3, prog.len, "prog.statements length");
@@ -106,8 +104,7 @@ void test_identifier_expression(void) {
     Lexer l = lexer_new(input, input_len);
     Parser* p = parser_new(&l);
     Program prog = parse_program(p);
-    if (prog.statements == NULL)
-        TEST_FAIL_MESSAGE("program.statements NULL");
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.statements, "program.statements NULL");
 
     check_parser_errors(p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.len, "prog.statements length");
@@ -128,7 +125,7 @@ void test_identifier_expression(void) {
     parser_destroy(p);
 }
 
-static void 
+static void
 test_integer_literal(Node n, long value) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             n_IntegerLiteral, n.typ, "assert IntegerLiteral");
@@ -152,8 +149,7 @@ void test_integer_literal_expression(void) {
     Lexer l = lexer_new(input, input_len);
     Parser* p = parser_new(&l);
     Program prog = parse_program(p);
-    if (prog.statements == NULL)
-        TEST_FAIL_MESSAGE("program.statements NULL");
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.statements, "program.statements NULL");
 
     check_parser_errors(p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.len, "prog.statements length");
@@ -177,14 +173,67 @@ void test_integer_literal_expression(void) {
     parser_destroy(p);
 }
 
+static void
+test_identifier(Node n, const char* value) {
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_Identifier, n.typ, "assert type Identifier");
+    Identifier* id = n.obj;
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            value, id->value, "assert Identifier.Value");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            value, id->tok.literal, "assert Identifier.Token.Literal");
+}
+
+static void
+test_boolean_literal(Node n, bool exp) {
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_Boolean, n.typ, "assert type Boolean");
+    Boolean* b = n.obj;
+    TEST_ASSERT_MESSAGE(b->value == exp, "assert Boolean.value");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            exp ? "true" : "false",
+            b->tok.literal, "assert Boolean.Token.literal");
+}
+
+typedef enum {
+    l_Integer,
+    l_String,
+    l_Boolean,
+} L_Type;
+
+typedef union {
+    long integer;
+    const char* string;
+    bool boolean;
+} L_Test;
+
+static void
+test_literal_expression(Node n, L_Test exp, L_Type typ) {
+    switch (typ) {
+        case l_Integer:
+            test_integer_literal(n, exp.integer);
+            break;
+        case l_String:
+            test_identifier(n, exp.string);
+            break;
+        case l_Boolean:
+            test_boolean_literal(n, exp.boolean);
+            break;
+        default:
+            fprintf(stderr, "type of exp not handled. got %d", typ);
+            exit(1);
+    }
+}
+
 void test_parsing_prefix_expressions(void) {
     struct Test {
         char* input;
         char* operator;
-        long integer_value;
+        L_Test value;
+        L_Type t;
     } tests[] = {
-        {"!5;", "!", 5},
-        {"-15;", "-", 15},
+        {"!5;", "!", {5}, l_Integer},
+        {"-15;", "-", {15}, l_Integer},
     };
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
 
@@ -194,8 +243,7 @@ void test_parsing_prefix_expressions(void) {
         Lexer l = lexer_new(test.input, strlen(test.input));
         Parser* p = parser_new(&l);
         Program prog = parse_program(p);
-        if (prog.statements == NULL)
-            TEST_FAIL_MESSAGE("program.statements NULL");
+        TEST_ASSERT_NOT_NULL_MESSAGE(prog.statements, "program.statements NULL");
 
         check_parser_errors(p);
         TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.len, "prog.statements length");
@@ -212,7 +260,7 @@ void test_parsing_prefix_expressions(void) {
         TEST_ASSERT_EQUAL_STRING_MESSAGE(
                 test.operator, pe->op, "assert PrefixExpression.op");
 
-        test_integer_literal(pe->right, test.integer_value);
+        test_literal_expression(pe->right, test.value, test.t);
 
         program_destroy(&prog);
         parser_destroy(p);
@@ -222,18 +270,22 @@ void test_parsing_prefix_expressions(void) {
 void test_parsing_infix_expressions(void) {
     struct Test {
         char* input;
-        long left_value;
+        L_Test left_value;
         char* operator;
-        long right_value;
+        L_Test right_value;
+        L_Type t;
     } tests[] = {
-        {"5 + 5;", 5, "+", 5},
-        {"5 - 5;", 5, "-", 5},
-        {"5 * 5;", 5, "*", 5},
-        {"5 / 5;", 5, "/", 5},
-        {"5 > 5;", 5, ">", 5},
-        {"5 < 5;", 5, "<", 5},
-        {"5 == 5;", 5, "==", 5},
-        {"5 != 5;", 5, "!=", 5},
+        {"5 + 5;", {5}, "+", {5}, l_Integer},
+        {"5 - 5;", {5}, "-", {5}, l_Integer},
+        {"5 * 5;", {5}, "*", {5}, l_Integer},
+        {"5 / 5;", {5}, "/", {5}, l_Integer},
+        {"5 > 5;", {5}, ">", {5}, l_Integer},
+        {"5 < 5;", {5}, "<", {5}, l_Integer},
+        {"5 == 5;", {5}, "==", {5}, l_Integer},
+        {"5 != 5;", {5}, "!=", {5}, l_Integer},
+        {"true == true", {true}, "==", {true}, l_Boolean},
+        {"true != false", {true}, "!=", {false}, l_Boolean},
+        {"false == false", {false}, "==", {false}, l_Boolean},
     };
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
 
@@ -243,8 +295,7 @@ void test_parsing_infix_expressions(void) {
         Lexer l = lexer_new(test.input, strlen(test.input));
         Parser* p = parser_new(&l);
         Program prog = parse_program(p);
-        if (prog.statements == NULL)
-            TEST_FAIL_MESSAGE("program.statements NULL");
+        TEST_ASSERT_NOT_NULL_MESSAGE(prog.statements, "program.statements NULL");
 
         check_parser_errors(p);
         TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.len, "prog.statements length");
@@ -259,12 +310,12 @@ void test_parsing_infix_expressions(void) {
 
         InfixExpression* ie = st->expression.obj;
 
-        test_integer_literal(ie->right, test.left_value);
+        test_literal_expression(ie->left, test.left_value, test.t);
 
         TEST_ASSERT_EQUAL_STRING_MESSAGE(
                 test.operator, ie->op, "assert InfixExpression.op");
 
-        test_integer_literal(ie->right, test.right_value);
+        test_literal_expression(ie->right, test.right_value, test.t);
 
         program_destroy(&prog);
         parser_destroy(p);
@@ -328,6 +379,42 @@ void test_operator_precedence_parsing(void) {
             "3 + 4 * 5 == 3 * 1 + 4 * 5",
             "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
         },
+        {
+            "true",
+            "true",
+        },
+        {
+            "false",
+            "false",
+        },
+        {
+            "3 > 5 == false",
+            "((3 > 5) == false)",
+        },
+        {
+            "3 < 5 == true",
+            "((3 < 5) == true)",
+        },
+        {
+            "1 + (2 + 3) + 4",
+            "((1 + (2 + 3)) + 4)",
+        },
+        {
+            "(5 + 5) * 2",
+            "((5 + 5) * 2)",
+        },
+        {
+            "2 / (5 + 5)",
+            "(2 / (5 + 5))",
+        },
+        {
+            "-(5 + 5)",
+            "(-(5 + 5))",
+        },
+        {
+            "!(true == true)",
+            "(!(true == true))",
+        },
     };
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
 
@@ -337,8 +424,7 @@ void test_operator_precedence_parsing(void) {
         Lexer l = lexer_new(test.input, strlen(test.input));
         Parser* p = parser_new(&l);
         Program prog = parse_program(p);
-        if (prog.statements == NULL)
-            TEST_FAIL_MESSAGE("program.statements NULL");
+        TEST_ASSERT_NOT_NULL_MESSAGE(prog.statements, "program.statements NULL");
         check_parser_errors(p);
 
         Node n = prog.statements[0];
@@ -346,7 +432,7 @@ void test_operator_precedence_parsing(void) {
                 n_ExpressionStatement, n.typ, "assert ExpressionStatement");
 
         size_t len = strlen(test.expected) + 2;
-        char* buf = malloc(len * sizeof(char));
+        char* buf = calloc(len, sizeof(char));
         FILE* fp = fmemopen(buf, len, "w");
         if (fp == NULL) {
             fprintf(stderr, "no memory");
@@ -365,6 +451,58 @@ void test_operator_precedence_parsing(void) {
     }
 }
 
+
+static void
+test_infix_expression(Node n, L_Test left, char* operator, L_Test right,
+        L_Type typ) {
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_InfixExpression, n.typ, "assert type InfixExpression");
+
+    InfixExpression* ie = n.obj;
+    test_literal_expression(ie->left, left, typ);
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            operator, ie->op, "assert InfixExpression.op");
+    test_literal_expression(ie->right, right, typ);
+}
+
+void test_boolean_expression(void) {
+    struct Test {
+        char* input;
+        bool expected;
+    } tests[] = {
+        {"true;", true},
+        {"false;", false},
+    };
+    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
+
+    for (size_t i = 0; i < tests_len; i++) {
+        struct Test test = tests[i];
+
+        Lexer l = lexer_new(test.input, strlen(test.input));
+        Parser* p = parser_new(&l);
+        Program prog = parse_program(p);
+        TEST_ASSERT_NOT_NULL_MESSAGE(prog.statements, "program.statements NULL");
+        check_parser_errors(p);
+
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.len, "prog.statements length");
+
+        Node n = prog.statements[0];
+        TEST_ASSERT_EQUAL_INT_MESSAGE(
+                n_ExpressionStatement, n.typ, "assert ExpressionStatement");
+
+        ExpressionStatement* es = n.obj;
+        TEST_ASSERT_EQUAL_INT_MESSAGE(
+                n_Boolean, es->expression.typ, "assert Boolean type");
+
+        Boolean* b = es->expression.obj;
+        TEST_ASSERT_MESSAGE(
+                b->value == test.expected, "assert Boolean.value");
+
+        program_destroy(&prog);
+        parser_destroy(p);
+    }
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_let_statements);
@@ -374,5 +512,6 @@ int main(void) {
     RUN_TEST(test_parsing_prefix_expressions);
     RUN_TEST(test_parsing_infix_expressions);
     RUN_TEST(test_operator_precedence_parsing);
+    RUN_TEST(test_boolean_expression);
     return UNITY_END();
 }

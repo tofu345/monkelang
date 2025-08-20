@@ -10,7 +10,8 @@ typedef struct Parser Parser;
 typedef Node (*PrefixParseFn) (Parser* p);
 typedef Node (*InfixParseFn) (Parser* p, Node left);
 
-// All `parse_*` functions must return with `p->cur_token` in use or freed
+// All `parse_*` functions must return with `p->cur_token`
+// in use or freed
 struct Parser {
     Lexer* l;
     char** errors;
@@ -21,8 +22,8 @@ struct Parser {
     Token peek_token;
 
     // memory efficient, no, fast, yes
-    PrefixParseFn prefix_parse_fns[(size_t)t_Return];
-    InfixParseFn infix_parse_fns[(size_t)t_Return];
+    PrefixParseFn prefix_parse_fns[t_Return];
+    InfixParseFn infix_parse_fns[t_Return];
 };
 
 Parser* parser_new(Lexer* l);

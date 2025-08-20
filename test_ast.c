@@ -36,7 +36,7 @@ void test_print(void) {
 
     char* expected = "let myVar = anotherVar;";
     size_t len = strlen(expected) + 2; // in case of stupidity
-    char* buf = malloc(len * sizeof(char));
+    char* buf = calloc(len, sizeof(char));
     FILE* fp = fmemopen(buf, len, "w");
     if (fp == NULL) {
         fprintf(stderr, "no memory");

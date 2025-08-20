@@ -73,6 +73,13 @@ int node_fprint(const Node n, FILE* fp) {
                 return 0;
             }
 
+        case n_Boolean:
+            {
+                Boolean* b = n.obj;
+                FPRINTF(fp, "%s", b->tok.literal);
+                return 0;
+            }
+
         case n_ReturnStatement:
             {
                 ReturnStatement* rs = n.obj;

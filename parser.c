@@ -26,8 +26,7 @@ struct {
 
 static enum Precedence
 lookup_precedence(TokenType t) {
-    static
-        const size_t precedences_len =
+    static const size_t precedences_len =
         sizeof(precedences) / sizeof(precedences[0]);
 
     for (size_t i = 0; i < precedences_len; i++) {
@@ -198,6 +197,25 @@ parse_prefix_expression(Parser* p) {
 }
 
 static Node
+parse_boolean(Parser* p) {
+    Boolean* b = malloc(sizeof(Boolean));
+    b->tok = p->cur_token;
+    b->value = cur_token_is(p, t_True);
+    return (Node){ n_Boolean, b };
+}
+
+static Node
+parse_grouped_expression(Parser* p) {
+    free(p->cur_token.literal); // free '(' token
+    next_token(p);
+    Node n = parse_expression(p, p_Lowest);
+    if (!expect_peek(p, t_Rparen)) {
+        return (Node){};
+    }
+    return n;
+}
+
+static Node
 parse_let_statement(Parser* p) {
     LetStatement* stmt = malloc(sizeof(LetStatement));
     if (stmt == NULL) exit_nomem();
@@ -289,6 +307,9 @@ Parser* parser_new(Lexer* l) {
     p->prefix_parse_fns[t_Int] = parse_integer_literal;
     p->prefix_parse_fns[t_Bang] = parse_prefix_expression;
     p->prefix_parse_fns[t_Minus] = parse_prefix_expression;
+    p->prefix_parse_fns[t_True] = parse_boolean;
+    p->prefix_parse_fns[t_False] = parse_boolean;
+    p->prefix_parse_fns[t_Lparen] = parse_grouped_expression;
 
     p->infix_parse_fns[t_Plus] = parse_infix_expression;
     p->infix_parse_fns[t_Minus] = parse_infix_expression;

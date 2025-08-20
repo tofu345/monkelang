@@ -14,6 +14,7 @@ enum NodeType {
     n_IntegerLiteral,
     n_PrefixExpression,
     n_InfixExpression,
+    n_Boolean,
 
     // Statements
     n_LetStatement,
@@ -91,5 +92,10 @@ typedef struct {
     char* op; // same as tok.literal
     Node right;
 } InfixExpression;
+
+typedef struct {
+    Token tok;
+    bool value;
+} Boolean;
 
 #endif

@@ -59,5 +59,5 @@ const char* token_types[] = {
 };
 
 const char* show_token_type(TokenType t) {
-    return token_types[t - 1];
+    return token_types[t];
 }

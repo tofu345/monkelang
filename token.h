@@ -2,7 +2,7 @@
 #define TOKEN_H
 
 typedef enum {
-    t_Illegal = 1,
+    t_Illegal,
     t_Eof,
     // identifiers + literals
     t_Ident,
@@ -32,7 +32,8 @@ typedef enum {
 	t_False,
 	t_If,
 	t_Else,
-	t_Return, // this must remain the last enum element
+    t_Return, // this must remain the last enum element, and cannot have a
+              // `PrefixParseFn` associated with it, see parser.h
 } TokenType;
 
 typedef struct {
