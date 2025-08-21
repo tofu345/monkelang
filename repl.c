@@ -20,7 +20,7 @@ void start(FILE* in, FILE* out) {
                 tok.type != t_Eof; tok = lexer_next_token(&l)) {
             fprintf(out, "{token_type = %s; literal = \"%s\"}\n",
                     show_token_type(tok.type), tok.literal);
-            free(tok.literal);
+            token_destroy(&tok);
         }
         free(input);
     }

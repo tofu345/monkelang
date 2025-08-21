@@ -1,6 +1,7 @@
 #ifndef AST_H
 #define AST_H
 
+#include "grow_array.h"
 #include "token.h"
 
 #include <stdbool.h>
@@ -15,11 +16,13 @@ enum NodeType {
     n_PrefixExpression,
     n_InfixExpression,
     n_Boolean,
+    n_IfExpression,
 
     // Statements
     n_LetStatement,
     n_ReturnStatement,
     n_ExpressionStatement,
+    n_BlockStatement,
 };
 
 typedef struct {
@@ -42,7 +45,7 @@ void node_destroy(Node n);
 
 // Ast Root Node, created by parser
 typedef struct {
-    Node* statements;
+    Node* stmts;
     size_t len;
     size_t cap;
 } Program;
@@ -96,5 +99,19 @@ typedef struct {
     Token tok;
     bool value;
 } Boolean;
+
+typedef struct {
+    Token tok; // the '{' token
+    Node* statements;
+    size_t len;
+    size_t cap;
+} BlockStatement;
+
+typedef struct {
+    Token tok; // the 'if' token
+    Node condition;
+    BlockStatement* consequence;
+    BlockStatement* alternative;
+} IfExpression;
 
 #endif

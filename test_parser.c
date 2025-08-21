@@ -49,7 +49,7 @@ let foobar = 838383;\
     Lexer l = lexer_new(input, input_len);
     Parser* p = parser_new(&l);
     Program prog = parse_program(p);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.statements, "program.statements NULL");
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
 
     check_parser_errors(p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(3, prog.len, "prog.statements length");
@@ -61,7 +61,7 @@ let foobar = 838383;\
     };
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
     for (size_t i = 0; i < tests_len; i++) {
-        Node stmt = prog.statements[i];
+        Node stmt = prog.stmts[i];
         test_let_statement(stmt, tests[i]);
     }
 
@@ -80,13 +80,13 @@ return 993322;\
     Lexer l = lexer_new(input, input_len);
     Parser* p = parser_new(&l);
     Program prog = parse_program(p);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.statements, "program.statements NULL");
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
 
     check_parser_errors(p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(3, prog.len, "prog.statements length");
 
     for (size_t i = 0; i < prog.len; i++) {
-        Node stmt = prog.statements[i];
+        Node stmt = prog.stmts[i];
         TEST_ASSERT_EQUAL_INT_MESSAGE(n_ReturnStatement, stmt.typ,
                 "stmt not ReturnStatement");
         TEST_ASSERT_EQUAL_STRING(
@@ -104,20 +104,20 @@ void test_identifier_expression(void) {
     Lexer l = lexer_new(input, input_len);
     Parser* p = parser_new(&l);
     Program prog = parse_program(p);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.statements, "program.statements NULL");
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
 
     check_parser_errors(p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.len, "prog.statements length");
 
-    Node n = prog.statements[0];
+    Node n = prog.stmts[0];
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             n_ExpressionStatement, n.typ, "assert ExpressionStatement");
 
-    ExpressionStatement* st = n.obj;
+    ExpressionStatement* es = n.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            n_Identifier, st->expression.typ, "assert Identifier");
+            n_Identifier, es->expression.typ, "assert Identifier");
 
-    Identifier* ident = st->expression.obj;
+    Identifier* ident = es->expression.obj;
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
             "foobar", ident->tok.literal, "assert Identifier.Token.Literal");
 
@@ -150,20 +150,20 @@ void test_integer_literal_expression(void) {
     Lexer l = lexer_new(input, input_len);
     Parser* p = parser_new(&l);
     Program prog = parse_program(p);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.statements, "program.statements NULL");
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
 
     check_parser_errors(p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.len, "prog.statements length");
 
-    Node n = prog.statements[0];
+    Node n = prog.stmts[0];
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             n_ExpressionStatement, n.typ, "assert ExpressionStatement");
 
-    ExpressionStatement* st = n.obj;
+    ExpressionStatement* es = n.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            n_IntegerLiteral, st->expression.typ, "assert IntegerLiteral");
+            n_IntegerLiteral, es->expression.typ, "assert IntegerLiteral");
 
-    IntegerLiteral* int_lit = st->expression.obj;
+    IntegerLiteral* int_lit = es->expression.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             5, int_lit->value, "assert IntegerLiteral.value");
 
@@ -244,20 +244,20 @@ void test_parsing_prefix_expressions(void) {
         Lexer l = lexer_new(test.input, strlen(test.input));
         Parser* p = parser_new(&l);
         Program prog = parse_program(p);
-        TEST_ASSERT_NOT_NULL_MESSAGE(prog.statements, "program.statements NULL");
+        TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
 
         check_parser_errors(p);
         TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.len, "prog.statements length");
 
-        Node n = prog.statements[0];
+        Node n = prog.stmts[0];
         TEST_ASSERT_EQUAL_INT_MESSAGE(
                 n_ExpressionStatement, n.typ, "assert ExpressionStatement");
 
-        ExpressionStatement* st = n.obj;
+        ExpressionStatement* es = n.obj;
         TEST_ASSERT_EQUAL_INT_MESSAGE(
-                n_PrefixExpression, st->expression.typ, "assert PrefixExpression");
+                n_PrefixExpression, es->expression.typ, "assert PrefixExpression");
 
-        PrefixExpression* pe = st->expression.obj;
+        PrefixExpression* pe = es->expression.obj;
         TEST_ASSERT_EQUAL_STRING_MESSAGE(
                 test.operator, pe->op, "assert PrefixExpression.op");
 
@@ -296,20 +296,20 @@ void test_parsing_infix_expressions(void) {
         Lexer l = lexer_new(test.input, strlen(test.input));
         Parser* p = parser_new(&l);
         Program prog = parse_program(p);
-        TEST_ASSERT_NOT_NULL_MESSAGE(prog.statements, "program.statements NULL");
+        TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
 
         check_parser_errors(p);
         TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.len, "prog.statements length");
 
-        Node n = prog.statements[0];
+        Node n = prog.stmts[0];
         TEST_ASSERT_EQUAL_INT_MESSAGE(
                 n_ExpressionStatement, n.typ, "assert ExpressionStatement");
 
-        ExpressionStatement* st = n.obj;
+        ExpressionStatement* es = n.obj;
         TEST_ASSERT_EQUAL_INT_MESSAGE(
-                n_InfixExpression, st->expression.typ, "assert InfixExpression");
+                n_InfixExpression, es->expression.typ, "assert InfixExpression");
 
-        InfixExpression* ie = st->expression.obj;
+        InfixExpression* ie = es->expression.obj;
 
         test_literal_expression(ie->left, test.left_value, test.t);
 
@@ -425,10 +425,10 @@ void test_operator_precedence_parsing(void) {
         Lexer l = lexer_new(test.input, strlen(test.input));
         Parser* p = parser_new(&l);
         Program prog = parse_program(p);
-        TEST_ASSERT_NOT_NULL_MESSAGE(prog.statements, "program.statements NULL");
+        TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
         check_parser_errors(p);
 
-        Node n = prog.statements[0];
+        Node n = prog.stmts[0];
         TEST_ASSERT_EQUAL_INT_MESSAGE(
                 n_ExpressionStatement, n.typ, "assert ExpressionStatement");
 
@@ -482,12 +482,12 @@ void test_boolean_expression(void) {
         Lexer l = lexer_new(test.input, strlen(test.input));
         Parser* p = parser_new(&l);
         Program prog = parse_program(p);
-        TEST_ASSERT_NOT_NULL_MESSAGE(prog.statements, "program.statements NULL");
+        TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
         check_parser_errors(p);
 
         TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.len, "prog.statements length");
 
-        Node n = prog.statements[0];
+        Node n = prog.stmts[0];
         TEST_ASSERT_EQUAL_INT_MESSAGE(
                 n_ExpressionStatement, n.typ, "assert ExpressionStatement");
 
@@ -504,6 +504,92 @@ void test_boolean_expression(void) {
     }
 }
 
+void test_if_expression(void) {
+    char* input = "if (x < y) { x }";
+    size_t input_len = strlen(input);
+
+    Lexer l = lexer_new(input, input_len);
+    Parser* p = parser_new(&l);
+    Program prog = parse_program(p);
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
+
+    check_parser_errors(p);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.len, "prog.statements length");
+
+    Node n = prog.stmts[0];
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_ExpressionStatement, n.typ, "assert ExpressionStatement");
+
+    ExpressionStatement* es = n.obj;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_IfExpression, es->expression.typ, "assert IfExpression");
+
+    IfExpression* ie = es->expression.obj;
+    test_infix_expression(ie->condition, (L_Test){ .string = "x" }, "<",
+            (L_Test){ .string = "y" }, l_String);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, ie->consequence->len,
+            "IfExpression.consequence length");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_ExpressionStatement, ie->consequence->statements[0].typ,
+            "assert IfExpression.consequence.statements[0] ExpressionStatement");
+
+    ExpressionStatement* consequence = ie->consequence->statements[0].obj;
+    test_identifier(consequence->expression, "x");
+
+    TEST_ASSERT_NULL_MESSAGE(ie->alternative,
+            "assert IfExpression.alternative NULL");
+
+    program_destroy(&prog);
+    parser_destroy(p);
+}
+
+void test_if_else_expression(void) {
+    char* input = "if (x < y) { x } else { y }";
+    size_t input_len = strlen(input);
+
+    Lexer l = lexer_new(input, input_len);
+    Parser* p = parser_new(&l);
+    Program prog = parse_program(p);
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
+
+    check_parser_errors(p);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.len, "prog.statements length");
+
+    Node n = prog.stmts[0];
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_ExpressionStatement, n.typ, "assert ExpressionStatement");
+
+    ExpressionStatement* es = n.obj;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_IfExpression, es->expression.typ, "assert IfExpression");
+
+    IfExpression* ie = es->expression.obj;
+    test_infix_expression(ie->condition, (L_Test){ .string = "x" }, "<",
+            (L_Test){ .string = "y" }, l_String);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, ie->consequence->len,
+            "IfExpression.consequence length");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_ExpressionStatement, ie->consequence->statements[0].typ,
+            "assert IfExpression.consequence.statements[0] ExpressionStatement");
+
+    ExpressionStatement* consequence = ie->consequence->statements[0].obj;
+    test_identifier(consequence->expression, "x");
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, ie->alternative->len,
+            "IfExpression.alternative length");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_ExpressionStatement, ie->alternative->statements[0].typ,
+            "assert IfExpression.alternative.statements[0] ExpressionStatement");
+
+    ExpressionStatement* alternative = ie->alternative->statements[0].obj;
+    test_identifier(alternative->expression, "y");
+
+    program_destroy(&prog);
+    parser_destroy(p);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_let_statements);
@@ -514,5 +600,7 @@ int main(void) {
     RUN_TEST(test_parsing_infix_expressions);
     RUN_TEST(test_operator_precedence_parsing);
     RUN_TEST(test_boolean_expression);
+    RUN_TEST(test_if_expression);
+    RUN_TEST(test_if_else_expression);
     return UNITY_END();
 }

@@ -1,14 +1,16 @@
-#include "parser.h"
 #include "ast.h"
+#include "grow_array.h"
 #include "lexer.h"
+#include "parser.h"
 #include "parser_tracing.h"
 #include "token.h"
 
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-#define START_CAP 8
+static Node parse_statement(Parser* p);
 
 struct {
     TokenType typ;
@@ -56,13 +58,10 @@ exit_nomem() {
 
 static void
 parser_error(Parser* p, char* msg) {
-    if (p->errors_len >= p->errors_cap) {
-        size_t new_cap = p->errors_cap * 2;
-        char** new_errors = realloc(p->errors, new_cap * sizeof(char*));
-        if (new_errors == NULL) exit_nomem();
-        p->errors_cap = new_cap;
-        p->errors = new_errors;
-    }
+    void* err = grow_array((void***)&p->errors, &p->errors_len,
+            &p->errors_cap, sizeof(char*));
+    if (err == NULL) exit_nomem();
+
     p->errors[p->errors_len] = msg;
     p->errors_len++;
 }
@@ -216,6 +215,73 @@ parse_grouped_expression(Parser* p) {
     return n;
 }
 
+static BlockStatement*
+parse_block_statement(Parser* p) {
+    BlockStatement* block = malloc(sizeof(BlockStatement));
+    block->tok = p->cur_token;
+    block->statements = malloc(START_CAPACITY * sizeof(Node));
+    block->cap = START_CAPACITY;
+    block->len = 0;
+    if (block->statements == NULL) exit_nomem();
+
+    next_token(p);
+
+    while (!cur_token_is(p, t_Rbrace) && !cur_token_is(p, t_Eof)) {
+        Node stmt = parse_statement(p);
+        if (stmt.obj != NULL) {
+            void* err = grow_array((void***)&block->statements, &block->len,
+                    &block->cap, sizeof(Node));
+            if (err == NULL) exit_nomem();
+            block->statements[block->len] = stmt;
+            block->len++;
+        }
+        next_token(p);
+    }
+    return block;
+}
+
+static Node
+parse_if_expression(Parser* p) {
+    IfExpression* ie = malloc(sizeof(IfExpression));
+    ie->tok = p->cur_token;
+    ie->alternative = NULL;
+    if (!expect_peek(p, t_Lparen)) {
+        free(ie);
+        return (Node){};
+    }
+
+    next_token(p);
+    ie->condition = parse_expression(p, p_Lowest);
+    if (!expect_peek(p, t_Rparen)) {
+        node_destroy(ie->condition);
+        free(ie);
+        return (Node){};
+    }
+    token_destroy(&p->cur_token);
+
+    if (!expect_peek(p, t_Lbrace)) {
+        node_destroy(ie->condition);
+        free(ie);
+        return (Node){};
+    }
+    token_destroy(&p->cur_token);
+    ie->consequence = parse_block_statement(p);
+
+    if (peek_token_is(p, t_Else)) {
+        next_token(p);
+        token_destroy(&p->cur_token);
+        if (!expect_peek(p, t_Lbrace)) {
+            node_destroy(ie->condition);
+            node_destroy((Node){ n_BlockStatement, ie->consequence });
+            free(ie);
+            return (Node){};
+        }
+        ie->alternative = parse_block_statement(p);
+    }
+
+    return (Node){ n_IfExpression, ie };
+}
+
 static Node
 parse_let_statement(Parser* p) {
     LetStatement* stmt = malloc(sizeof(LetStatement));
@@ -305,8 +371,8 @@ parse_statement(Parser* p) {
 Parser* parser_new(Lexer* l) {
     Parser* p = calloc(1, sizeof(Parser));
     p->l = l;
-    p->errors = malloc(START_CAP * sizeof(char*));
-    p->errors_cap = START_CAP;
+    p->errors = malloc(START_CAPACITY * sizeof(char*));
+    p->errors_cap = START_CAPACITY;
 
     p->prefix_parse_fns[t_Ident] = parse_identifier;
     p->prefix_parse_fns[t_Int] = parse_integer_literal;
@@ -315,6 +381,7 @@ Parser* parser_new(Lexer* l) {
     p->prefix_parse_fns[t_True] = parse_boolean;
     p->prefix_parse_fns[t_False] = parse_boolean;
     p->prefix_parse_fns[t_Lparen] = parse_grouped_expression;
+    p->prefix_parse_fns[t_If] = parse_if_expression;
 
     p->infix_parse_fns[t_Plus] = parse_infix_expression;
     p->infix_parse_fns[t_Minus] = parse_infix_expression;
@@ -342,24 +409,19 @@ void parser_destroy(Parser* p) {
 
 Program parse_program(Parser* p) {
     Program prog;
-    prog.statements = malloc(START_CAP * sizeof(Node));
-    if (prog.statements == NULL) exit_nomem();
-    prog.cap = START_CAP;
+    prog.stmts = malloc(START_CAPACITY * sizeof(Node));
+    if (prog.stmts == NULL) exit_nomem();
+    prog.cap = START_CAPACITY;
     prog.len = 0;
 
     while (p->cur_token.type != t_Eof) {
         Node stmt = parse_statement(p);
         if (stmt.obj != NULL) {
-            if (prog.len >= prog.cap) {
-                size_t new_cap = prog.cap * 2;
-                Node* new_stmts =
-                    realloc(prog.statements, new_cap * sizeof(Node));
-                if (new_stmts == NULL) exit_nomem();
-                prog.cap = new_cap;
-                prog.statements = new_stmts;
-            }
+            void* err = grow_array((void***)&prog.stmts, &prog.len, &prog.cap,
+                    sizeof(Node));
+            if (err == NULL) exit_nomem();
 
-            prog.statements[prog.len] = stmt;
+            prog.stmts[prog.len] = stmt;
             prog.len++;
         }
         next_token(p);
@@ -370,8 +432,7 @@ Program parse_program(Parser* p) {
 
 void program_destroy(Program* p) {
     for (size_t i = 0; i < p->len; i++) {
-        node_destroy(p->statements[i]);
+        node_destroy(p->stmts[i]);
     }
-    free(p->statements);
+    free(p->stmts);
 }
-

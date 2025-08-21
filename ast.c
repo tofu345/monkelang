@@ -63,6 +63,29 @@ int node_fprint(const Node n, FILE* fp) {
                 return 0;
             }
 
+        case n_IfExpression:
+            {
+                IfExpression* ie = n.obj;
+                FPRINTF(fp, "if");
+                node_fprint(ie->condition, fp);
+                FPRINTF(fp, " ");
+                node_fprint((Node){ n_BlockStatement, ie->consequence }, fp);
+                if (ie->alternative != NULL) {
+                    FPRINTF(fp, "else ");
+                    node_fprint((Node){ n_BlockStatement, ie->alternative }, fp);
+                }
+                return 0;
+            }
+
+        case n_BlockStatement:
+            {
+                BlockStatement* bs = n.obj;
+                for (size_t i = 0; i < bs->len; i++) {
+                    node_fprint(bs->statements[i], fp);
+                }
+                return 0;
+            }
+
         case n_LetStatement:
             {
                 LetStatement* ls = n.obj;
@@ -169,7 +192,7 @@ void node_destroy(Node n) {
 
 char* program_token_literal(const Program* p) {
     if (p->len > 0) {
-        return token_literal(p->statements[0]);
+        return token_literal(p->stmts[0]);
     } else {
         return "";
     }
@@ -177,7 +200,7 @@ char* program_token_literal(const Program* p) {
 
 int program_fprint(const Program* p, FILE* fp) {
     for (size_t i = 0; i < p->len; i++) {
-        if (node_fprint(p->statements[i], fp) == -1)
+        if (node_fprint(p->stmts[i], fp) == -1)
             return -1;
     }
     return 0;

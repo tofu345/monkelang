@@ -67,5 +67,9 @@ const char* token_types[] = {
 };
 
 const char* show_token_type(TokenType t) {
+    if (t > t_Return) {
+        fprintf(stderr, "invalid token_type to show_token_type");
+        exit(1);
+    }
     return token_types[t];
 }
