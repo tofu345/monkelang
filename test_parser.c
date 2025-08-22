@@ -25,7 +25,7 @@ static void check_parser_errors(Parser* p) {
     TEST_FAIL();
 }
 
-static void test_let_statement(Node stmt, char* exp_name) {
+static void test_let_statement(Node stmt, const char* exp_name) {
     TEST_ASSERT_EQUAL_STRING_MESSAGE(token_literal(stmt), "let",
             "assert LetStatement.Token.Literal");
     TEST_ASSERT_EQUAL_INT_MESSAGE(n_LetStatement, stmt.typ,
@@ -38,36 +38,6 @@ static void test_let_statement(Node stmt, char* exp_name) {
             "assert LetStatement.Identifier.Token.Literal");
 }
 
-void test_let_statements(void) {
-    char* input = "\
-let x = 5;\
-let y = 10;\
-let foobar = 838383;\
-";
-    size_t input_len = strlen(input);
-
-    Lexer l = lexer_new(input, input_len);
-    Parser* p = parser_new(&l);
-    Program prog = parse_program(p);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
-
-    check_parser_errors(p);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(3, prog.len, "prog.statements length");
-
-    char* tests[] = {
-        "x",
-        "y",
-        "foobar",
-    };
-    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
-    for (size_t i = 0; i < tests_len; i++) {
-        Node stmt = prog.stmts[i];
-        test_let_statement(stmt, tests[i]);
-    }
-
-    program_destroy(&prog);
-    parser_destroy(p);
-}
 
 void test_return_statements(void) {
     char* input = "\
@@ -223,6 +193,38 @@ test_literal_expression(Node n, L_Test exp, L_Type typ) {
         default:
             fprintf(stderr, "type of exp not handled. got %d", typ);
             exit(1);
+    }
+}
+
+void test_let_statements(void) {
+    struct Test {
+        const char* input;
+        const char* expectedIdent;
+        L_Test expectedVal;
+        L_Type t;
+    } tests[] = {
+        {"let x = 5;", "x", {5}, l_Integer},
+        {"let y = true;", "y", {true}, l_Boolean},
+        {"let foobar = y;", "foobar", (L_Test){ .string = "y" }, l_String},
+    };
+    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
+    for (size_t i = 0; i < tests_len; i++) {
+        struct Test test = tests[i];
+
+        Lexer l = lexer_new(test.input, strlen(test.input));
+        Parser* p = parser_new(&l);
+        Program prog = parse_program(p);
+        TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
+        check_parser_errors(p);
+
+        Node stmt = prog.stmts[0];
+        test_let_statement(stmt, test.expectedIdent);
+
+        LetStatement* ls = stmt.obj;
+        test_literal_expression(ls->value, test.expectedVal, test.t);
+
+        program_destroy(&prog);
+        parser_destroy(p);
     }
 }
 
@@ -416,6 +418,18 @@ void test_operator_precedence_parsing(void) {
             "!(true == true)",
             "(!(true == true))",
         },
+        {
+            "a + add(b * c) + d",
+            "((a + add((b * c))) + d)",
+        },
+        {
+            "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+            "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+        },
+        {
+            "add(a + b + c * d / f + g)",
+            "add((((a + b) + ((c * d) / f)) + g))",
+        },
     };
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
 
@@ -590,6 +604,131 @@ void test_if_else_expression(void) {
     parser_destroy(p);
 }
 
+void test_function_literal_parsing(void) {
+    char* input = "fn(x, y) { x + y; }";
+    size_t input_len = strlen(input);
+
+    Lexer l = lexer_new(input, input_len);
+    Parser* p = parser_new(&l);
+    Program prog = parse_program(p);
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
+
+    check_parser_errors(p);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.len, "prog.statements length");
+
+    Node n = prog.stmts[0];
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_ExpressionStatement, n.typ, "assert ExpressionStatement");
+
+    ExpressionStatement* es = n.obj;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_FunctionLiteral, es->expression.typ, "assert n_FunctionLiteral");
+
+    FunctionLiteral* fl = es->expression.obj;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            2, fl->params_len, "assert FunctionLiteral.paremeters_len");
+
+    test_literal_expression((Node){ n_Identifier, fl->params[0] },
+            (L_Test){ .string = "x" }, l_String);
+    test_literal_expression((Node){ n_Identifier, fl->params[1] },
+            (L_Test){ .string = "y" }, l_String);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, fl->body->len,
+            "assert FunctionLiteral.body.len");
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_ExpressionStatement, fl->body->statements[0].typ, "assert ExpressionStatement");
+
+    ExpressionStatement* body_stmt = fl->body->statements[0].obj;
+
+    test_infix_expression(body_stmt->expression,
+            (L_Test){ .string = "x" }, "+", (L_Test){ .string = "y" },
+            l_String);
+
+    program_destroy(&prog);
+    parser_destroy(p);
+}
+
+void test_function_parameter_parsing(void) {
+    struct Test {
+        const char* input;
+        const char* expectedParams[3];
+        int len;
+    } tests[] = {
+        {"fn() {};", {}, 0},
+        {"fn(x) {};", {"x"}, 1},
+        {"fn(x, y, z) {};", {"x", "y", "z"}, 3},
+    };
+    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
+    for (size_t i = 0; i < tests_len; i++) {
+        struct Test test = tests[i];
+
+        Lexer l = lexer_new(test.input, strlen(test.input));
+        Parser* p = parser_new(&l);
+        Program prog = parse_program(p);
+        TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
+        check_parser_errors(p);
+
+        // segfaults waiting to happen
+        ExpressionStatement* es = prog.stmts[0].obj;
+        FunctionLiteral* fl = es->expression.obj;
+
+        TEST_ASSERT_EQUAL_INT_MESSAGE(
+                test.len, fl->params_len,
+                "assert FunctionLiteral.paremeters_len");
+
+        for (int i = 0; i < test.len; i++) {
+            test_literal_expression((Node){ n_Identifier, fl->params[i] },
+                    (L_Test){ .string = test.expectedParams[i] }, l_String);
+        }
+
+        program_destroy(&prog);
+        parser_destroy(p);
+    }
+}
+
+void test_call_expression_parsing(void) {
+    char* input = "add(1, 2 * 3, 4 + 5);";
+    size_t input_len = strlen(input);
+
+    Lexer l = lexer_new(input, input_len);
+    Parser* p = parser_new(&l);
+    Program prog = parse_program(p);
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
+
+    check_parser_errors(p);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.len, "prog.statements length");
+
+    Node n = prog.stmts[0];
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_ExpressionStatement, n.typ, "assert ExpressionStatement");
+
+    ExpressionStatement* es = n.obj;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_CallExpression, es->expression.typ, "assert n_CallExpression");
+
+    CallExpression* ce = es->expression.obj;
+
+    test_identifier(ce->function, "add");
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            3, ce->args_len, "assert CallExpression.args_len");
+
+    test_literal_expression(ce->args[0],
+            (L_Test){ .integer = 1 }, l_Integer);
+
+    test_infix_expression(ce->args[1],
+            (L_Test){ .integer = 2 }, "*", (L_Test){ .integer = 3 },
+            l_Integer);
+
+    test_infix_expression(ce->args[2],
+            (L_Test){ .integer = 4 }, "+", (L_Test){ .integer = 5 },
+            l_Integer);
+
+    program_destroy(&prog);
+    parser_destroy(p);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_let_statements);
@@ -602,5 +741,8 @@ int main(void) {
     RUN_TEST(test_boolean_expression);
     RUN_TEST(test_if_expression);
     RUN_TEST(test_if_else_expression);
+    RUN_TEST(test_function_literal_parsing);
+    RUN_TEST(test_function_parameter_parsing);
+    RUN_TEST(test_call_expression_parsing);
     return UNITY_END();
 }

@@ -10,13 +10,9 @@
     if (fprintf(fp, __VA_ARGS__) <= 0) \
         return -1;
 
-bool is_expression(const Node n) {
-    return n.typ < n_LetStatement;
-}
-
-bool is_statement(const Node n) {
-    return n.typ >= n_LetStatement;
-}
+#define NODE_FPRINT(fp, ...) \
+    if (node_fprint( __VA_ARGS__, fp) == -1) \
+        return -1;
 
 char* token_literal(const Node n) {
     // since the first element of every `node.obj` is a token.
@@ -24,109 +20,239 @@ char* token_literal(const Node n) {
     return tok->literal;
 }
 
+static int
+fprint_identifier(Identifier* i, FILE* fp) {
+    FPRINTF(fp, "%s", i->value);
+    return 0;
+}
+
+static int
+fprint_integer_literal(IntegerLiteral* il, FILE* fp) {
+    FPRINTF(fp, "%ld", il->value);
+    return 0;
+}
+
+static int
+fprint_prefix_expression(PrefixExpression* pe, FILE* fp) {
+    FPRINTF(fp, "(%s", pe->op);
+    NODE_FPRINT(fp, pe->right);
+    FPRINTF(fp, ")");
+    return 0;
+}
+
+static int
+fprint_infix_expression(InfixExpression* ie, FILE* fp) {
+    FPRINTF(fp, "(");
+    NODE_FPRINT(fp, ie->left);
+    FPRINTF(fp, " %s ", ie->op);
+    NODE_FPRINT(fp, ie->right);
+    FPRINTF(fp, ")");
+    return 0;
+}
+
+static int
+fprint_block_statement(BlockStatement* bs, FILE* fp) {
+    for (size_t i = 0; i < bs->len; i++) {
+        NODE_FPRINT(fp, bs->statements[i]);
+    }
+    return 0;
+}
+
+static int
+fprint_if_expression(IfExpression* ie, FILE* fp) {
+    FPRINTF(fp, "if");
+    NODE_FPRINT(fp, ie->condition);
+    FPRINTF(fp, " ");
+    fprint_block_statement(ie->consequence, fp);
+    if (ie->alternative != NULL) {
+        FPRINTF(fp, "else ");
+        fprint_block_statement(ie->alternative, fp);
+    }
+    return 0;
+}
+
+static int
+fprint_function_literal(FunctionLiteral* fl, FILE* fp) {
+    FPRINTF(fp, "%s(", fl->tok.literal);
+    for (size_t i = 0; i < fl->params_len - 1; i++) {
+        fprint_identifier(fl->params[i], fp);
+        FPRINTF(fp, ", ");
+    }
+    if (fl->params_len > 0)
+        fprint_identifier(fl->params[fl->params_len - 1], fp);
+    FPRINTF(fp, ")");
+    fprint_block_statement(fl->body, fp);
+    return 0;
+}
+
+static int
+fprint_call_expression(CallExpression* ce, FILE* fp) {
+    NODE_FPRINT(fp, ce->function);
+    FPRINTF(fp, "(");
+    for (size_t i = 0; i < ce->args_len - 1; i++) {
+        NODE_FPRINT(fp, ce->args[i]);
+        FPRINTF(fp, ", ");
+    }
+    if (ce->args_len > 0)
+        NODE_FPRINT(fp, ce->args[ce->args_len - 1]);
+    FPRINTF(fp, ")");
+    return 0;
+}
+
+static int
+fprint_let_statement(LetStatement* ls, FILE* fp) {
+    FPRINTF(fp, "%s %s = ",
+            ls->tok.literal, ls->name->value);
+    if (ls->value.obj != NULL) {
+        NODE_FPRINT(fp, ls->value);
+    }
+    FPRINTF(fp, ";");
+    return 0;
+}
+
+static int
+fprint_boolean(Boolean* b, FILE* fp) {
+    FPRINTF(fp, "%s", b->tok.literal);
+    return 0;
+}
+
+static int
+fprint_return_statement(ReturnStatement* rs, FILE* fp) {
+    FPRINTF(fp, "%s ", rs->tok.literal);
+    if (rs->return_value.obj != NULL) {
+        NODE_FPRINT(fp, rs->return_value);
+    }
+    FPRINTF(fp, ";");
+    return 0;
+}
+
+static int
+fprint_expression_statement(ExpressionStatement* es, FILE* fp) {
+    NODE_FPRINT(fp, es->expression);
+    return 0;
+}
+
 int node_fprint(const Node n, FILE* fp) {
     if (n.obj == NULL) return 0;
 
-    // i despise this indentation
     switch (n.typ) {
         case n_Identifier:
-            {
-                Identifier* i = n.obj;
-                FPRINTF(fp, "%s", i->value);
-                return 0;
-            }
+            return fprint_identifier(n.obj, fp);
 
         case n_IntegerLiteral:
-            {
-                IntegerLiteral* il = n.obj;
-                FPRINTF(fp, "%ld", il->value);
-                return 0;
-            }
+            return fprint_integer_literal(n.obj, fp);
 
         case n_PrefixExpression:
-            {
-                PrefixExpression* pe = n.obj;
-                FPRINTF(fp, "(%s", pe->op);
-                node_fprint(pe->right, fp);
-                FPRINTF(fp, ")");
-                return 0;
-            }
+            return fprint_prefix_expression(n.obj, fp);
 
         case n_InfixExpression:
-            {
-                InfixExpression* ie = n.obj;
-                FPRINTF(fp, "(");
-                node_fprint(ie->left, fp);
-                FPRINTF(fp, " %s ", ie->op);
-                node_fprint(ie->right, fp);
-                FPRINTF(fp, ")");
-                return 0;
-            }
+            return fprint_infix_expression(n.obj, fp);
 
         case n_IfExpression:
-            {
-                IfExpression* ie = n.obj;
-                FPRINTF(fp, "if");
-                node_fprint(ie->condition, fp);
-                FPRINTF(fp, " ");
-                node_fprint((Node){ n_BlockStatement, ie->consequence }, fp);
-                if (ie->alternative != NULL) {
-                    FPRINTF(fp, "else ");
-                    node_fprint((Node){ n_BlockStatement, ie->alternative }, fp);
-                }
-                return 0;
-            }
+            return fprint_if_expression(n.obj, fp);
 
-        case n_BlockStatement:
-            {
-                BlockStatement* bs = n.obj;
-                for (size_t i = 0; i < bs->len; i++) {
-                    node_fprint(bs->statements[i], fp);
-                }
-                return 0;
-            }
+        case n_FunctionLiteral:
+            return fprint_function_literal(n.obj, fp);
+
+        case n_CallExpression:
+            return fprint_call_expression(n.obj, fp);
 
         case n_LetStatement:
-            {
-                LetStatement* ls = n.obj;
-                FPRINTF(fp, "%s %s = ",
-                        ls->tok.literal, ls->name->value);
-                if (ls->value.obj != NULL)
-                    node_fprint(ls->value, fp);
-                FPRINTF(fp, ";");
-                return 0;
-            }
+            return fprint_let_statement(n.obj, fp);
 
         case n_Boolean:
-            {
-                Boolean* b = n.obj;
-                FPRINTF(fp, "%s", b->tok.literal);
-                return 0;
-            }
+            return fprint_boolean(n.obj, fp);
 
         case n_ReturnStatement:
-            {
-                ReturnStatement* rs = n.obj;
-                FPRINTF(fp, "%s ", rs->tok.literal);
-                if (rs->return_value.obj != NULL)
-                    node_fprint(rs->return_value, fp);
-                FPRINTF(fp, ";");
-                return 0;
-            }
+            return fprint_return_statement(n.obj, fp);
 
         case n_ExpressionStatement:
-            {
-                ExpressionStatement* es = n.obj;
-                if (n.obj != NULL)
-                    node_fprint(es->expression, fp);
-                return 0;
-            }
+            return fprint_expression_statement(n.obj, fp);
+
+        case n_BlockStatement:
+            return fprint_block_statement(n.obj, fp);
 
         default:
-            {
-                return -1;
-            }
+            fprintf(stderr, "node_fprint: node type not handled %d", n.typ);
+            exit(1);
     }
+}
+
+static void
+destroy_prefix_expression(PrefixExpression* pe) {
+    token_destroy(&pe->tok);
+    node_destroy(pe->right);
+    free(pe);
+}
+
+static void
+destroy_infix_expression(InfixExpression* ie) {
+    node_destroy(ie->left);
+    free(ie->op);
+    node_destroy(ie->right);
+    free(ie);
+}
+
+static void
+destroy_block_statement(BlockStatement* bs) {
+    token_destroy(&bs->tok);
+    for (size_t i = 0; i < bs->len; i++)
+        node_destroy(bs->statements[i]);
+    free(bs->statements);
+    free(bs);
+}
+
+static void
+destroy_if_expression(IfExpression* ie) {
+    token_destroy(&ie->tok);
+    node_destroy(ie->condition);
+    destroy_block_statement(ie->consequence);
+    if (ie->alternative != NULL)
+        destroy_block_statement(ie->alternative);
+    free(ie);
+}
+
+static void
+destroy_function_literal(FunctionLiteral* fl) {
+    token_destroy(&fl->tok);
+    for (size_t i = 0; i < fl->params_len; i++)
+        free(fl->params[i]->value);
+    free(fl->params);
+    destroy_block_statement(fl->body);
+    free(fl);
+}
+
+static void
+destroy_call_expression(CallExpression* ce) {
+    token_destroy(&ce->tok);
+    node_destroy(ce->function);
+    for (size_t i = 0; i < ce->args_len; i++) {
+        node_destroy(ce->args[i]);
+    }
+    free(ce->args);
+    free(ce);
+}
+
+static void
+destroy_let_statement(LetStatement* ls) {
+    token_destroy(&ls->tok);
+    node_destroy(ls->value);
+    if (ls->name != NULL)
+        token_destroy(&ls->name->tok);
+    free(ls);
+}
+
+static void
+destroy_return_statement(ReturnStatement* rs) {
+    token_destroy(&rs->tok);
+    node_destroy(rs->return_value);
+    free(rs);
+}
+
+static void
+destroy_expression_statement(ExpressionStatement* es) {
+    node_destroy(es->expression);
+    free(es);
 }
 
 void node_destroy(Node n) {
@@ -134,59 +260,37 @@ void node_destroy(Node n) {
 
     switch (n.typ) {
         case n_PrefixExpression:
-            {
-                PrefixExpression* pe = n.obj;
-                token_destroy(&pe->tok);
-                node_destroy(pe->right);
-                free(pe);
-                break;
-            }
+            return destroy_prefix_expression(n.obj);
 
         case n_InfixExpression:
-            {
-                InfixExpression* ie = n.obj;
-                token_destroy(&ie->tok);
-                node_destroy(ie->left);
-                node_destroy(ie->right);
-                free(ie);
-                break;
-            }
+            return destroy_infix_expression(n.obj);
+
+        case n_IfExpression:
+            return destroy_if_expression(n.obj);
+
+        case n_FunctionLiteral:
+            return destroy_function_literal(n.obj);
+
+        case n_CallExpression:
+            return destroy_call_expression(n.obj);
 
         case n_LetStatement:
-            {
-                LetStatement* ls = n.obj;
-                token_destroy(&ls->tok);
-                node_destroy(ls->value);
-                if (ls->name != NULL)
-                    token_destroy(&ls->name->tok);
-                free(ls);
-                break;
-            }
+            return destroy_let_statement(n.obj);
 
         case n_ReturnStatement:
-            {
-                ReturnStatement* rs = n.obj;
-                token_destroy(&rs->tok);
-                node_destroy(rs->return_value);
-                free(rs);
-                break;
-            }
+            return destroy_return_statement(n.obj);
 
         case n_ExpressionStatement:
-            {
-                ExpressionStatement* es = n.obj;
-                node_destroy(es->expression);
-                free(es);
-                break;
-            }
+            return destroy_expression_statement(n.obj);
+
+        case n_BlockStatement:
+            return destroy_block_statement(n.obj);
 
         default:
-            {
-                // since first field of `n.obj` is `Token`
-                token_destroy(n.obj);
-                free(n.obj);
-                break;
-            }
+            // since first field of `n.obj` is `Token`
+            token_destroy(n.obj);
+            free(n.obj);
+            break;
     }
 }
 

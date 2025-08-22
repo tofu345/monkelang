@@ -10,7 +10,7 @@ static char*
 indent_level(void) {
     int len = 1;
     if (traceLevel > 0)
-        len = traceLevel + 1;
+        len = traceLevel;
     char* indent = malloc(len * sizeof(char));
     int i;
     for (i = 0; i < len; i++) {

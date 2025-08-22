@@ -32,11 +32,13 @@ void test_print(void) {
             }
         }
     };
-    Program prog = { .statements = stmts, .len = 1, .cap = 1 };
+    Program prog = { .stmts = stmts, .len = 1, .cap = 1 };
 
     char* expected = "let myVar = anotherVar;";
     size_t len = strlen(expected) + 2; // in case of stupidity
     char* buf = calloc(len, sizeof(char));
+
+    // `open_memstream` would be better
     FILE* fp = fmemopen(buf, len, "w");
     if (fp == NULL) {
         fprintf(stderr, "no memory");

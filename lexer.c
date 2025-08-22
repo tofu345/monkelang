@@ -45,7 +45,7 @@ static void skip_whitespace(Lexer* l) {
     }
 }
 
-char* read_while(Lexer* l, bool (*is_ok) (char)) {
+static char* read_while(Lexer* l, bool (*is_ok) (char)) {
     size_t position = l->position;
     int len = 0;
     while (is_ok(l->ch)) {
@@ -61,7 +61,7 @@ char* read_while(Lexer* l, bool (*is_ok) (char)) {
     return ident;
 }
 
-char peek_char(Lexer *l) {
+static char peek_char(Lexer *l) {
     if (l->read_position >= l->input_len) {
         return 0;
     } else {

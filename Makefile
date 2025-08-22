@@ -2,7 +2,7 @@ CFLAGS := -g -Wall -Wextra
 
 main: .FORCE
 	@ gcc ${CFLAGS} -o main.out \
-		main.c repl.c lexer.c token.c
+		main.c repl.c lexer.c token.c parser.c grow_array.c parser_tracing.c ast.c
 
 test_lexer: .FORCE
 	@ gcc ${CFLAGS} -o test_lexer.out \

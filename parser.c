@@ -24,6 +24,7 @@ struct {
     { t_Minus, p_Sum },
     { t_Slash, p_Product },
     { t_Asterisk, p_Product },
+    { t_Lparen, p_Call },
 };
 
 static enum Precedence
@@ -58,10 +59,8 @@ exit_nomem() {
 
 static void
 parser_error(Parser* p, char* msg) {
-    void* err = grow_array((void***)&p->errors, &p->errors_len,
-            &p->errors_cap, sizeof(char*));
-    if (err == NULL) exit_nomem();
-
+    if (p->errors_len >= p->errors_cap)
+        grow_array((void**)&p->errors, &p->errors_cap, sizeof(char*));
     p->errors[p->errors_len] = msg;
     p->errors_len++;
 }
@@ -120,6 +119,8 @@ parse_expression(Parser* p, enum Precedence precedence) {
         return (Node){};
     }
     Node left_exp = prefix(p);
+    if (left_exp.obj == NULL)
+        return (Node){};
 
     while (!peek_token_is(p, t_Semicolon)
             && precedence < peek_precedence(p)) {
@@ -128,7 +129,10 @@ parse_expression(Parser* p, enum Precedence precedence) {
             return left_exp;
 
         next_token(p);
+
         left_exp = infix(p, left_exp);
+        if (left_exp.obj == NULL)
+            return (Node){};
     };
     untrace("parse_expression");
     return left_exp;
@@ -150,6 +154,7 @@ parse_integer_literal(Parser* p) {
     if (int_lit == NULL) exit_nomem();
     int_lit->tok = p->cur_token;
 
+    // TODO: base 2, 8, 16
     long value = strtol(p->cur_token.literal, NULL, 10);
     if (errno == ERANGE) {
         char* msg = NULL;
@@ -175,6 +180,12 @@ parse_infix_expression(Parser* p, Node left) {
     enum Precedence precedence = cur_precedence(p);
     next_token(p);
     ie->right = parse_expression(p, precedence);
+    if (ie->right.obj == NULL) {
+        node_destroy(left);
+        free(ie->tok.literal);
+        free(ie);
+        return (Node){};
+    }
 
     untrace("parse_infix_expression");
     return (Node){ n_InfixExpression, ie };
@@ -190,6 +201,11 @@ parse_prefix_expression(Parser* p) {
     next_token(p);
 
     pe->right = parse_expression(p, p_Prefix);
+    if (pe->right.obj == NULL) {
+        free(pe->tok.literal);
+        free(pe);
+        return (Node){};
+    }
 
     untrace("parse_prefix_expression");
     return (Node){ n_PrefixExpression, pe };
@@ -217,27 +233,151 @@ parse_grouped_expression(Parser* p) {
 
 static BlockStatement*
 parse_block_statement(Parser* p) {
-    BlockStatement* block = malloc(sizeof(BlockStatement));
-    block->tok = p->cur_token;
-    block->statements = malloc(START_CAPACITY * sizeof(Node));
-    block->cap = START_CAPACITY;
-    block->len = 0;
-    if (block->statements == NULL) exit_nomem();
+    BlockStatement* bs = malloc(sizeof(BlockStatement));
+    bs->tok = p->cur_token;
+    bs->statements = malloc(START_CAPACITY * sizeof(Node));
+    if (bs->statements == NULL) exit_nomem();
+    bs->cap = START_CAPACITY;
+    bs->len = 0;
 
     next_token(p);
 
     while (!cur_token_is(p, t_Rbrace) && !cur_token_is(p, t_Eof)) {
         Node stmt = parse_statement(p);
         if (stmt.obj != NULL) {
-            void* err = grow_array((void***)&block->statements, &block->len,
-                    &block->cap, sizeof(Node));
-            if (err == NULL) exit_nomem();
-            block->statements[block->len] = stmt;
-            block->len++;
+            if (bs->len >= bs->cap)
+                grow_array((void**)&bs->statements, &bs->cap, sizeof(Node));
+            bs->statements[bs->len] = stmt;
+            bs->len++;
         }
         next_token(p);
     }
-    return block;
+    return bs;
+}
+
+static int
+parse_function_parameters(Parser* p, FunctionLiteral* fl) {
+    fl->params = malloc(START_CAPACITY * sizeof(Identifier*));
+    fl->params_len = 0;
+    fl->params_cap = START_CAPACITY;
+
+    if (peek_token_is(p, t_Rparen)) {
+        token_destroy(&p->cur_token); // free '(' tok
+        next_token(p);
+        token_destroy(&p->cur_token); // free ')' tok
+        return 0;
+    }
+
+    token_destroy(&p->cur_token); // free '(' tok
+    next_token(p);
+
+    Identifier* ident = malloc(sizeof(Identifier));
+    ident->tok = p->cur_token;
+    ident->value = p->cur_token.literal;
+    fl->params[0] = ident;
+    fl->params_len = 1;
+
+    while (peek_token_is(p, t_Comma)) {
+        next_token(p);
+        token_destroy(&p->cur_token); // free ',' tok
+        if (!expect_peek(p, t_Ident))
+            return -1;
+
+        ident = malloc(sizeof(Identifier));
+        ident->tok = p->cur_token;
+        ident->value = p->cur_token.literal;
+
+        if (fl->params_len >= fl->params_cap)
+            grow_array((void**)&fl->params, &fl->params_cap,
+                    sizeof(Identifier*));
+        fl->params[fl->params_len] = ident;
+        fl->params_len++;
+    }
+
+    if (!expect_peek(p, t_Rparen))
+        return -1;
+
+    return 0;
+}
+
+static Node
+parse_function_literal(Parser* p) {
+    FunctionLiteral* fl = malloc(sizeof(FunctionLiteral));
+    fl->tok = p->cur_token;
+    if (!expect_peek(p, t_Lparen)) {
+        free(fl);
+        return (Node){};
+    }
+
+    if (parse_function_parameters(p, fl) == -1
+            || !expect_peek(p, t_Lbrace)) {
+        for (size_t i = 0; i < fl->params_len; i++) {
+            free(fl->params[i]->tok.literal);
+            free(fl->params[i]);
+        }
+        free(fl->params);
+        free(fl);
+        return (Node){};
+    }
+
+    fl->body = parse_block_statement(p);
+    return (Node){ n_FunctionLiteral, fl };
+}
+
+static int
+parse_call_arguments(Parser* p, CallExpression* ce) {
+    ce->args = malloc(START_CAPACITY * sizeof(Node));
+    ce->args_len = 0;
+    ce->args_cap = START_CAPACITY;
+
+    if (peek_token_is(p, t_Rparen)) {
+        next_token(p);
+        token_destroy(&p->cur_token); // free ')' tok
+        return 0;
+    }
+
+    next_token(p);
+
+    ce->args[0] = parse_expression(p, p_Lowest);
+    ce->args_len = 1;
+
+    while (peek_token_is(p, t_Comma)) {
+        next_token(p);
+        token_destroy(&p->cur_token); // free ',' tok
+        next_token(p);
+
+        Node exp = parse_expression(p, p_Lowest);
+        if (exp.obj == NULL) {
+            return -1;
+        }
+
+        if (ce->args_len >= ce->args_cap)
+            grow_array((void**)&ce->args, &ce->args_cap, sizeof(Node));
+        ce->args[ce->args_len] = exp;
+        ce->args_len++;
+    }
+
+    if (!expect_peek(p, t_Rparen))
+        return -1;
+
+    return 0;
+}
+
+static Node
+parse_call_expression(Parser* p, Node function) {
+    CallExpression* ce = malloc(sizeof(CallExpression));
+    ce->tok = p->cur_token;
+    ce->function = function;
+    if (parse_call_arguments(p, ce) == -1) {
+        for (size_t i = 0; i < ce->args_len; i++) {
+            node_destroy(ce->args[i]);
+        }
+        free(ce->args);
+        free(ce);
+        node_destroy(function);
+        return (Node){};
+    }
+    return (Node){ n_CallExpression, ce };
 }
 
 static Node
@@ -264,7 +404,7 @@ parse_if_expression(Parser* p) {
         free(ie);
         return (Node){};
     }
-    token_destroy(&p->cur_token);
+
     ie->consequence = parse_block_statement(p);
 
     if (peek_token_is(p, t_Else)) {
@@ -308,10 +448,11 @@ parse_let_statement(Parser* p) {
     }
     token_destroy(&p->cur_token);
 
-    stmt->value = (Node){};
-    // TODO: the boss says we are skipping expressions until we
-    // encounter a semicolon
-    while (!cur_token_is(p, t_Semicolon)) {
+    next_token(p);
+
+    stmt->value = parse_expression(p, p_Lowest);
+
+    if (peek_token_is(p, t_Semicolon)) {
         next_token(p);
         token_destroy(&p->cur_token);
     }
@@ -327,13 +468,12 @@ parse_return_statement(Parser* p) {
 
     next_token(p);
 
-    stmt->return_value = (Node){};
-    // TODO: skipping the expressions until we encounter a semicolon
-    while (!cur_token_is(p, t_Semicolon)) {
-        token_destroy(&p->cur_token);
+    stmt->return_value = parse_expression(p, p_Lowest);
+
+    if (peek_token_is(p, t_Semicolon)) {
         next_token(p);
+        token_destroy(&p->cur_token);
     }
-    token_destroy(&p->cur_token);
 
     return (Node){ n_ReturnStatement, stmt };
 }
@@ -345,6 +485,10 @@ parse_expression_statement(Parser* p) {
     if (stmt == NULL) exit_nomem();
     stmt->tok = p->cur_token;
     stmt->expression = parse_expression(p, p_Lowest);
+    if (stmt->expression.obj == NULL) {
+        free(stmt);
+        return (Node){};
+    }
 
     if (peek_token_is(p, t_Semicolon)) {
         next_token(p);
@@ -355,7 +499,7 @@ parse_expression_statement(Parser* p) {
     return (Node){ n_ExpressionStatement, stmt };
 }
 
-// on failure returns a Node with `n.typ` and `n.obj` == 0
+// on failure, return Node with `n.obj` == NULL
 static Node
 parse_statement(Parser* p) {
     switch (p->cur_token.type) {
@@ -382,6 +526,7 @@ Parser* parser_new(Lexer* l) {
     p->prefix_parse_fns[t_False] = parse_boolean;
     p->prefix_parse_fns[t_Lparen] = parse_grouped_expression;
     p->prefix_parse_fns[t_If] = parse_if_expression;
+    p->prefix_parse_fns[t_Function] = parse_function_literal;
 
     p->infix_parse_fns[t_Plus] = parse_infix_expression;
     p->infix_parse_fns[t_Minus] = parse_infix_expression;
@@ -391,10 +536,11 @@ Parser* parser_new(Lexer* l) {
     p->infix_parse_fns[t_Not_eq] = parse_infix_expression;
     p->infix_parse_fns[t_Lt] = parse_infix_expression;
     p->infix_parse_fns[t_Gt] = parse_infix_expression;
+    p->infix_parse_fns[t_Lparen] = parse_call_expression;
 
     // Read two tokens, so curToken and peekToken are both set
-    next_token(p);
-    next_token(p);
+    p->cur_token = lexer_next_token(p->l);
+    p->peek_token = lexer_next_token(p->l);
     return p;
 }
 
@@ -417,10 +563,8 @@ Program parse_program(Parser* p) {
     while (p->cur_token.type != t_Eof) {
         Node stmt = parse_statement(p);
         if (stmt.obj != NULL) {
-            void* err = grow_array((void***)&prog.stmts, &prog.len, &prog.cap,
-                    sizeof(Node));
-            if (err == NULL) exit_nomem();
-
+            if (prog.len >= prog.cap)
+                grow_array((void**)&prog.stmts, &prog.cap, sizeof(Node));
             prog.stmts[prog.len] = stmt;
             prog.len++;
         }

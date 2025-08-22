@@ -17,6 +17,8 @@ enum NodeType {
     n_InfixExpression,
     n_Boolean,
     n_IfExpression,
+    n_FunctionLiteral,
+    n_CallExpression,
 
     // Statements
     n_LetStatement,
@@ -113,5 +115,21 @@ typedef struct {
     BlockStatement* consequence;
     BlockStatement* alternative;
 } IfExpression;
+
+typedef struct {
+    Token tok; // the 'fn' token
+    Identifier** params;
+    size_t params_len;
+    size_t params_cap;
+    BlockStatement* body;
+} FunctionLiteral;
+
+typedef struct {
+    Token tok; // the '(' token
+    Node function; // Identifier or FunctionLiteral
+    Node* args;
+    size_t args_len;
+    size_t args_cap;
+} CallExpression;
 
 #endif
