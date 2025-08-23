@@ -180,7 +180,7 @@ int node_fprint(const Node n, FILE* fp) {
 
 static void
 destroy_prefix_expression(PrefixExpression* pe) {
-    token_destroy(&pe->tok);
+    free(pe->tok.literal);
     node_destroy(pe->right);
     free(pe);
 }
@@ -195,7 +195,7 @@ destroy_infix_expression(InfixExpression* ie) {
 
 static void
 destroy_block_statement(BlockStatement* bs) {
-    token_destroy(&bs->tok);
+    free(bs->tok.literal);
     for (size_t i = 0; i < bs->len; i++)
         node_destroy(bs->statements[i]);
     free(bs->statements);
@@ -204,7 +204,7 @@ destroy_block_statement(BlockStatement* bs) {
 
 static void
 destroy_if_expression(IfExpression* ie) {
-    token_destroy(&ie->tok);
+    free(ie->tok.literal);
     node_destroy(ie->condition);
     destroy_block_statement(ie->consequence);
     if (ie->alternative != NULL)
@@ -214,9 +214,11 @@ destroy_if_expression(IfExpression* ie) {
 
 static void
 destroy_function_literal(FunctionLiteral* fl) {
-    token_destroy(&fl->tok);
-    for (size_t i = 0; i < fl->params_len; i++)
+    free(fl->tok.literal);
+    for (size_t i = 0; i < fl->params_len; i++) {
         free(fl->params[i]->value);
+        free(fl->params[i]);
+    }
     free(fl->params);
     destroy_block_statement(fl->body);
     free(fl);
@@ -224,7 +226,7 @@ destroy_function_literal(FunctionLiteral* fl) {
 
 static void
 destroy_call_expression(CallExpression* ce) {
-    token_destroy(&ce->tok);
+    free(ce->tok.literal);
     node_destroy(ce->function);
     for (size_t i = 0; i < ce->args_len; i++) {
         node_destroy(ce->args[i]);
@@ -235,16 +237,18 @@ destroy_call_expression(CallExpression* ce) {
 
 static void
 destroy_let_statement(LetStatement* ls) {
-    token_destroy(&ls->tok);
+    free(ls->tok.literal);
     node_destroy(ls->value);
-    if (ls->name != NULL)
-        token_destroy(&ls->name->tok);
+    if (ls->name != NULL) {
+        free(ls->name->tok.literal);
+        free(ls->name);
+    }
     free(ls);
 }
 
 static void
 destroy_return_statement(ReturnStatement* rs) {
-    token_destroy(&rs->tok);
+    free(rs->tok.literal);
     node_destroy(rs->return_value);
     free(rs);
 }
@@ -288,7 +292,7 @@ void node_destroy(Node n) {
 
         default:
             // since first field of `n.obj` is `Token`
-            token_destroy(n.obj);
+            free(((Token*)n.obj)->literal);
             free(n.obj);
             break;
     }

@@ -5,13 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-void token_destroy(Token* t) {
-    // see `lexer_next_token`
-    if (t->type != t_Eof) {
-        free(t->literal);
-    }
-}
-
 struct Keyword {
     char* name;
     TokenType tok_typ;

@@ -130,10 +130,10 @@ if (5 < 10) {\
             TEST_ASSERT_NULL(tok.literal);
         } else {
             TEST_ASSERT_EQUAL_STRING_MESSAGE(t.exp_lit, tok.literal, msg);
+            free(tok.literal);
         }
 
         free(msg);
-        token_destroy(&tok);
     }
 }
 

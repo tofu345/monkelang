@@ -38,7 +38,6 @@ static void test_let_statement(Node stmt, const char* exp_name) {
             "assert LetStatement.Identifier.Token.Literal");
 }
 
-
 void test_return_statements(void) {
     char* input = "\
 return 5;\
@@ -465,7 +464,6 @@ void test_operator_precedence_parsing(void) {
         parser_destroy(p);
     }
 }
-
 
 static void
 test_infix_expression(Node n, L_Test left, char* operator, L_Test right,
