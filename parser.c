@@ -276,6 +276,17 @@ parse_function_parameters(Parser* p, FunctionLiteral* fl) {
     free(p->cur_token.literal); // '(' tok
     next_token(p);
 
+    if (p->cur_token.type != t_Ident) {
+        char* msg = NULL;
+        int len = asprintf(&msg,
+                "expected first function parameter to be '%s', got '%s' instead",
+                show_token_type(t_Ident), show_token_type(p->cur_token.type));
+        if (len == -1) exit_nomem();
+        parser_error(p, msg);
+        free(p->cur_token.literal);
+        return -1;
+    }
+
     Identifier* ident = malloc(sizeof(Identifier));
     ident->tok = p->cur_token;
     ident->value = p->cur_token.literal;
@@ -502,7 +513,6 @@ parse_expression_statement(Parser* p) {
     stmt->tok = p->cur_token;
     stmt->expression = parse_expression(p, p_Lowest);
     if (stmt->expression.obj == NULL) {
-        free(stmt->tok.literal);
         free(stmt);
         return (Node){};
     }
@@ -579,12 +589,15 @@ Program parse_program(Parser* p) {
 
     while (p->cur_token.type != t_Eof) {
         Node stmt = parse_statement(p);
-        if (stmt.obj != NULL) {
-            if (prog.len >= prog.cap)
-                grow_array((void**)&prog.stmts, &prog.cap, sizeof(Node));
-            prog.stmts[prog.len] = stmt;
-            prog.len++;
-        }
+        if (stmt.obj == NULL)
+            break;
+
+        if (prog.len >= prog.cap)
+            grow_array((void**)&prog.stmts, &prog.cap, sizeof(Node));
+
+        prog.stmts[prog.len] = stmt;
+        prog.len++;
+
         next_token(p);
     }
 
