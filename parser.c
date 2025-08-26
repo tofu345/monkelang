@@ -5,6 +5,7 @@
 #include "parser_tracing.h"
 #include "token.h"
 
+#include <asm-generic/errno-base.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,11 +73,23 @@ next_token(Parser* p) {
 }
 
 static void
+cur_tok_error(Parser* p, TokenType t) {
+    char* msg = NULL;
+    int len = asprintf(&msg,
+            ":%d:%d: expected token to be '%s', got '%s' instead",
+            p->cur_token.line, p->cur_token.col,
+            show_token_type(t), p->cur_token.literal);
+    if (len == -1) exit_nomem();
+    parser_error(p, msg);
+}
+
+static void
 peek_error(Parser* p, TokenType t) {
     char* msg = NULL;
     int len = asprintf(&msg,
-            "expected next token to be '%s', got '%s' instead",
-            show_token_type(t), show_token_type(p->peek_token.type));
+            ":%d:%d: expected next token to be '%s', got '%s' instead",
+            p->cur_token.line, p->cur_token.col,
+            show_token_type(t), p->peek_token.literal);
     if (len == -1) exit_nomem();
     parser_error(p, msg);
 }
@@ -154,14 +167,20 @@ parse_integer_literal(Parser* p) {
     if (int_lit == NULL) exit_nomem();
     int_lit->tok = p->cur_token;
 
-    // TODO: base 2, 8, 16
-    long value = strtol(p->cur_token.literal, NULL, 10);
-    if (errno == ERANGE) {
+    char* endptr;
+    char* lit = int_lit->tok.literal;
+    long value;
+    if (strlen(lit) > 1 && lit[1] == 'b')
+        value = strtol(lit + 2, &endptr, 2); // skip '0b'
+    else
+        value = strtol(lit, &endptr, 0); // parse dec, hex, octal
+
+    if (*endptr != '\0' || errno == ERANGE || errno == EINVAL) {
         char* msg = NULL;
-        int err = asprintf(&msg, "could not parse '%s' as integer", p->cur_token.literal);
+        int err = asprintf(&msg, "could not parse '%s' as integer", lit);
         if (err == -1) exit_nomem();
         parser_error(p, msg);
-        free(p->cur_token.literal);
+        free(int_lit->tok.literal);
         free(int_lit);
         return (Node){};
     }
@@ -169,6 +188,29 @@ parse_integer_literal(Parser* p) {
     int_lit->value = value;
     untrace("parse_integer_literal");
     return (Node){ n_IntegerLiteral, int_lit };
+}
+
+static Node
+parse_float_literal(Parser* p) {
+    FloatLiteral* fl_lit = malloc(sizeof(FloatLiteral));
+    if (fl_lit == NULL) exit_nomem();
+    fl_lit->tok = p->cur_token;
+
+    char* endptr;
+    double value = strtod(fl_lit->tok.literal, &endptr);
+    if (*endptr != '\0' || errno == ERANGE || errno == EINVAL) {
+        char* msg = NULL;
+        int err = asprintf(&msg, "could not parse '%s' as float",
+                fl_lit->tok.literal);
+        if (err == -1) exit_nomem();
+        parser_error(p, msg);
+        free(fl_lit->tok.literal);
+        free(fl_lit);
+        return (Node){};
+    }
+
+    fl_lit->value = value;
+    return (Node){ n_FloatLiteral, fl_lit };
 }
 
 static Node
@@ -277,12 +319,7 @@ parse_function_parameters(Parser* p, FunctionLiteral* fl) {
     next_token(p);
 
     if (p->cur_token.type != t_Ident) {
-        char* msg = NULL;
-        int len = asprintf(&msg,
-                "expected first function parameter to be '%s', got '%s' instead",
-                show_token_type(t_Ident), show_token_type(p->cur_token.type));
-        if (len == -1) exit_nomem();
-        parser_error(p, msg);
+        cur_tok_error(p, t_Ident);
         free(p->cur_token.literal);
         return -1;
     }
@@ -547,6 +584,7 @@ Parser* parser_new(Lexer* l) {
 
     p->prefix_parse_fns[t_Ident] = parse_identifier;
     p->prefix_parse_fns[t_Int] = parse_integer_literal;
+    p->prefix_parse_fns[t_Float] = parse_float_literal;
     p->prefix_parse_fns[t_Bang] = parse_prefix_expression;
     p->prefix_parse_fns[t_Minus] = parse_prefix_expression;
     p->prefix_parse_fns[t_True] = parse_boolean;

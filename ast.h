@@ -13,6 +13,7 @@ enum NodeType {
     // Expressions
     n_Identifier = 1,
     n_IntegerLiteral,
+    n_FloatLiteral,
     n_PrefixExpression,
     n_InfixExpression,
     n_Boolean,
@@ -83,6 +84,11 @@ typedef struct {
     Token tok;
     long value;
 } IntegerLiteral;
+
+typedef struct {
+    Token tok;
+    double value;
+} FloatLiteral;
 
 typedef struct {
     Token tok; // the prefix token, e.g !

@@ -1,12 +1,13 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
-typedef enum {
+typedef enum __attribute__ ((__packed__)) {
     t_Illegal,
     t_Eof,
     // identifiers + literals
     t_Ident,
-	t_Int,
+	t_Int, // stored as `long`
+	t_Float, // stored as `double`
     // Operators
 	t_Assign,
 	t_Plus,
@@ -38,6 +39,8 @@ typedef enum {
 
 typedef struct {
     TokenType type;
+    short col;
+    int line;
     char *literal; // a malloced string
 } Token;
 

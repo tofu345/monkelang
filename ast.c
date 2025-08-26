@@ -33,6 +33,12 @@ fprint_integer_literal(IntegerLiteral* il, FILE* fp) {
 }
 
 static int
+fprint_float_literal(FloatLiteral* fl, FILE* fp) {
+    FPRINTF(fp, "%.3f", fl->value);
+    return 0;
+}
+
+static int
 fprint_prefix_expression(PrefixExpression* pe, FILE* fp) {
     FPRINTF(fp, "(%s", pe->op);
     NODE_FPRINT(fp, pe->right);
@@ -80,7 +86,7 @@ fprint_function_literal(FunctionLiteral* fl, FILE* fp) {
     }
     if (fl->params_len > 0)
         fprint_identifier(fl->params[fl->params_len - 1], fp);
-    FPRINTF(fp, ")");
+    FPRINTF(fp, ") ");
     fprint_block_statement(fl->body, fp);
     return 0;
 }
@@ -142,6 +148,9 @@ int node_fprint(const Node n, FILE* fp) {
         case n_IntegerLiteral:
             return fprint_integer_literal(n.obj, fp);
 
+        case n_FloatLiteral:
+            return fprint_float_literal(n.obj, fp);
+
         case n_PrefixExpression:
             return fprint_prefix_expression(n.obj, fp);
 
@@ -173,7 +182,7 @@ int node_fprint(const Node n, FILE* fp) {
             return fprint_block_statement(n.obj, fp);
 
         default:
-            fprintf(stderr, "node_fprint: node type not handled %d", n.typ);
+            fprintf(stderr, "node_fprint: node type not handled %d\n", n.typ);
             exit(1);
     }
 }

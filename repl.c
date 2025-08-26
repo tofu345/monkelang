@@ -6,11 +6,12 @@
 #include <string.h>
 
 void print_parser_errors(FILE* out, Parser* p, const char* monkey_face) {
-    fprintf(out, "%s", monkey_face);
-    fprintf(out, "Woops! We ran into some monkey business here!\n");
-    fprintf(out, " parser errors:\n");
+    // fprintf(out, "%s", monkey_face);
+    // fprintf(out, "Woops! We ran into some monkey business here!\n");
+    fprintf(out, "parser errors:\n");
     for (size_t i = 0; i < p->errors_len; i++) {
-        fprintf(out, "\t%s\n", p->errors[i]);
+        fprintf(out, "%s\n", p->errors[i]);
+        // fprintf(out, "\t%s\n", p->errors[i]);
     }
 }
 
@@ -25,12 +26,11 @@ char* load_monkey_face(void) {
     rewind(fp);
 
     char* buf = malloc((bufsize + 1) * sizeof(char));
-
-    size_t new_len = fread(buf, sizeof(char), bufsize, fp);
-    if ( ferror( fp ) != 0 ) {
+    size_t len = fread(buf, sizeof(char), bufsize, fp);
+    if (ferror(fp) != 0) {
         fprintf(stderr, "error reading file: %s", filename);
     } else {
-        buf[new_len++] = '\0';
+        buf[len++] = '\0';
     }
     fclose(fp);
     return buf;

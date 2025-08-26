@@ -10,6 +10,9 @@ typedef struct {
     const char* input;
     size_t input_len;
 
+    short col;
+    int line;
+
     size_t position;      // current position in input (points to current char)
     size_t read_position; // current reading position in input (after current char)
     char ch;

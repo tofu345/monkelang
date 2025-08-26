@@ -112,6 +112,24 @@ test_integer_literal(Node n, long value) {
     free(expected);
 }
 
+static void
+test_float_literal(Node n, double value) {
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_FloatLiteral, n.typ, "assert FloatLiteral");
+
+    FloatLiteral* il = n.obj;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            value, il->value, "assert FloatLiteral.value");
+
+    char* expected = NULL;
+    if (asprintf(&expected, "%.3f", value) == -1)
+        TEST_FAIL_MESSAGE("no memory");
+
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            expected, il->tok.literal, "assert FloatLiteral.tok.literal");
+    free(expected);
+}
+
 void test_integer_literal_expression(void) {
     char* input = "5;";
     size_t input_len = strlen(input);
@@ -143,6 +161,37 @@ void test_integer_literal_expression(void) {
     parser_destroy(p);
 }
 
+void test_float_literal_expression(void) {
+    char* input = "5.01;";
+    size_t input_len = strlen(input);
+
+    Lexer l = lexer_new(input, input_len);
+    Parser* p = parser_new(&l);
+    Program prog = parse_program(p);
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
+
+    check_parser_errors(p);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.len, "prog.statements length");
+
+    Node n = prog.stmts[0];
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_ExpressionStatement, n.typ, "assert ExpressionStatement");
+
+    ExpressionStatement* es = n.obj;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_FloatLiteral, es->expression.typ, "assert FloatLiteral");
+
+    FloatLiteral* fl_lit = es->expression.obj;
+    TEST_ASSERT_EQUAL_FLOAT_MESSAGE(
+            5.01, fl_lit->value, "assert FloatLiteral.value");
+
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            "5.01", fl_lit->tok.literal, "FloatLiteral.Token.Literal");
+
+    program_destroy(&prog);
+    parser_destroy(p);
+}
+
 static void
 test_identifier(Node n, const char* value) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(
@@ -167,12 +216,14 @@ test_boolean_literal(Node n, bool exp) {
 
 typedef enum {
     l_Integer,
+    l_Float,
     l_String,
     l_Boolean,
 } L_Type;
 
 typedef union {
     long integer;
+    double floating;
     const char* string;
     bool boolean;
 } L_Test;
@@ -182,6 +233,9 @@ test_literal_expression(Node n, L_Test exp, L_Type typ) {
     switch (typ) {
         case l_Integer:
             test_integer_literal(n, exp.integer);
+            break;
+        case l_Float:
+            test_float_literal(n, exp.integer);
             break;
         case l_String:
             test_identifier(n, exp.string);
@@ -203,6 +257,7 @@ void test_let_statements(void) {
         L_Type t;
     } tests[] = {
         {"let x = 5;", "x", {5}, l_Integer},
+        {"let x = 5.000;", "x", {5.0}, l_Float},
         {"let y = true;", "y", {true}, l_Boolean},
         {"let foobar = y;", "foobar", (L_Test){ .string = "y" }, l_String},
     };
@@ -412,6 +467,14 @@ void test_operator_precedence_parsing(void) {
         {
             "-(5 + 5)",
             "(-(5 + 5))",
+        },
+        {
+            "-(1.1 + 5)",
+            "(-(1.100 + 5))",
+        },
+        {
+            "-(2. * 5)",
+            "(-(2.000 * 5))",
         },
         {
             "!(true == true)",
@@ -733,6 +796,7 @@ int main(void) {
     RUN_TEST(test_return_statements);
     RUN_TEST(test_identifier_expression);
     RUN_TEST(test_integer_literal_expression);
+    RUN_TEST(test_float_literal_expression);
     RUN_TEST(test_parsing_prefix_expressions);
     RUN_TEST(test_parsing_infix_expressions);
     RUN_TEST(test_operator_precedence_parsing);

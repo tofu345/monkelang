@@ -15,17 +15,17 @@ void test_print(void) {
         {
             n_LetStatement,
             &(LetStatement){
-                .tok = { t_Let, "let" },
+                .tok = { t_Let, 0, 0, "let" },
                 .name =
                     &(Identifier){
-                        .tok = { t_Ident, "myVar" },
+                        .tok = { t_Ident, 0, 0, "myVar" },
                         .value = "myVar",
                     },
                 .value =
                     {
                         n_Identifier,
                         &(Identifier){
-                            .tok = { t_Ident, "anotherVar" },
+                            .tok = { t_Ident, 0, 0, "anotherVar" },
                             .value = "anotherVar",
                         },
                     }
