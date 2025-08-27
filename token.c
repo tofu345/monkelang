@@ -34,6 +34,7 @@ const char* token_types[] = {
     "Eof",
     "Identifier",
 	"Int",
+	"Float",
 	"=",
 	"+",
 	"-",
