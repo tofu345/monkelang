@@ -1,5 +1,5 @@
 #include "ast.h"
-#include "grow_array.h"
+#include "utils.h"
 #include "lexer.h"
 #include "parser.h"
 #include "parser_tracing.h"
@@ -76,7 +76,7 @@ static void
 cur_tok_error(Parser* p, TokenType t) {
     char* msg = NULL;
     int len = asprintf(&msg,
-            ":%d:%d: expected token to be '%s', got '%s' instead",
+            ":%d,%d: expected token to be '%s', got '%s' instead",
             p->cur_token.line, p->cur_token.col,
             show_token_type(t), p->cur_token.literal);
     if (len == -1) exit_nomem();
@@ -87,7 +87,7 @@ static void
 peek_error(Parser* p, TokenType t) {
     char* msg = NULL;
     int len = asprintf(&msg,
-            ":%d:%d: expected next token to be '%s', got '%s' instead",
+            ":%d,%d: expected next token to be '%s', got '%s' instead",
             p->cur_token.line, p->cur_token.col,
             show_token_type(t), p->peek_token.literal);
     if (len == -1) exit_nomem();
@@ -118,7 +118,8 @@ expect_peek(Parser* p, TokenType t) {
 static void
 no_prefix_parse_error(Parser* p, Token t) {
     char* msg = NULL;
-    int err = asprintf(&msg, "no prefix parse function for '%s' found", t.literal);
+    int err = asprintf(&msg, ":%d,%d: no prefix parse function for '%s' found",
+            p->cur_token.line, p->cur_token.col, t.literal);
     if (err == -1) exit_nomem();
     parser_error(p, msg);
 }
@@ -258,10 +259,10 @@ parse_prefix_expression(Parser* p) {
 
 static Node
 parse_boolean(Parser* p) {
-    Boolean* b = malloc(sizeof(Boolean));
+    BooleanLiteral* b = malloc(sizeof(BooleanLiteral));
     b->tok = p->cur_token;
     b->value = cur_token_is(p, t_True);
-    return (Node){ n_Boolean, b };
+    return (Node){ n_BooleanLiteral, b };
 }
 
 static Node
@@ -562,7 +563,7 @@ parse_expression_statement(Parser* p) {
 
     stmt->expression = parse_expression(p, p_Lowest);
     if (stmt->expression.obj == NULL) {
-        free(stmt->tok.literal);
+        // stmt.tok points to stmt.expression.tok
         free(stmt);
         return (Node){};
     }
@@ -589,12 +590,13 @@ parse_statement(Parser* p) {
     }
 }
 
-Parser* parser_new(Lexer* l) {
-    Parser* p = calloc(1, sizeof(Parser));
+void parser_init(Parser* p, Lexer* l) {
     p->l = l;
     p->errors = malloc(START_CAPACITY * sizeof(char*));
     p->errors_cap = START_CAPACITY;
+    p->errors_len = 0;
 
+    memset(p->prefix_parse_fns, 0, t_Return * sizeof(PrefixParseFn));
     p->prefix_parse_fns[t_Ident] = parse_identifier;
     p->prefix_parse_fns[t_Int] = parse_integer_literal;
     p->prefix_parse_fns[t_Float] = parse_float_literal;
@@ -606,6 +608,7 @@ Parser* parser_new(Lexer* l) {
     p->prefix_parse_fns[t_If] = parse_if_expression;
     p->prefix_parse_fns[t_Function] = parse_function_literal;
 
+    memset(p->infix_parse_fns, 0, t_Return * sizeof(InfixParseFn));
     p->infix_parse_fns[t_Plus] = parse_infix_expression;
     p->infix_parse_fns[t_Minus] = parse_infix_expression;
     p->infix_parse_fns[t_Slash] = parse_infix_expression;
@@ -619,7 +622,6 @@ Parser* parser_new(Lexer* l) {
     // Read two tokens, so curToken and peekToken are both set
     p->cur_token = lexer_next_token(p->l);
     p->peek_token = lexer_next_token(p->l);
-    return p;
 }
 
 void parser_destroy(Parser* p) {
@@ -628,7 +630,6 @@ void parser_destroy(Parser* p) {
     }
     free(p->errors);
     free(p->peek_token.literal);
-    free(p);
 }
 
 Program parse_program(Parser* p) {
@@ -640,7 +641,7 @@ Program parse_program(Parser* p) {
 
     while (p->cur_token.type != t_Eof) {
         Node stmt = parse_statement(p);
-        if (stmt.obj == NULL)
+        if (stmt.obj == NULL) // stop parsing on first error
             break;
 
         if (prog.len >= prog.cap)

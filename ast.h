@@ -1,7 +1,7 @@
 #ifndef AST_H
 #define AST_H
 
-#include "grow_array.h"
+#include "utils.h"
 #include "token.h"
 
 #include <stdbool.h>
@@ -16,7 +16,7 @@ enum NodeType {
     n_FloatLiteral,
     n_PrefixExpression,
     n_InfixExpression,
-    n_Boolean,
+    n_BooleanLiteral,
     n_IfExpression,
     n_FunctionLiteral,
     n_CallExpression,
@@ -106,7 +106,7 @@ typedef struct {
 typedef struct {
     Token tok;
     bool value;
-} Boolean;
+} BooleanLiteral;
 
 typedef struct {
     Token tok; // the '{' token

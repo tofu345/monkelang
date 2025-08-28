@@ -6,10 +6,6 @@
 #include <string.h>
 
 // macro programming, wow
-#define FPRINTF(fp, ...) \
-    if (fprintf(fp, __VA_ARGS__) <= 0) \
-        return -1;
-
 #define NODE_FPRINT(fp, ...) \
     if (node_fprint( __VA_ARGS__, fp) == -1) \
         return -1;
@@ -117,7 +113,7 @@ fprint_let_statement(LetStatement* ls, FILE* fp) {
 }
 
 static int
-fprint_boolean(Boolean* b, FILE* fp) {
+fprint_boolean(BooleanLiteral* b, FILE* fp) {
     FPRINTF(fp, "%s", b->tok.literal);
     return 0;
 }
@@ -169,7 +165,7 @@ int node_fprint(const Node n, FILE* fp) {
         case n_LetStatement:
             return fprint_let_statement(n.obj, fp);
 
-        case n_Boolean:
+        case n_BooleanLiteral:
             return fprint_boolean(n.obj, fp);
 
         case n_ReturnStatement:

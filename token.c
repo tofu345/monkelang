@@ -61,7 +61,8 @@ const char* token_types[] = {
 };
 
 const char* show_token_type(TokenType t) {
-    if (t > t_Return) {
+    static size_t len = sizeof(token_types) / sizeof(token_types[0]);
+    if (t >= len) {
         fprintf(stderr, "invalid token_type to show_token_type");
         exit(1);
     }

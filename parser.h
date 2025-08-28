@@ -26,7 +26,7 @@ struct Parser {
     InfixParseFn infix_parse_fns[t_Return];
 };
 
-Parser* parser_new(Lexer* l);
+void parser_init(Parser* p, Lexer* l);
 
 void parser_destroy(Parser* p);
 void program_destroy(Program* p);

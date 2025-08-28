@@ -5,6 +5,11 @@
 
 #define START_CAPACITY 8
 
+// macro programming, wow
+#define FPRINTF(fp, ...) \
+    if (fprintf(fp, __VA_ARGS__) <= 0) \
+        return -1;
+
 // realloc `arr` to (`cap` * 2) * `size` and return new pointer
 //
 // one could argue that this method is unnecessary
