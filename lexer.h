@@ -1,5 +1,4 @@
-#ifndef LEXER_H
-#define LEXER_H
+#pragma once
 
 #include "token.h"
 
@@ -26,5 +25,3 @@ Lexer lexer_new(const char* input, size_t len);
 // literal that is copied from the input and must be freed by the
 // caller.
 Token lexer_next_token(Lexer* l);
-
-#endif

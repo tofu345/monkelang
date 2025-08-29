@@ -1,5 +1,4 @@
-#ifndef TOKEN_H
-#define TOKEN_H
+#pragma once
 
 typedef enum __attribute__ ((__packed__)) {
     t_Illegal,
@@ -47,5 +46,3 @@ typedef struct {
 TokenType lookup_ident(const char* ident);
 
 const char* show_token_type(TokenType t);
-
-#endif

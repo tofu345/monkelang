@@ -1,5 +1,4 @@
-#ifndef AST_H
-#define AST_H
+#pragma once
 
 #include "utils.h"
 #include "token.h"
@@ -137,5 +136,3 @@ typedef struct {
     size_t args_len;
     size_t args_cap;
 } CallExpression;
-
-#endif

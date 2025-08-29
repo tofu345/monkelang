@@ -641,14 +641,13 @@ Program parse_program(Parser* p) {
 
     while (p->cur_token.type != t_Eof) {
         Node stmt = parse_statement(p);
-        if (stmt.obj == NULL) // stop parsing on first error
-            break;
+        if (stmt.obj != NULL) {
+            if (prog.len >= prog.cap)
+                grow_array((void**)&prog.stmts, &prog.cap, sizeof(Node));
 
-        if (prog.len >= prog.cap)
-            grow_array((void**)&prog.stmts, &prog.cap, sizeof(Node));
-
-        prog.stmts[prog.len] = stmt;
-        prog.len++;
+            prog.stmts[prog.len] = stmt;
+            prog.len++;
+        }
 
         next_token(p);
     }

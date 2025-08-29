@@ -46,9 +46,8 @@ test_integer_object(Object o, long expected) {
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
 		show_object_type(o_Integer), show_object_type(o.typ),
         "incorrect type");
-    Integer* i = o.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            expected, i->value, "integer has wrong value");
+            expected, o.data.integer, "integer has wrong value");
 }
 
 void test_eval_integer_expression(void) {
@@ -86,9 +85,8 @@ test_boolean_object(Object o, bool expected) {
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
 		show_object_type(o_Boolean), show_object_type(o.typ),
         "incorrect type");
-    Boolean* b = o.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            expected, b->value, "boolean has wrong value");
+            expected, o.data.boolean, "boolean has wrong value");
 }
 
 void test_eval_boolean_expression(void) {

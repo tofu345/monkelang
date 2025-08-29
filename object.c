@@ -5,26 +5,30 @@
 #include <stdlib.h>
 
 void object_destroy(Object* o) {
-    if (o->obj == NULL) return;
     switch (o->typ) {
         case o_Boolean:
         case o_Null:
             break;
         default:
-            free(o->obj);
             break;
     }
 }
 
 static int
-fprintf_integer(Integer* i, FILE* fp) {
-    FPRINTF(fp, "%ld", i->value);
+fprintf_integer(ObjectData i, FILE* fp) {
+    FPRINTF(fp, "%ld", i.integer);
     return 0;
 }
 
 static int
-fprintf_boolean(Boolean* b, FILE* fp) {
-    FPRINTF(fp, "%s", b->value ? "true" : "false");
+fprintf_float(ObjectData f, FILE* fp) {
+    FPRINTF(fp, "%.3f", f.floating);
+    return 0;
+}
+
+static int
+fprintf_boolean(ObjectData b, FILE* fp) {
+    FPRINTF(fp, "%s", b.boolean ? "true" : "false");
     return 0;
 }
 
@@ -35,13 +39,13 @@ fprintf_null(FILE* fp) {
 }
 
 int object_fprint(Object o, FILE* fp) {
-    if (o.obj == NULL) return 0;
-
     switch (o.typ) {
         case o_Integer:
-            return fprintf_integer(o.obj, fp);
+            return fprintf_integer(o.data, fp);
+        case o_Float:
+            return fprintf_float(o.data, fp);
         case o_Boolean:
-            return fprintf_boolean(o.obj, fp);
+            return fprintf_boolean(o.data, fp);
         case o_Null:
             return fprintf_null(fp);
         default:
@@ -53,14 +57,15 @@ int object_fprint(Object o, FILE* fp) {
 
 const char* object_types[] = {
     "Integer",
+    "Float",
     "Boolean",
     "Null",
 };
 
-const char* show_object_type(enum ObjectType t) {
+const char* show_object_type(ObjectType t) {
     static size_t len = sizeof(object_types) / sizeof(object_types[0]);
     if (t == 0 || t > len) {
-        fprintf(stderr, "invalid object_type to show_object_type");
+        fprintf(stderr, "show_object_type: invalid object_type %d", t);
         exit(1);
     }
     return object_types[t - 1];

@@ -1,3 +1,4 @@
+#include "ast.h"
 #include "object.h"
 #include "parser.h"
 #include "lexer.h"
@@ -24,11 +25,12 @@ void start(FILE* in, FILE* out) {
         fprintf(out, ">> ");
         char* input = NULL;
         size_t len = 0;
+
         if (getline(&input, &len, in) == -1) {
             break;
         }
 
-        Lexer l = lexer_new(input, strlen(input));
+        Lexer l = lexer_new(input, len);
         Parser p;
         parser_init(&p, &l);
         Program prog = parse_program(&p);
@@ -38,7 +40,7 @@ void start(FILE* in, FILE* out) {
         }
 
         Object evaluated = eval_program(&prog);
-        if (evaluated.obj != NULL) {
+        if (evaluated.typ != o_Null) {
             object_fprint(evaluated, out);
             fprintf(out, "\n");
 

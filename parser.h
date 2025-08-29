@@ -1,5 +1,4 @@
-#ifndef PARSER_H
-#define PARSER_H
+#pragma once
 
 #include "ast.h"
 #include "lexer.h"
@@ -14,12 +13,12 @@ typedef Node (*InfixParseFn) (Parser* p, Node left);
 // in use or freed
 struct Parser {
     Lexer* l;
+    Token cur_token;
+    Token peek_token;
+
     char** errors;
     size_t errors_len;
     size_t errors_cap;
-
-    Token cur_token;
-    Token peek_token;
 
     // memory efficient, no, fast, yes
     PrefixParseFn prefix_parse_fns[t_Return];
@@ -43,5 +42,3 @@ enum Precedence {
 
 // returns a program with `cap` 0 on fail
 Program parse_program(Parser* p);
-
-#endif

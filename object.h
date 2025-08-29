@@ -1,36 +1,32 @@
-#ifndef OBJECT_H
-#define OBJECT_H
+#pragma once
 
-// my DRY senses are tingling
-//
-// TODO: evaluate using ast Node's directly
+// garbage collection based on [boot.dev: c memory mgmt course](https://www.youtube.com/watch?v=rJrd2QMVbGM)
 
 #include <stdio.h>
 #include <stdbool.h>
 
-enum ObjectType {
+struct Null {};
+
+typedef enum __attribute__ ((__packed__)) {
     o_Integer = 1,
+    o_Float,
     o_Boolean,
-    o_Null,
-};
+    o_Null, // last object type that cannot contain references to
+            // another `Object`.
+} ObjectType;
+
+typedef union {
+    long integer;
+    double floating;
+    bool boolean;
+    void* null;
+} ObjectData;
 
 typedef struct {
-    enum ObjectType typ;
-    void* obj;
+    ObjectType typ; // err if 0
+    ObjectData data;
 } Object;
 
 int object_fprint(Object o, FILE* fp);
+const char* show_object_type(ObjectType t);
 void object_destroy(Object* o);
-const char* show_object_type(enum ObjectType t);
-
-typedef struct {
-    long value;
-} Integer;
-
-typedef struct {
-    bool value;
-} Boolean;
-
-struct Null {};
-
-#endif
