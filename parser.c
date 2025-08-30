@@ -118,7 +118,8 @@ expect_peek(Parser* p, TokenType t) {
 static void
 no_prefix_parse_error(Parser* p, Token t) {
     char* msg = NULL;
-    int err = asprintf(&msg, ":%d,%d: no prefix parse function for '%s' found",
+    int err = asprintf(&msg,
+            ":%d,%d: no prefix parse function for '%s' found",
             p->cur_token.line, p->cur_token.col, t.literal);
     if (err == -1) exit_nomem();
     parser_error(p, msg);
@@ -299,11 +300,19 @@ parse_block_statement(Parser* p) {
         }
         next_token(p);
     }
-    free(p->cur_token.literal); // '}' token
+
+    if (cur_token_is(p, t_Rbrace)) {
+        free(p->cur_token.literal); // '}' token
+    } else {
+        cur_tok_error(p, t_Rbrace);
+        node_destroy((Node){ n_BlockStatement, bs });
+        return NULL;
+    }
 
     return bs;
 }
 
+// returns -1 on err
 static int
 parse_function_parameters(Parser* p, FunctionLiteral* fl) {
     fl->params = malloc(START_CAPACITY * sizeof(Identifier*));
@@ -367,19 +376,18 @@ parse_function_literal(Parser* p) {
         return (Node){};
     }
 
-    if (parse_function_parameters(p, fl) == -1
-            || !expect_peek(p, t_Lbrace)) {
-        for (size_t i = 0; i < fl->params_len; i++) {
-            free(fl->params[i]->tok.literal);
-            free(fl->params[i]);
-        }
-        free(fl->params);
-        free(fl->tok.literal);
-        free(fl);
+    int err = parse_function_parameters(p, fl);
+    if (err == -1 || !expect_peek(p, t_Lbrace)) {
+        node_destroy((Node){ n_FunctionLiteral, fl });
         return (Node){};
     }
 
     fl->body = parse_block_statement(p);
+    if (fl->body == NULL) {
+        node_destroy((Node){ n_FunctionLiteral, fl });
+        return (Node){};
+    }
+
     return (Node){ n_FunctionLiteral, fl };
 }
 
@@ -446,6 +454,7 @@ static Node
 parse_if_expression(Parser* p) {
     IfExpression* ie = malloc(sizeof(IfExpression));
     ie->tok = p->cur_token;
+    ie->consequence = NULL;
     ie->alternative = NULL;
     if (!expect_peek(p, t_Lparen)) {
         free(ie->tok.literal);
@@ -457,33 +466,35 @@ parse_if_expression(Parser* p) {
     next_token(p);
     ie->condition = parse_expression(p, p_Lowest);
     if (ie->condition.obj == NULL || !expect_peek(p, t_Rparen)) {
-        node_destroy(ie->condition);
-        free(ie->tok.literal);
-        free(ie);
+        node_destroy((Node){ n_IfExpression, ie });
         return (Node){};
     }
     free(p->cur_token.literal); // ')' tok
 
     if (!expect_peek(p, t_Lbrace)) {
-        node_destroy(ie->condition);
-        free(ie->tok.literal);
-        free(ie);
+        node_destroy((Node){ n_IfExpression, ie });
         return (Node){};
     }
 
     ie->consequence = parse_block_statement(p);
+    if (ie->consequence == NULL) {
+        node_destroy((Node){ n_IfExpression, ie });
+        return (Node){};
+    }
 
     if (peek_token_is(p, t_Else)) {
         next_token(p);
         free(p->cur_token.literal); // 'else' tok
         if (!expect_peek(p, t_Lbrace)) {
-            node_destroy(ie->condition);
-            node_destroy((Node){ n_BlockStatement, ie->consequence });
-            free(ie->tok.literal);
-            free(ie);
+            node_destroy((Node){ n_IfExpression, ie });
             return (Node){};
         }
+
         ie->alternative = parse_block_statement(p);
+        if (ie->alternative == NULL) {
+            node_destroy((Node){ n_IfExpression, ie });
+            return (Node){};
+        }
     }
 
     return (Node){ n_IfExpression, ie };
@@ -507,10 +518,7 @@ parse_let_statement(Parser* p) {
     stmt->name->value = p->cur_token.literal;
 
     if (!expect_peek(p, t_Assign)) {
-        free(stmt->name->tok.literal);
-        free(stmt->name);
-        free(stmt->tok.literal);
-        free(stmt);
+        node_destroy((Node){ n_LetStatement, stmt });
         return (Node){};
     }
     free(p->cur_token.literal); // '=' tok
@@ -518,10 +526,7 @@ parse_let_statement(Parser* p) {
 
     stmt->value = parse_expression(p, p_Lowest);
     if (stmt->value.obj == NULL) {
-        free(stmt->name->tok.literal);
-        free(stmt->name);
-        free(stmt->tok.literal);
-        free(stmt);
+        node_destroy((Node){ n_LetStatement, stmt });
         return (Node){};
     }
 

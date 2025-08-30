@@ -30,7 +30,7 @@ void start(FILE* in, FILE* out) {
             break;
         }
 
-        Lexer l = lexer_new(input, len);
+        Lexer l = lexer_new(input);
         Parser p;
         parser_init(&p, &l);
         Program prog = parse_program(&p);

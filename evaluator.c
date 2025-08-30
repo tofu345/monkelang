@@ -8,48 +8,64 @@
 
 Object eval(Node n);
 
-#define _BOOL(b) (Object){ o_Boolean, {.boolean = b} }
+#define OBJ(t, d) (Object){ t, {d} }
+#define NULL_OBJ(b) (Object){} // `typ` == 0 == o_Null
+#define BOOL(b) (Object){ o_Boolean, {.boolean = b} }
+
 #define STR_EQ(exp, str) strcmp(exp, str) == 0
+
+bool is_truthy(Object o) {
+    switch (o.typ) {
+        case o_Null: return false;
+        case o_Boolean: return o.data.boolean;
+        default: return true; // TODO? c-like?
+    }
+}
 
 static Object
 eval_integer_literal(IntegerLiteral* il) {
-    return (Object){ o_Integer, {il->value} };
+    return OBJ(o_Integer, il->value);
 }
 
 static Object
 eval_float_literal(FloatLiteral* fl) {
-    return (Object){ o_Float, {fl->value} };
+    return OBJ(o_Float, fl->value);
 }
 
 static Object
-eval_statements(Node* stmt, size_t len) {
+eval_block_statement(Node* stmt, size_t len) {
     Object result = {};
     for (size_t i = 0; i < len; i++) {
         result = eval(stmt[i]);
+        if (result.typ == o_ReturnValue) {
+            return result;
+        }
     }
     return result;
 }
 
 static Object
 eval_minus_prefix_operator_expression(Object right) {
-    if (right.typ == o_Integer) {
-        return (Object){ o_Integer, {-right.data.integer} };
-    } else if (right.typ == o_Float) {
-        return (Object){ o_Float, {-right.data.floating} };
-    } else
-        return (Object){};
-    return right;
+    switch (right.typ) {
+        case o_Integer:
+            return OBJ(o_Integer, -right.data.integer);
+        case o_Float:
+            return OBJ(o_Float, -right.data.floating);
+        default:
+            return NULL_OBJ();
+    }
 }
 
 static Object
 eval_bang_operator_expression(Object right) {
-    if (right.typ == o_Boolean) {
-        return _BOOL(!right.data.boolean);
-
-    } else if (right.typ == o_Null) {
-        return _BOOL(true);
+    switch (right.typ) {
+        case o_Boolean:
+            return BOOL(!right.data.boolean);
+        case o_Null:
+            return BOOL(true);
+        default:
+            return BOOL(false);
     }
-    return _BOOL(false);
 }
 
 static Object
@@ -63,7 +79,7 @@ eval_prefix_expression(PrefixExpression* pe) {
         return eval_minus_prefix_operator_expression(right);
     }
 
-    return (Object){};
+    return NULL_OBJ();
 }
 
 static double
@@ -98,22 +114,22 @@ eval_float_infix_expression(char* op, Object left, Object right) {
         left_val /= right_val;
 
     } else if (STR_EQ("<", op)) {
-        return _BOOL(left_val < right_val);
+        return BOOL(left_val < right_val);
 
     } else if (STR_EQ(">", op)) {
-        return _BOOL(left_val > right_val);
+        return BOOL(left_val > right_val);
 
     } else if (STR_EQ("==", op)) {
-        return _BOOL(left_val == right_val);
+        return BOOL(left_val == right_val);
 
     } else if (STR_EQ("!=", op)) {
-        return _BOOL(left_val != right_val);
+        return BOOL(left_val != right_val);
 
     } else {
-        return (Object){};
+        return NULL_OBJ();
     }
 
-    return (Object){ o_Float, {left_val} };
+    return OBJ(o_Float, left_val);
 }
 
 static Object
@@ -134,22 +150,22 @@ eval_integer_infix_expression(char* op, Object left, Object right) {
         left_val /= right_val;
 
     } else if (STR_EQ("<", op)) {
-        return _BOOL(left_val < right_val);
+        return BOOL(left_val < right_val);
 
     } else if (STR_EQ(">", op)) {
-        return _BOOL(left_val > right_val);
+        return BOOL(left_val > right_val);
 
     } else if (STR_EQ("==", op)) {
-        return _BOOL(left_val == right_val);
+        return BOOL(left_val == right_val);
 
     } else if (STR_EQ("!=", op)) {
-        return _BOOL(left_val != right_val);
+        return BOOL(left_val != right_val);
 
     } else {
-        return (Object){};
+        return NULL_OBJ();
     }
 
-    return (Object){ o_Integer, {left_val} };
+    return OBJ(o_Integer, left_val);
 }
 
 static Object
@@ -164,16 +180,37 @@ eval_infix_expression(InfixExpression* ie) {
         return eval_float_infix_expression(ie->op, left, right);
 
     } else if (STR_EQ("==", ie->op)) {
-        return _BOOL(left.data.boolean == right.data.boolean);
+        return BOOL(left.data.boolean == right.data.boolean);
 
     } else if (STR_EQ("!=", ie->op)) {
-        return _BOOL(left.data.boolean != right.data.boolean);
+        return BOOL(left.data.boolean != right.data.boolean);
     }
-    return (Object){};
+
+    return NULL_OBJ();
+}
+
+static Object
+eval_if_expression(IfExpression* ie) {
+    Object condition = eval(ie->condition);
+    if (is_truthy(condition)) {
+        return eval((Node){ n_BlockStatement, ie->consequence });
+
+    } else if (ie->alternative != NULL) {
+        return eval((Node){ n_BlockStatement, ie->alternative });
+    }
+
+    return NULL_OBJ();
 }
 
 Object eval(Node n) {
     switch (n.typ) {
+        case n_BlockStatement:
+            {
+                BlockStatement* b = n.obj;
+                return eval_block_statement(b->statements, b->len);
+            }
+        case n_IfExpression:
+            return eval_if_expression(n.obj);
         case n_IntegerLiteral:
             return eval_integer_literal(n.obj);
         case n_FloatLiteral:
@@ -181,20 +218,34 @@ Object eval(Node n) {
         case n_BooleanLiteral:
             {
                 BooleanLiteral* b = n.obj;
-                return _BOOL(b->value);
+                return BOOL(b->value);
             }
         case n_PrefixExpression:
             return eval_prefix_expression(n.obj);
         case n_InfixExpression:
             return eval_infix_expression(n.obj);
+        case n_ReturnStatement:
+            {
+                ReturnStatement* ns = n.obj;
+                return to_return_value(eval(ns->return_value));
+            }
         case n_ExpressionStatement:
-            return eval(
-                    ((ExpressionStatement*)n.obj)->expression);
+            {
+                ExpressionStatement* es = n.obj;
+                return eval(es->expression);
+            }
         default:
-            return (Object){};
+            return NULL_OBJ();
     }
 }
 
 Object eval_program(const Program* p) {
-    return eval_statements(p->stmts, p->len);
+    Object result = {};
+    for (size_t i = 0; i < p->len; i++) {
+        result = eval(p->stmts[i]);
+        if (result.typ == o_ReturnValue) {
+            return from_return_value(result);
+        }
+    }
+    return result;
 }

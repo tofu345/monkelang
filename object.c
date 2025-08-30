@@ -6,10 +6,20 @@
 
 void object_destroy(Object* o) {
     switch (o->typ) {
+        case o_Float:
+        case o_Integer:
         case o_Boolean:
         case o_Null:
             break;
+        case o_ReturnValue:
+            {
+                // TODO: replace with garbage collector
+                Object* val = o->data.ptr;
+                object_destroy(val);
+                free(val);
+            }
         default:
+            // TODO: panic if type not handled
             break;
     }
 }
@@ -55,18 +65,31 @@ int object_fprint(Object o, FILE* fp) {
     }
 }
 
+Object to_return_value(Object obj) {
+    struct ReturnValue* return_val = (void*)&obj;
+    return_val->value_typ = return_val->typ;
+    return_val->typ = o_ReturnValue;
+    return obj;
+}
+
+Object from_return_value(Object obj) {
+    struct ReturnValue* return_val = (void*)&obj;
+    return_val->typ = return_val->value_typ;
+    return obj;
+}
+
 const char* object_types[] = {
+    "Null",
     "Integer",
     "Float",
     "Boolean",
-    "Null",
 };
 
 const char* show_object_type(ObjectType t) {
     static size_t len = sizeof(object_types) / sizeof(object_types[0]);
-    if (t == 0 || t > len) {
-        fprintf(stderr, "show_object_type: invalid object_type %d", t);
+    if (t >= len) {
+        fprintf(stderr, "show_object_type: invalid object_type %d\n", t);
         exit(1);
     }
-    return object_types[t - 1];
+    return object_types[t];
 }

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 
 static void read_char(Lexer* l) {
     if (l->read_position >= l->input_len) {
@@ -12,22 +13,22 @@ static void read_char(Lexer* l) {
         l->ch = l->input[l->read_position];
     }
 
+    l->position = l->read_position;
+    l->read_position += 1;
+
     if (l->ch == '\n') {
         l->line++;
         l->col = 0;
     } else {
         l->col++;
     }
-
-    l->position = l->read_position;
-    l->read_position += 1;
 }
 
-Lexer lexer_new(const char* input, size_t len) {
+Lexer lexer_new(const char* input) {
     Lexer l = {};
     l.line = 1;
     l.input = input;
-    l.input_len = len;
+    l.input_len = strlen(input);
     read_char(&l);
     return l;
 }
@@ -186,6 +187,8 @@ Token lexer_next_token(Lexer* l) {
         tok = new_token(l, t_Rbrace, l->ch);
         break;
     case 0:
+        tok.line = l->line;
+        tok.col = l->col;
         tok.literal = NULL;
         tok.type = t_Eof;
         break;

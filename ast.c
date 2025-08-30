@@ -211,7 +211,8 @@ static void
 destroy_if_expression(IfExpression* ie) {
     free(ie->tok.literal);
     node_destroy(ie->condition);
-    destroy_block_statement(ie->consequence);
+    if (ie->consequence != NULL)
+        destroy_block_statement(ie->consequence);
     if (ie->alternative != NULL)
         destroy_block_statement(ie->alternative);
     free(ie);
@@ -225,7 +226,8 @@ destroy_function_literal(FunctionLiteral* fl) {
         free(fl->params[i]);
     }
     free(fl->params);
-    destroy_block_statement(fl->body);
+    if (fl->body != NULL)
+        destroy_block_statement(fl->body);
     free(fl);
 }
 

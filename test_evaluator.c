@@ -25,8 +25,8 @@ check_parser_errors(Parser* p) {
 }
 
 static Object
-test_eval(char* input, size_t input_len) {
-    Lexer l = lexer_new(input, input_len);
+test_eval(char* input) {
+    Lexer l = lexer_new(input);
     Parser p;
     parser_init(&p, &l);
     Program prog = parse_program(&p);
@@ -74,7 +74,7 @@ void test_eval_integer_expression(void) {
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
     for (size_t i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        Object evaluated = test_eval(test.input, strlen(test.input));
+        Object evaluated = test_eval(test.input);
         test_integer_object(evaluated, test.expected);
         object_destroy(&evaluated);
     }
@@ -117,7 +117,7 @@ void test_eval_boolean_expression(void) {
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
     for (size_t i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        Object evaluated = test_eval(test.input, strlen(test.input));
+        Object evaluated = test_eval(test.input);
         test_boolean_object(evaluated, test.expected);
         object_destroy(&evaluated);
     }
@@ -138,8 +138,68 @@ void test_bang_operator(void) {
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
     for (size_t i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        Object evaluated = test_eval(test.input, strlen(test.input));
+        Object evaluated = test_eval(test.input);
         test_boolean_object(evaluated, test.expected);
+        object_destroy(&evaluated);
+    }
+}
+
+void test_null_object(Object o) {
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            "Null", show_object_type(o.typ),
+            "object is not null");
+}
+
+void test_if_else_expression(void) {
+    struct Test {
+        char* input;
+        long expected;
+    } tests[] = {
+        {"if (true) { 10 }", 10},
+        {"if (false) { 10 }", 0}, // NULL
+        {"if (1) { 10 }", 10},
+        {"if (1 < 2) { 10 }", 10},
+        {"if (1 > 2) { 10 }", 0}, // NULL
+        {"if (1 > 2) { 10 } else { 20 }", 20},
+        {"if (1 < 2) { 10 } else { 20 }", 10},
+    };
+    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
+    for (size_t i = 0; i < tests_len; i++) {
+        struct Test test = tests[i];
+        Object evaluated = test_eval(test.input);
+        if (test.expected == 0) {
+            test_null_object(evaluated);
+        } else {
+            test_integer_object(evaluated, test.expected);
+        }
+        object_destroy(&evaluated);
+    }
+}
+
+void test_return_statements(void) {
+    struct Test {
+        char* input;
+        long expected;
+    } tests[] = {
+        {"return 10;", 10},
+        {"return 10; 9;", 10},
+        {"return 2 * 5; 9;", 10},
+        {"9; return 2 * 5; 9;", 10},
+        {
+            "if (10 > 1) {\
+                if (10 > 1) {\
+                    return 10;\
+                }\
+                return 1;\
+            }",
+            10,
+        },
+    };
+    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
+    for (size_t i = 0; i < tests_len; i++) {
+        struct Test test = tests[i];
+        Object evaluated = test_eval(test.input);
+        test_integer_object(evaluated, test.expected);
         object_destroy(&evaluated);
     }
 }
@@ -149,5 +209,7 @@ int main(void) {
     RUN_TEST(test_eval_integer_expression);
     RUN_TEST(test_eval_boolean_expression);
     RUN_TEST(test_bang_operator);
+    RUN_TEST(test_if_else_expression);
+    RUN_TEST(test_return_statements);
     return UNITY_END();
 }

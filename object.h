@@ -3,15 +3,15 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-struct Null {};
-
 typedef enum __attribute__ ((__packed__)) {
     // Primitives (not heap allocated)
-    o_Null,
+    o_Null, // TODO? `null` tokens, lexing and parsing?
     o_Integer,
     o_Float,
     o_Boolean,
-    // Heap allocated
+    o_ReturnValue, // if `ObjectType` is `o_ReturnValue`
+                   // `Object` is cast into `struct ReturnValue`.
+    // Heap allocated (uses `.ptr`)
 } ObjectType;
 
 typedef union {
@@ -22,10 +22,20 @@ typedef union {
 } ObjectData;
 
 typedef struct {
-    ObjectType typ; // err if 0
+    ObjectType typ;
     ObjectData data;
 } Object;
 
 int object_fprint(Object o, FILE* fp);
 const char* show_object_type(ObjectType t);
 void object_destroy(Object* o);
+
+// stores the actual type of `value` in second byte
+struct ReturnValue {
+    ObjectType typ; // will be `o_ReturnValue`
+    ObjectType value_typ;
+    ObjectData value;
+};
+
+Object to_return_value(Object obj);
+Object from_return_value(Object obj);

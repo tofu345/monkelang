@@ -43,9 +43,8 @@ return 5;\
 return 10;\
 return 993322;\
 ";
-    size_t input_len = strlen(input);
 
-    Lexer l = lexer_new(input, input_len);
+    Lexer l = lexer_new(input);
     Parser p;
     parser_init(&p, &l);
     Program prog = parse_program(&p);
@@ -69,9 +68,8 @@ return 993322;\
 
 void test_identifier_expression(void) {
     char* input = "foobar;";
-    size_t input_len = strlen(input);
 
-    Lexer l = lexer_new(input, input_len);
+    Lexer l = lexer_new(input);
     Parser p;
     parser_init(&p, &l);
     Program prog = parse_program(&p);
@@ -130,9 +128,8 @@ test_float_literal(Node n, double value) {
 
 void test_integer_literal_expression(void) {
     char* input = "5;";
-    size_t input_len = strlen(input);
 
-    Lexer l = lexer_new(input, input_len);
+    Lexer l = lexer_new(input);
     Parser p;
     parser_init(&p, &l);
     Program prog = parse_program(&p);
@@ -161,9 +158,8 @@ void test_integer_literal_expression(void) {
 
 void test_float_literal_expression(void) {
     char* input = "5.01;";
-    size_t input_len = strlen(input);
 
-    Lexer l = lexer_new(input, input_len);
+    Lexer l = lexer_new(input);
     Parser p;
     parser_init(&p, &l);
     Program prog = parse_program(&p);
@@ -262,7 +258,7 @@ void test_let_statements(void) {
     for (size_t i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
-        Lexer l = lexer_new(test.input, strlen(test.input));
+        Lexer l = lexer_new(test.input);
         Parser p;
         parser_init(&p, &l);
         Program prog = parse_program(&p);
@@ -295,7 +291,7 @@ void test_parsing_prefix_expressions(void) {
     for (size_t i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
-        Lexer l = lexer_new(test.input, strlen(test.input));
+        Lexer l = lexer_new(test.input);
         Parser p;
         parser_init(&p, &l);
         Program prog = parse_program(&p);
@@ -347,7 +343,7 @@ void test_parsing_infix_expressions(void) {
     for (size_t i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
-        Lexer l = lexer_new(test.input, strlen(test.input));
+        Lexer l = lexer_new(test.input);
         Parser p;
         parser_init(&p, &l);
         Program prog = parse_program(&p);
@@ -496,7 +492,7 @@ void test_operator_precedence_parsing(void) {
     for (size_t i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
-        Lexer l = lexer_new(test.input, strlen(test.input));
+        Lexer l = lexer_new(test.input);
         Parser p;
         parser_init(&p, &l);
         Program prog = parse_program(&p);
@@ -551,7 +547,7 @@ void test_boolean_expression(void) {
     for (size_t i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
-        Lexer l = lexer_new(test.input, strlen(test.input));
+        Lexer l = lexer_new(test.input);
         Parser p;
         parser_init(&p, &l);
         Program prog = parse_program(&p);
@@ -578,9 +574,8 @@ void test_boolean_expression(void) {
 
 void test_if_expression(void) {
     char* input = "if (x < y) { x }";
-    size_t input_len = strlen(input);
 
-    Lexer l = lexer_new(input, input_len);
+    Lexer l = lexer_new(input);
     Parser p;
     parser_init(&p, &l);
     Program prog = parse_program(&p);
@@ -617,9 +612,8 @@ void test_if_expression(void) {
 
 void test_if_else_expression(void) {
     char* input = "if (x < y) { x } else { y }";
-    size_t input_len = strlen(input);
 
-    Lexer l = lexer_new(input, input_len);
+    Lexer l = lexer_new(input);
     Parser p;
     parser_init(&p, &l);
     Program prog = parse_program(&p);
@@ -661,9 +655,8 @@ void test_if_else_expression(void) {
 
 void test_function_literal_parsing(void) {
     char* input = "fn(x, y) { x + y; }";
-    size_t input_len = strlen(input);
 
-    Lexer l = lexer_new(input, input_len);
+    Lexer l = lexer_new(input);
     Parser p;
     parser_init(&p, &l);
     Program prog = parse_program(&p);
@@ -718,7 +711,7 @@ void test_function_parameter_parsing(void) {
     for (size_t i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
-        Lexer l = lexer_new(test.input, strlen(test.input));
+        Lexer l = lexer_new(test.input);
         Parser p;
         parser_init(&p, &l);
         Program prog = parse_program(&p);
@@ -745,9 +738,8 @@ void test_function_parameter_parsing(void) {
 
 void test_call_expression_parsing(void) {
     char* input = "add(1, 2 * 3, 4 + 5);";
-    size_t input_len = strlen(input);
 
-    Lexer l = lexer_new(input, input_len);
+    Lexer l = lexer_new(input);
     Parser p;
     parser_init(&p, &l);
     Program prog = parse_program(&p);
