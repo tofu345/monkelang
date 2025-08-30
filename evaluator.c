@@ -11,11 +11,6 @@ Object eval(Node n);
 #define _BOOL(b) (Object){ o_Boolean, {.boolean = b} }
 #define STR_EQ(exp, str) strcmp(exp, str) == 0
 
-// better dereferencing an actual NULL?
-const struct Null Null = {};
-#define _NULL() (Object){ o_Null, {.null = (void*)&Null} }
-#define IS_NULL(obj) obj.data.null == &Null
-
 static Object
 eval_integer_literal(IntegerLiteral* il) {
     return (Object){ o_Integer, {il->value} };
@@ -28,7 +23,7 @@ eval_float_literal(FloatLiteral* fl) {
 
 static Object
 eval_statements(Node* stmt, size_t len) {
-    Object result = _NULL();
+    Object result = {};
     for (size_t i = 0; i < len; i++) {
         result = eval(stmt[i]);
     }
@@ -42,7 +37,7 @@ eval_minus_prefix_operator_expression(Object right) {
     } else if (right.typ == o_Float) {
         return (Object){ o_Float, {-right.data.floating} };
     } else
-        return _NULL();
+        return (Object){};
     return right;
 }
 
@@ -51,7 +46,7 @@ eval_bang_operator_expression(Object right) {
     if (right.typ == o_Boolean) {
         return _BOOL(!right.data.boolean);
 
-    } else if (IS_NULL(right)) {
+    } else if (right.typ == o_Null) {
         return _BOOL(true);
     }
     return _BOOL(false);
@@ -67,7 +62,8 @@ eval_prefix_expression(PrefixExpression* pe) {
     } else if (STR_EQ("-", pe->op)) {
         return eval_minus_prefix_operator_expression(right);
     }
-    return _NULL();
+
+    return (Object){};
 }
 
 static double
@@ -114,7 +110,7 @@ eval_float_infix_expression(char* op, Object left, Object right) {
         return _BOOL(left_val != right_val);
 
     } else {
-        return _NULL();
+        return (Object){};
     }
 
     return (Object){ o_Float, {left_val} };
@@ -150,7 +146,7 @@ eval_integer_infix_expression(char* op, Object left, Object right) {
         return _BOOL(left_val != right_val);
 
     } else {
-        return _NULL();
+        return (Object){};
     }
 
     return (Object){ o_Integer, {left_val} };
@@ -163,14 +159,17 @@ eval_infix_expression(InfixExpression* ie) {
 
     if (left.typ == o_Integer && right.typ == o_Integer) {
         return eval_integer_infix_expression(ie->op, left, right);
+
     } else if (left.typ == o_Float || right.typ == o_Float) {
         return eval_float_infix_expression(ie->op, left, right);
+
     } else if (STR_EQ("==", ie->op)) {
         return _BOOL(left.data.boolean == right.data.boolean);
+
     } else if (STR_EQ("!=", ie->op)) {
         return _BOOL(left.data.boolean != right.data.boolean);
     }
-    return _NULL();
+    return (Object){};
 }
 
 Object eval(Node n) {
@@ -192,7 +191,7 @@ Object eval(Node n) {
             return eval(
                     ((ExpressionStatement*)n.obj)->expression);
         default:
-            return _NULL();
+            return (Object){};
     }
 }
 

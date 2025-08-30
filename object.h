@@ -1,25 +1,24 @@
 #pragma once
 
-// garbage collection based on [boot.dev: c memory mgmt course](https://www.youtube.com/watch?v=rJrd2QMVbGM)
-
 #include <stdio.h>
 #include <stdbool.h>
 
 struct Null {};
 
 typedef enum __attribute__ ((__packed__)) {
-    o_Integer = 1,
+    // Primitives (not heap allocated)
+    o_Null,
+    o_Integer,
     o_Float,
     o_Boolean,
-    o_Null, // last object type that cannot contain references to
-            // another `Object`.
+    // Heap allocated
 } ObjectType;
 
 typedef union {
     long integer;
     double floating;
     bool boolean;
-    void* null;
+    void* ptr;
 } ObjectData;
 
 typedef struct {
