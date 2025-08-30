@@ -10,14 +10,8 @@ void object_destroy(Object* o) {
         case o_Integer:
         case o_Boolean:
         case o_Null:
-            break;
         case o_ReturnValue:
-            {
-                // TODO: replace with garbage collector
-                Object* val = o->data.ptr;
-                object_destroy(val);
-                free(val);
-            }
+            break;
         default:
             // TODO: panic if type not handled
             break;
