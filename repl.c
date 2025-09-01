@@ -1,4 +1,5 @@
 #include "ast.h"
+#include "environment.h"
 #include "object.h"
 #include "parser.h"
 #include "lexer.h"
@@ -7,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 void print_parser_errors(FILE* out, Parser* p) {
     fprintf(out, "Woops! We ran into some monke business here!\n");
@@ -18,8 +18,7 @@ void print_parser_errors(FILE* out, Parser* p) {
 }
 
 void start(FILE* in, FILE* out) {
-    printf("Hello %s! This is the Monke Programming Language!\n",
-            getlogin());
+    Env* env = env_new();
 
     while (1) {
         fprintf(out, ">> ");
@@ -27,6 +26,7 @@ void start(FILE* in, FILE* out) {
         size_t len = 0;
 
         if (getline(&input, &len, in) == -1) {
+            free(input);
             break;
         }
 
@@ -39,16 +39,18 @@ void start(FILE* in, FILE* out) {
             continue;
         }
 
-        Object evaluated = eval_program(&prog);
+        Object evaluated = eval_program(&prog, env);
         if (evaluated.typ != o_Null) {
             object_fprint(evaluated, out);
             fprintf(out, "\n");
 
-            object_destroy(&evaluated);
+            // object_destroy(&evaluated);
         }
 
         program_destroy(&prog);
         parser_destroy(&p);
         free(input);
     }
+
+    env_destroy(env);
 }

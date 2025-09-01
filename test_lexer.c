@@ -114,7 +114,6 @@ if (5 < 10) {\
 		{t_Eof, ""},
     };
 
-    size_t len = sizeof(input) / sizeof(input[0]);
     size_t len_tests = sizeof(tests) / sizeof(tests[0]);
     Lexer l = lexer_new(input);
     for (size_t i = 0; i < len_tests; i++) {
@@ -184,10 +183,9 @@ let add = fn(x, y) {\n\
 		{t_Eq, "==", "8,4"},
 		{t_Int, "10", "8,7"},
 		{t_Semicolon, ";", "8,9"},
-		{t_Eof, "", "0,0"},
+		{t_Eof, "", "9,1"},
     };
 
-    size_t len = sizeof(input) / sizeof(input[0]);
     size_t len_tests = sizeof(tests) / sizeof(tests[0]);
     Lexer l = lexer_new(input);
     for (size_t i = 0; i < len_tests; i++) {

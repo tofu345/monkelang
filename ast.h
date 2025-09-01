@@ -7,6 +7,8 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#define NODE(t, p) (Node){ t, p }
+
 // no interfaces, so.. everything is a node, separated by order
 enum NodeType {
     // Expressions
@@ -113,6 +115,9 @@ typedef struct {
     size_t len;
     size_t cap;
 } BlockStatement;
+
+void destroy_block_statement(BlockStatement* bs);
+int fprint_block_statement(BlockStatement* bs, FILE* fp);
 
 typedef struct {
     Token tok; // the 'if' token

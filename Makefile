@@ -3,7 +3,8 @@ CFLAGS := -g -Wall -Wextra
 repl: .FORCE
 	@ gcc ${CFLAGS} -o build/repl.out \
 		main.c repl.c lexer.c token.c parser.c utils.c \
-		parser_tracing.c ast.c evaluator.c object.c
+		parser_tracing.c ast.c evaluator.c object.c environment.c \
+		hash-table/ht.c
 
 test_lexer: .FORCE
 	@ gcc ${CFLAGS} -o build/test_lexer.out \
@@ -21,6 +22,7 @@ test_ast: .FORCE
 test_evaluator: .FORCE
 	@ gcc ${CFLAGS} -o build/test_evaluator.out \
 		unity/* test_evaluator.c evaluator.c object.c utils.c \
-		parser.c parser_tracing.c ast.c lexer.c token.c
+		parser.c parser_tracing.c ast.c lexer.c token.c environment.c \
+		hash-table/ht.c
 
 .FORCE:

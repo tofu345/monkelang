@@ -52,8 +52,7 @@ fprint_infix_expression(InfixExpression* ie, FILE* fp) {
     return 0;
 }
 
-static int
-fprint_block_statement(BlockStatement* bs, FILE* fp) {
+int fprint_block_statement(BlockStatement* bs, FILE* fp) {
     for (size_t i = 0; i < bs->len; i++) {
         NODE_FPRINT(fp, bs->statements[i]);
     }
@@ -198,8 +197,7 @@ destroy_infix_expression(InfixExpression* ie) {
     free(ie);
 }
 
-static void
-destroy_block_statement(BlockStatement* bs) {
+void destroy_block_statement(BlockStatement* bs) {
     free(bs->tok.literal);
     for (size_t i = 0; i < bs->len; i++)
         node_destroy(bs->statements[i]);
@@ -221,11 +219,13 @@ destroy_if_expression(IfExpression* ie) {
 static void
 destroy_function_literal(FunctionLiteral* fl) {
     free(fl->tok.literal);
-    for (size_t i = 0; i < fl->params_len; i++) {
-        free(fl->params[i]->value);
-        free(fl->params[i]);
+    if (fl->params != NULL) {
+        for (size_t i = 0; i < fl->params_len; i++) {
+            free(fl->params[i]->value);
+            free(fl->params[i]);
+        }
+        free(fl->params);
     }
-    free(fl->params);
     if (fl->body != NULL)
         destroy_block_statement(fl->body);
     free(fl);

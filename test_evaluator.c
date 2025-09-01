@@ -1,3 +1,5 @@
+#include "ast.h"
+#include "environment.h"
 #include "unity/unity.h"
 #include "object.h"
 #include "evaluator.h"
@@ -5,6 +7,7 @@
 #include "parser.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 void setUp(void) {}
@@ -32,12 +35,10 @@ test_eval(char* input) {
     Program prog = parse_program(&p);
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
     check_parser_errors(&p);
-
-    Object evaluated = eval_program(&prog);
-
+    Env* env = env_new();
+    Object evaluated = eval_program(&prog, env);
     program_destroy(&prog);
     parser_destroy(&p);
-
     return evaluated;
 }
 
@@ -204,6 +205,143 @@ void test_return_statements(void) {
     }
 }
 
+void test_error_handling(void) {
+    struct Test {
+        char* input;
+        char* error_msg;
+    } tests[] = {
+        {
+            "5 + true;",
+            "type mismatch: Integer + Boolean",
+        },
+        {
+            "5 + true; 5;",
+            "type mismatch: Integer + Boolean",
+        },
+        {
+            "-true",
+            "unknown operator: -Boolean",
+        },
+        {
+            "true + false;",
+            "unknown operator: Boolean + Boolean",
+        },
+        {
+            "5; true + false; 5",
+            "unknown operator: Boolean + Boolean",
+        },
+        {
+            "if (10 > 1) { true + false; }",
+            "unknown operator: Boolean + Boolean",
+        },
+        {
+            "if (10 > 1) {\
+                if (10 > 1) {\
+                    return true + false;\
+                }\
+            \
+                return 1;\
+            }",
+            "unknown operator: Boolean + Boolean",
+        },
+        {
+            "foobar",
+            "identifier not found: foobar",
+        },
+    };
+    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
+    for (size_t i = 0; i < tests_len; i++) {
+        struct Test test = tests[i];
+        Object error = test_eval(test.input);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(
+                show_object_type(o_Error),
+                show_object_type(error.typ), "wrong object type");
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(
+                test.error_msg, error.data.error_msg,
+                "error has wrong message");
+        object_destroy(&error);
+    }
+}
+
+void test_let_statements(void) {
+    struct Test {
+        char* input;
+        long expected;
+    } tests[] = {
+        {"let a = 5; a;", 5},
+        {"let a = 5 * 5; a;", 25},
+        {"let a = 5; let b = a; b;", 5},
+        {"let a = 5; let b = a; let c = a + b + 5; c;", 15},
+    };
+    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
+    for (size_t i = 0; i < tests_len; i++) {
+        struct Test test = tests[i];
+        Object evaluated = test_eval(test.input);
+        test_integer_object(evaluated, test.expected);
+        object_destroy(&evaluated);
+    }
+}
+
+void test_function_object(void) {
+    char* input = "fn(x) { x + 2; };";
+    Lexer l = lexer_new(input);
+    Parser p;
+    parser_init(&p, &l);
+    Program prog = parse_program(&p);
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts, "program.statements NULL");
+    check_parser_errors(&p);
+    Env* env = env_new();
+    Object evaluated = eval_program(&prog, env);
+
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            show_object_type(o_Function), show_object_type(evaluated.typ),
+            "wrong object type");
+
+    Function* fn = evaluated.data.func;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            1, fn->params_len, "wrong number of parameters");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            "x", fn->params[0]->value, "wrong paramater");
+
+    char* expected_body = "(x + 2)";
+
+    char* buf = NULL;
+    size_t len;
+    FILE* fp = open_memstream(&buf, &len);
+    int err = node_fprint((Node){ n_BlockStatement, fn->body }, fp);
+    if (err == -1) TEST_FAIL_MESSAGE("node_fprint fail");
+    fclose(fp);
+
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            expected_body, buf, "wrong function body");
+
+    free(buf);
+    object_destroy(&evaluated);
+    program_destroy(&prog);
+    parser_destroy(&p);
+}
+
+void test_function_application(void) {
+    struct Test {
+        char* input;
+        long expected;
+    } tests[] = {
+        {"let identity = fn(x) { x; }; identity(5);", 5},
+        {"let identity = fn(x) { return x; }; identity(5);", 5},
+        {"let double = fn(x) { x * 2; }; double(5);", 10},
+        {"let add = fn(x, y) { x + y; }; add(5, 5);", 10},
+        {"let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", 20},
+        {"fn(x) { x; }(5)", 5},
+    };
+    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
+    for (size_t i = 0; i < tests_len; i++) {
+        struct Test test = tests[i];
+        Object evaluated = test_eval(test.input);
+        test_integer_object(evaluated, test.expected);
+        object_destroy(&evaluated);
+    }
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_eval_integer_expression);
@@ -211,5 +349,8 @@ int main(void) {
     RUN_TEST(test_bang_operator);
     RUN_TEST(test_if_else_expression);
     RUN_TEST(test_return_statements);
+    RUN_TEST(test_error_handling);
+    RUN_TEST(test_function_object);
+    RUN_TEST(test_function_application);
     return UNITY_END();
 }

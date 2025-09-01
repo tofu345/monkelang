@@ -1,8 +1,11 @@
 #include "object.h"
+#include "ast.h"
+#include "environment.h"
 #include "utils.h"
 
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 void object_destroy(Object* o) {
     switch (o->typ) {
@@ -12,6 +15,21 @@ void object_destroy(Object* o) {
         case o_Null:
         case o_ReturnValue:
             break;
+        case o_Error:
+            free(o->data.error_msg);
+            break;
+        case o_Function:
+            {
+                Function* fn = o->data.func;
+                for (size_t i = 0; i < fn->params_len; i++) {
+                    free(fn->params[i]->value);
+                    free(fn->params[i]);
+                }
+                free(fn->params);
+                destroy_block_statement(fn->body);
+                // env_destroy(fn->env);
+                free(fn);
+            }
         default:
             // TODO: panic if type not handled
             break;
@@ -42,6 +60,27 @@ fprintf_null(FILE* fp) {
     return 0;
 }
 
+static int
+fprintf_error(ObjectData e, FILE* fp) {
+    FPRINTF(fp, "error: %s", e.error_msg);
+    return 0;
+}
+
+static int
+fprint_function(ObjectData d, FILE* fp) {
+    Function* fn = d.func;
+    FPRINTF(fp, "fn(");
+    for (size_t i = 0; i < fn->params_len - 1; i++) {
+        FPRINTF(fp, "%s, ", fn->params[i]->value);
+    }
+    if (fn->params_len >= 1)
+        FPRINTF(fp, "%s", fn->params[fn->params_len - 1]->value);
+    FPRINTF(fp, ") {\n");
+    fprint_block_statement(fn->body, fp);
+    FPRINTF(fp, "\n}\n");
+    return 0;
+}
+
 int object_fprint(Object o, FILE* fp) {
     switch (o.typ) {
         case o_Integer:
@@ -52,10 +91,40 @@ int object_fprint(Object o, FILE* fp) {
             return fprintf_boolean(o.data, fp);
         case o_Null:
             return fprintf_null(fp);
+        case o_Error:
+            return fprintf_error(o.data, fp);
+        case o_Function:
+            return fprint_function(o.data, fp);
         default:
             fprintf(stderr, "object_fprint: object type not handled %d\n",
                     o.typ);
             exit(1);
+    }
+}
+
+bool object_cmp(Object left, Object right) {
+    if (left.typ != right.typ) return false;
+
+    switch (left.typ) {
+        case o_Float:
+            return left.data.floating == right.data.floating;
+        case o_Integer:
+            return left.data.integer == right.data.integer;
+        case o_Boolean:
+            return left.data.boolean == right.data.boolean;
+        case o_Null:
+            return true;
+        case o_Error:
+            return !strcmp(left.data.error_msg, right.data.error_msg);
+        case o_ReturnValue:
+            return object_cmp(
+                    from_return_value(left),
+                    from_return_value(right));
+        default:
+            fprintf(stderr, "object_cmp: object type not handled %s\n",
+                    show_object_type(left.typ));
+            exit(1);
+            break;
     }
 }
 
@@ -77,6 +146,9 @@ const char* object_types[] = {
     "Integer",
     "Float",
     "Boolean",
+    "ReturnValue",
+    "Error",
+    "Function",
 };
 
 const char* show_object_type(ObjectType t) {

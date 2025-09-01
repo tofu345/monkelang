@@ -160,7 +160,7 @@ parse_identifier(Parser* p) {
     if (id == NULL) exit_nomem();
     id->tok = p->cur_token;
     id->value = p->cur_token.literal;
-    return (Node){ n_Identifier, id };
+    return NODE(n_Identifier, id);
 }
 
 static Node
@@ -190,7 +190,7 @@ parse_integer_literal(Parser* p) {
 
     int_lit->value = value;
     untrace("parse_integer_literal");
-    return (Node){ n_IntegerLiteral, int_lit };
+    return NODE(n_IntegerLiteral, int_lit);
 }
 
 static Node
@@ -213,7 +213,7 @@ parse_float_literal(Parser* p) {
     }
 
     fl_lit->value = value;
-    return (Node){ n_FloatLiteral, fl_lit };
+    return NODE(n_FloatLiteral, fl_lit);
 }
 
 static Node
@@ -235,7 +235,7 @@ parse_infix_expression(Parser* p, Node left) {
     }
 
     untrace("parse_infix_expression");
-    return (Node){ n_InfixExpression, ie };
+    return NODE(n_InfixExpression, ie);
 }
 
 static Node
@@ -255,7 +255,7 @@ parse_prefix_expression(Parser* p) {
     }
 
     untrace("parse_prefix_expression");
-    return (Node){ n_PrefixExpression, pe };
+    return NODE(n_PrefixExpression, pe);
 }
 
 static Node
@@ -263,7 +263,7 @@ parse_boolean(Parser* p) {
     BooleanLiteral* b = malloc(sizeof(BooleanLiteral));
     b->tok = p->cur_token;
     b->value = cur_token_is(p, t_True);
-    return (Node){ n_BooleanLiteral, b };
+    return NODE(n_BooleanLiteral, b);
 }
 
 static Node
@@ -305,7 +305,7 @@ parse_block_statement(Parser* p) {
         free(p->cur_token.literal); // '}' token
     } else {
         cur_tok_error(p, t_Rbrace);
-        node_destroy((Node){ n_BlockStatement, bs });
+        node_destroy(NODE(n_BlockStatement, bs));
         return NULL;
     }
 
@@ -316,6 +316,7 @@ parse_block_statement(Parser* p) {
 static int
 parse_function_parameters(Parser* p, FunctionLiteral* fl) {
     fl->params = malloc(START_CAPACITY * sizeof(Identifier*));
+    if (fl->params == NULL) exit_nomem();
     fl->params_len = 0;
     fl->params_cap = START_CAPACITY;
 
@@ -336,6 +337,7 @@ parse_function_parameters(Parser* p, FunctionLiteral* fl) {
     }
 
     Identifier* ident = malloc(sizeof(Identifier));
+    if (ident == NULL) exit_nomem();
     ident->tok = p->cur_token;
     ident->value = p->cur_token.literal;
     fl->params[0] = ident;
@@ -376,19 +378,20 @@ parse_function_literal(Parser* p) {
         return (Node){};
     }
 
+    fl->body = NULL;
     int err = parse_function_parameters(p, fl);
     if (err == -1 || !expect_peek(p, t_Lbrace)) {
-        node_destroy((Node){ n_FunctionLiteral, fl });
+        node_destroy(NODE(n_FunctionLiteral, fl));
         return (Node){};
     }
 
     fl->body = parse_block_statement(p);
     if (fl->body == NULL) {
-        node_destroy((Node){ n_FunctionLiteral, fl });
+        node_destroy(NODE(n_FunctionLiteral, fl));
         return (Node){};
     }
 
-    return (Node){ n_FunctionLiteral, fl };
+    return NODE(n_FunctionLiteral, fl);
 }
 
 static int
@@ -447,7 +450,7 @@ parse_call_expression(Parser* p, Node function) {
         return (Node){};
     }
     free(p->cur_token.literal);
-    return (Node){ n_CallExpression, ce };
+    return NODE(n_CallExpression, ce);
 }
 
 static Node
@@ -466,19 +469,19 @@ parse_if_expression(Parser* p) {
     next_token(p);
     ie->condition = parse_expression(p, p_Lowest);
     if (ie->condition.obj == NULL || !expect_peek(p, t_Rparen)) {
-        node_destroy((Node){ n_IfExpression, ie });
+        node_destroy(NODE(n_IfExpression, ie));
         return (Node){};
     }
     free(p->cur_token.literal); // ')' tok
 
     if (!expect_peek(p, t_Lbrace)) {
-        node_destroy((Node){ n_IfExpression, ie });
+        node_destroy(NODE(n_IfExpression, ie));
         return (Node){};
     }
 
     ie->consequence = parse_block_statement(p);
     if (ie->consequence == NULL) {
-        node_destroy((Node){ n_IfExpression, ie });
+        node_destroy(NODE(n_IfExpression, ie));
         return (Node){};
     }
 
@@ -486,18 +489,18 @@ parse_if_expression(Parser* p) {
         next_token(p);
         free(p->cur_token.literal); // 'else' tok
         if (!expect_peek(p, t_Lbrace)) {
-            node_destroy((Node){ n_IfExpression, ie });
+            node_destroy(NODE(n_IfExpression, ie));
             return (Node){};
         }
 
         ie->alternative = parse_block_statement(p);
         if (ie->alternative == NULL) {
-            node_destroy((Node){ n_IfExpression, ie });
+            node_destroy(NODE(n_IfExpression, ie));
             return (Node){};
         }
     }
 
-    return (Node){ n_IfExpression, ie };
+    return NODE(n_IfExpression, ie);
 }
 
 static Node
@@ -518,7 +521,7 @@ parse_let_statement(Parser* p) {
     stmt->name->value = p->cur_token.literal;
 
     if (!expect_peek(p, t_Assign)) {
-        node_destroy((Node){ n_LetStatement, stmt });
+        node_destroy(NODE(n_LetStatement, stmt));
         return (Node){};
     }
     free(p->cur_token.literal); // '=' tok
@@ -526,7 +529,7 @@ parse_let_statement(Parser* p) {
 
     stmt->value = parse_expression(p, p_Lowest);
     if (stmt->value.obj == NULL) {
-        node_destroy((Node){ n_LetStatement, stmt });
+        node_destroy(NODE(n_LetStatement, stmt));
         return (Node){};
     }
 
@@ -534,7 +537,7 @@ parse_let_statement(Parser* p) {
         next_token(p);
         free(p->cur_token.literal);
     }
-    return (Node){ n_LetStatement, stmt };
+    return NODE(n_LetStatement, stmt);
 }
 
 static Node
@@ -556,7 +559,7 @@ parse_return_statement(Parser* p) {
         next_token(p);
         free(p->cur_token.literal);
     }
-    return (Node){ n_ReturnStatement, stmt };
+    return NODE(n_ReturnStatement, stmt);
 }
 
 static Node
@@ -579,7 +582,7 @@ parse_expression_statement(Parser* p) {
     }
 
     untrace("parse_expression_statement");
-    return (Node){ n_ExpressionStatement, stmt };
+    return NODE(n_ExpressionStatement, stmt);
 }
 
 // on failure, return Node with `n.obj` == NULL
@@ -653,10 +656,8 @@ Program parse_program(Parser* p) {
             prog.stmts[prog.len] = stmt;
             prog.len++;
         }
-
         next_token(p);
     }
-
     return prog;
 }
 

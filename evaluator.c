@@ -1,18 +1,38 @@
 #include "evaluator.h"
 #include "ast.h"
+#include "environment.h"
 #include "object.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-Object eval(Node n);
+Object eval(Node n, Env* env);
 
 #define OBJ(t, d) (Object){ t, {d} }
-#define NULL_OBJ(b) (Object){} // `typ` == 0 == o_Null
+#define NULL_OBJ() (Object){} // `typ` == 0 == o_Null
 #define BOOL(b) (Object){ o_Boolean, {.boolean = b} }
 
 #define STR_EQ(exp, str) strcmp(exp, str) == 0
+#define IS_ERROR(obj) obj.typ == o_Error
+#define IS_NULL(obj) obj.typ == o_Null
+
+void alloc_fail() {
+    fprintf(stderr, "no memory");
+    exit(1);
+}
+
+Object new_error(char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    char* msg = NULL;
+    if (vasprintf(&msg, format, args) == -1) {
+        alloc_fail();
+    };
+    va_end(args);
+    return (Object){ o_Error, {.error_msg = msg} };
+}
 
 bool is_truthy(Object o) {
     switch (o.typ) {
@@ -33,11 +53,13 @@ eval_float_literal(FloatLiteral* fl) {
 }
 
 static Object
-eval_block_statement(Node* stmt, size_t len) {
+eval_block_statement(Node* stmt, size_t len, Env* env) {
     Object result = {};
     for (size_t i = 0; i < len; i++) {
-        result = eval(stmt[i]);
+        result = eval(stmt[i], env);
         if (result.typ == o_ReturnValue) {
+            return result;
+        } else if (result.typ == o_Error) {
             return result;
         }
     }
@@ -52,7 +74,8 @@ eval_minus_prefix_operator_expression(Object right) {
         case o_Float:
             return OBJ(o_Float, -right.data.floating);
         default:
-            return NULL_OBJ();
+            return new_error("unknown operator: -%s",
+                    show_object_type(right.typ));
     }
 }
 
@@ -69,17 +92,21 @@ eval_bang_operator_expression(Object right) {
 }
 
 static Object
-eval_prefix_expression(PrefixExpression* pe) {
-    Object right = eval(pe->right);
+eval_prefix_expression(PrefixExpression* pe, Env* env) {
+    Object right = eval(pe->right, env);
+    if (IS_ERROR(right))
+        return right;
 
     if (STR_EQ("!", pe->op)) {
         return eval_bang_operator_expression(right);
 
     } else if (STR_EQ("-", pe->op)) {
         return eval_minus_prefix_operator_expression(right);
-    }
 
-    return NULL_OBJ();
+    } else {
+        return new_error("unknown operator: %s%s",
+                pe->op, show_object_type(right.typ));
+    }
 }
 
 static double
@@ -126,7 +153,9 @@ eval_float_infix_expression(char* op, Object left, Object right) {
         return BOOL(left_val != right_val);
 
     } else {
-        return NULL_OBJ();
+        return new_error("unknown operator: %s %s %s",
+                show_object_type(left.typ), op,
+                show_object_type(right.typ));
     }
 
     return OBJ(o_Float, left_val);
@@ -162,16 +191,23 @@ eval_integer_infix_expression(char* op, Object left, Object right) {
         return BOOL(left_val != right_val);
 
     } else {
-        return NULL_OBJ();
+        return new_error("unknown operator: %s %s %s",
+                show_object_type(left.typ), op,
+                show_object_type(right.typ));
     }
 
     return OBJ(o_Integer, left_val);
 }
 
 static Object
-eval_infix_expression(InfixExpression* ie) {
-    Object left = eval(ie->left);
-    Object right = eval(ie->right);
+eval_infix_expression(InfixExpression* ie, Env* env) {
+    Object left = eval(ie->left, env);
+    if (IS_ERROR(left))
+        return left;
+
+    Object right = eval(ie->right, env);
+    if (IS_ERROR(right))
+        return right;
 
     if (left.typ == o_Integer && right.typ == o_Integer) {
         return eval_integer_infix_expression(ie->op, left, right);
@@ -180,37 +216,95 @@ eval_infix_expression(InfixExpression* ie) {
         return eval_float_infix_expression(ie->op, left, right);
 
     } else if (STR_EQ("==", ie->op)) {
-        return BOOL(left.data.boolean == right.data.boolean);
+        return BOOL(object_cmp(left, right));
 
     } else if (STR_EQ("!=", ie->op)) {
-        return BOOL(left.data.boolean != right.data.boolean);
+        return BOOL(!object_cmp(left, right));
+
+    } else if (left.typ != right.typ) {
+        return new_error("type mismatch: %s %s %s",
+                show_object_type(left.typ), ie->op,
+                show_object_type(right.typ));
+
+    } else {
+        return new_error("unknown operator: %s %s %s",
+                show_object_type(left.typ), ie->op,
+                show_object_type(right.typ));
+    }
+}
+
+static Object
+eval_if_expression(IfExpression* ie, Env* env) {
+    Object condition = eval(ie->condition, env);
+    if (is_truthy(condition)) {
+        return eval(NODE(n_BlockStatement, ie->consequence), env);
+
+    } else if (ie->alternative != NULL) {
+        return eval(NODE(n_BlockStatement, ie->alternative), env);
     }
 
     return NULL_OBJ();
 }
 
 static Object
-eval_if_expression(IfExpression* ie) {
-    Object condition = eval(ie->condition);
-    if (is_truthy(condition)) {
-        return eval((Node){ n_BlockStatement, ie->consequence });
-
-    } else if (ie->alternative != NULL) {
-        return eval((Node){ n_BlockStatement, ie->alternative });
+eval_identifier(Identifier* i, Env* env) {
+    Object val = env_get(env, i->value);
+    if (IS_NULL(val)) {
+        return new_error("identifier not found: %s", i->value);
     }
-
-    return NULL_OBJ();
+    return val;
 }
 
-Object eval(Node n) {
+static Object*
+eval_expressions(int* len, Node* args, int args_len, Env* env) {
+    Object* results = malloc(args_len * sizeof(Object));
+    if (results == NULL) alloc_fail();
+    *len = 0;
+    for (int i = 0; i < args_len; i++) {
+        Object evaluated = eval(args[i], env);
+        if (IS_NULL(evaluated)) {
+            *len = 1;
+            results[0] = evaluated;
+            return results;
+        }
+        results[(*len)++] = evaluated;
+    }
+    return results;
+}
+
+Env* extend_function_env(Function* func, Object* args, int args_len) {
+    Env* env = env_enclosed_new(func->env);
+    for (int i = 0; i < args_len; i++) {
+        if (env_set(env, func->params[i]->value, args[i]) == NULL)
+            alloc_fail();
+    }
+    return env;
+}
+
+// load args into enclosed env, run function and return result
+static Object
+apply_function(Object fn, Object* args, int args_len) {
+    if (fn.typ != o_Function)
+        return new_error("not a function: %s",
+                show_object_type(fn.typ));
+    Function* func = fn.data.func;
+    Env* extended_env = extend_function_env(func, args, args_len);
+    Object evaluated = eval(NODE(n_BlockStatement, func->body), extended_env);
+
+    // TODO: GC
+    // env_destroy(func->env);
+
+    if (evaluated.typ == o_ReturnValue)
+        return from_return_value(evaluated);
+    return evaluated;
+}
+
+Object eval(Node n, Env* env) {
     switch (n.typ) {
-        case n_BlockStatement:
-            {
-                BlockStatement* b = n.obj;
-                return eval_block_statement(b->statements, b->len);
-            }
+        case n_Identifier:
+            return eval_identifier(n.obj, env);
         case n_IfExpression:
-            return eval_if_expression(n.obj);
+            return eval_if_expression(n.obj, env);
         case n_IntegerLiteral:
             return eval_integer_literal(n.obj);
         case n_FloatLiteral:
@@ -220,31 +314,83 @@ Object eval(Node n) {
                 BooleanLiteral* b = n.obj;
                 return BOOL(b->value);
             }
+        case n_FunctionLiteral:
+            {
+                FunctionLiteral* fl = n.obj;
+                Function* fn = malloc(sizeof(Function));
+                if (fn == NULL) alloc_fail();
+                fn->params = fl->params;
+                fn->params_len = fl->params_len;
+                fn->body = fl->body;
+                fn->env = env;
+                // don't free with `parser_destroy`
+                fl->params = NULL;
+                fl->params_len = 0;
+                fl->body = NULL;
+                return OBJ(o_Function, .func = fn);
+            }
         case n_PrefixExpression:
-            return eval_prefix_expression(n.obj);
+            return eval_prefix_expression(n.obj, env);
         case n_InfixExpression:
-            return eval_infix_expression(n.obj);
+            return eval_infix_expression(n.obj, env);
+        case n_CallExpression:
+            {
+                CallExpression* ce = n.obj;
+                Object function = eval(ce->function, env);
+                if (IS_ERROR(function)) {
+                    return function;
+                }
+                int args_len;
+                Object* args = eval_expressions(&args_len, ce->args, ce->args_len, env);
+                if (args_len == 1 && IS_ERROR(args[0])) {
+                    Object err = args[0];
+                    free(args);
+                    return err;
+                }
+                return apply_function(function, args, args_len);
+            }
+        case n_LetStatement:
+            {
+                LetStatement* ls = n.obj;
+                Object val = eval(ls->value, env);
+                if (IS_ERROR(val)) {
+                    return val;
+                }
+                env_set(env, ls->name->value, val);
+                return NULL_OBJ();
+            }
+        case n_BlockStatement:
+            {
+                BlockStatement* b = n.obj;
+                return eval_block_statement(b->statements, b->len, env);
+            }
         case n_ReturnStatement:
             {
                 ReturnStatement* ns = n.obj;
-                return to_return_value(eval(ns->return_value));
+                Object res = eval(ns->return_value, env);
+                if (IS_ERROR(res)) {
+                    return res;
+                }
+                return to_return_value(res);
             }
         case n_ExpressionStatement:
             {
                 ExpressionStatement* es = n.obj;
-                return eval(es->expression);
+                return eval(es->expression, env);
             }
         default:
             return NULL_OBJ();
     }
 }
 
-Object eval_program(const Program* p) {
+Object eval_program(const Program* p, Env* env) {
     Object result = {};
     for (size_t i = 0; i < p->len; i++) {
-        result = eval(p->stmts[i]);
+        result = eval(p->stmts[i], env);
         if (result.typ == o_ReturnValue) {
             return from_return_value(result);
+        } else if (result.typ == o_Error) {
+            return result;
         }
     }
     return result;
