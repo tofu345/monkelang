@@ -1,3 +1,4 @@
+#include "buffer.h"
 #include "unity/unity.h"
 #include "token.h"
 #include "ast.h"
@@ -32,7 +33,7 @@ void test_print(void) {
             }
         }
     };
-    Program prog = { .stmts = stmts, .len = 1, .cap = 1 };
+    Program prog = {{ stmts, 1, 0, sizeof(Node) }};
 
     char* expected = "let myVar = anotherVar;";
     size_t len = strlen(expected) + 2; // in case of stupidity

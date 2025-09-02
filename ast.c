@@ -1,4 +1,5 @@
 #include "ast.h"
+#include "buffer.h"
 #include "token.h"
 
 #include <stdio.h>
@@ -54,7 +55,7 @@ fprint_infix_expression(InfixExpression* ie, FILE* fp) {
 
 int fprint_block_statement(BlockStatement* bs, FILE* fp) {
     for (size_t i = 0; i < bs->len; i++) {
-        NODE_FPRINT(fp, bs->statements[i]);
+        NODE_FPRINT(fp, bs->stmts[i]);
     }
     return 0;
 }
@@ -75,12 +76,12 @@ fprint_if_expression(IfExpression* ie, FILE* fp) {
 static int
 fprint_function_literal(FunctionLiteral* fl, FILE* fp) {
     FPRINTF(fp, "%s(", fl->tok.literal);
-    for (size_t i = 0; i < fl->params_len - 1; i++) {
+    for (size_t i = 0; i < fl->len - 1; i++) {
         fprint_identifier(fl->params[i], fp);
         FPRINTF(fp, ", ");
     }
-    if (fl->params_len > 0)
-        fprint_identifier(fl->params[fl->params_len - 1], fp);
+    if (fl->len > 0)
+        fprint_identifier(fl->params[fl->len - 1], fp);
     FPRINTF(fp, ") ");
     fprint_block_statement(fl->body, fp);
     return 0;
@@ -90,12 +91,12 @@ static int
 fprint_call_expression(CallExpression* ce, FILE* fp) {
     NODE_FPRINT(fp, ce->function);
     FPRINTF(fp, "(");
-    for (size_t i = 0; i < ce->args_len - 1; i++) {
+    for (size_t i = 0; i < ce->len - 1; i++) {
         NODE_FPRINT(fp, ce->args[i]);
         FPRINTF(fp, ", ");
     }
-    if (ce->args_len > 0)
-        NODE_FPRINT(fp, ce->args[ce->args_len - 1]);
+    if (ce->len > 0)
+        NODE_FPRINT(fp, ce->args[ce->len - 1]);
     FPRINTF(fp, ")");
     return 0;
 }
@@ -200,8 +201,8 @@ destroy_infix_expression(InfixExpression* ie) {
 void destroy_block_statement(BlockStatement* bs) {
     free(bs->tok.literal);
     for (size_t i = 0; i < bs->len; i++)
-        node_destroy(bs->statements[i]);
-    free(bs->statements);
+        node_destroy(bs->stmts[i]);
+    free(bs->stmts);
     free(bs);
 }
 
@@ -220,7 +221,7 @@ static void
 destroy_function_literal(FunctionLiteral* fl) {
     free(fl->tok.literal);
     if (fl->params != NULL) {
-        for (size_t i = 0; i < fl->params_len; i++) {
+        for (size_t i = 0; i < fl->len; i++) {
             free(fl->params[i]->value);
             free(fl->params[i]);
         }
@@ -235,7 +236,7 @@ static void
 destroy_call_expression(CallExpression* ce) {
     free(ce->tok.literal);
     node_destroy(ce->function);
-    for (size_t i = 0; i < ce->args_len; i++) {
+    for (size_t i = 0; i < ce->len; i++) {
         node_destroy(ce->args[i]);
     }
     free(ce->args);
@@ -305,17 +306,11 @@ void node_destroy(Node n) {
     }
 }
 
-char* program_token_literal(const Program* p) {
-    if (p->len > 0) {
-        return token_literal(p->stmts[0]);
-    } else {
-        return "";
-    }
-}
-
-int program_fprint(const Program* p, FILE* fp) {
-    for (size_t i = 0; i < p->len; i++) {
-        if (node_fprint(p->stmts[i], fp) == -1)
+int program_fprint(Program* p, FILE* fp) {
+    Node* stmt;
+    for (size_t i = 0; i < p->stmts.len; i++) {
+        stmt = buffer_nth(&p->stmts, i);
+        if (node_fprint(*stmt, fp) == -1)
             return -1;
     }
     return 0;

@@ -16,9 +16,11 @@ struct Parser {
     Token cur_token;
     Token peek_token;
 
-    char** errors;
-    size_t errors_len;
-    size_t errors_cap;
+    struct ParserErrors {
+        char** data;
+        size_t len;
+        size_t cap;
+    } errors;
 
     // memory efficient, no, fast, yes
     PrefixParseFn prefix_parse_fns[t_Return];

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "buffer.h"
 #include "utils.h"
 #include "token.h"
 
@@ -49,16 +50,12 @@ void node_destroy(Node n);
 
 // Ast Root Node, created by parser
 typedef struct {
-    Node* stmts;
-    size_t len;
-    size_t cap;
+    buffer stmts;
 } Program;
-
-char* program_token_literal(const Program* p);
 
 // Returns -1 on write to FILE err
 // TODO: return index of statement where fprint failed on to resume later
-int program_fprint(const Program* p, FILE* fp);
+int program_fprint(Program* p, FILE* fp);
 
 typedef struct {
     Token tok; // the 't_Ident' token
@@ -111,7 +108,7 @@ typedef struct {
 
 typedef struct {
     Token tok; // the '{' token
-    Node* statements;
+    Node* stmts;
     size_t len;
     size_t cap;
 } BlockStatement;
@@ -129,8 +126,8 @@ typedef struct {
 typedef struct {
     Token tok; // the 'fn' token
     Identifier** params;
-    size_t params_len;
-    size_t params_cap;
+    size_t len;
+    size_t cap;
     BlockStatement* body;
 } FunctionLiteral;
 
@@ -138,6 +135,6 @@ typedef struct {
     Token tok; // the '(' token
     Node function; // Identifier or FunctionLiteral
     Node* args;
-    size_t args_len;
-    size_t args_cap;
+    size_t len;
+    size_t cap;
 } CallExpression;

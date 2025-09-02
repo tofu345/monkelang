@@ -21,7 +21,7 @@ void object_destroy(Object* o) {
         case o_Function:
             {
                 Function* fn = o->data.func;
-                for (size_t i = 0; i < fn->params_len; i++) {
+                for (size_t i = 0; i < fn->len; i++) {
                     free(fn->params[i]->value);
                     free(fn->params[i]);
                 }
@@ -70,11 +70,11 @@ static int
 fprint_function(ObjectData d, FILE* fp) {
     Function* fn = d.func;
     FPRINTF(fp, "fn(");
-    for (size_t i = 0; i < fn->params_len - 1; i++) {
+    for (size_t i = 0; i < fn->len - 1; i++) {
         FPRINTF(fp, "%s, ", fn->params[i]->value);
     }
-    if (fn->params_len >= 1)
-        FPRINTF(fp, "%s", fn->params[fn->params_len - 1]->value);
+    if (fn->len >= 1)
+        FPRINTF(fp, "%s", fn->params[fn->len - 1]->value);
     FPRINTF(fp, ") {\n");
     fprint_block_statement(fn->body, fp);
     FPRINTF(fp, "\n}\n");
@@ -120,6 +120,7 @@ bool object_cmp(Object left, Object right) {
             return object_cmp(
                     from_return_value(left),
                     from_return_value(right));
+        // TODO: cmp function error
         default:
             fprintf(stderr, "object_cmp: object type not handled %s\n",
                     show_object_type(left.typ));

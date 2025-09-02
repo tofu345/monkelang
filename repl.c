@@ -10,10 +10,10 @@
 #include <string.h>
 
 void print_parser_errors(FILE* out, Parser* p) {
-    fprintf(out, "Woops! We ran into some monke business here!\n");
+    fprintf(out, "Woops! We ran into some monkey business here!\n");
     // fprintf(out, "parser errors:\n");
-    for (size_t i = 0; i < p->errors_len; i++) {
-        fprintf(out, "%s\n", p->errors[i]);
+    for (size_t i = 0; i < p->errors.len; i++) {
+        fprintf(out, "%s\n", p->errors.data[i]);
     }
 }
 
@@ -34,7 +34,7 @@ void start(FILE* in, FILE* out) {
         Parser p;
         parser_init(&p, &l);
         Program prog = parse_program(&p);
-        if (p.errors_len != 0) {
+        if (p.errors.len != 0) {
             print_parser_errors(out, &p);
             continue;
         }

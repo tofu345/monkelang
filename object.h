@@ -32,6 +32,7 @@ typedef union {
 
 typedef struct {
     ObjectType typ;
+    bool is_marked;
     ObjectData data;
 } Object;
 
@@ -43,6 +44,7 @@ bool object_cmp(Object left, Object right);
 // stores the actual type of `value` in second byte
 struct ReturnValue {
     ObjectType typ; // will be `o_ReturnValue`
+    bool is_marked;
     ObjectType value_typ;
     ObjectData value;
 };
