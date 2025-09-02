@@ -14,15 +14,21 @@
 // - an allocation fails
 // - a function returns
 
+struct HeapObject {
+    ObjectType typ;
+    void* ptr;
+};
+
+BUFFER(Frame, ht*);
+BUFFER(Alloc, struct HeapObject);
+
 typedef struct {
-    buffer frames;
-    // heap allocated `Objects`
-    buffer allocs;
+    FrameBuffer frames;
+    AllocBuffer allocs; // heap allocated [Objects]
 } Env;
 
 struct Function {
-    Identifier** params;
-    size_t len;
+    ParamBuffer params;
     BlockStatement* body;
     Env* env;
     FunctionLiteral* lit; // [params] and [body] point to the same

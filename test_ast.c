@@ -33,7 +33,7 @@ void test_print(void) {
             }
         }
     };
-    Program prog = {{ stmts, 1, 0, sizeof(Node) }};
+    Program prog = {{ stmts, 1, 0 }};
 
     char* expected = "let myVar = anotherVar;";
     size_t len = strlen(expected) + 2; // in case of stupidity

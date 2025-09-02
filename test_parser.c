@@ -1,4 +1,3 @@
-#include "buffer.h"
 #include "unity/unity.h"
 #include "ast.h"
 #include "parser.h"
@@ -15,12 +14,12 @@ void setUp(void) {}
 void tearDown(void) {}
 
 static void check_parser_errors(Parser* p) {
-    if (p->errors.len == 0) {
+    if (p->errors.length == 0) {
         return;
     }
 
-    printf("parser had %d errors\n", (int)p->errors.len);
-    for (size_t i = 0; i < p->errors.len; i++) {
+    printf("parser had %d errors\n", p->errors.length);
+    for (int i = 0; i < p->errors.length; i++) {
         printf("parser error: %s\n", p->errors.data[i]);
     }
     TEST_FAIL();
@@ -52,14 +51,15 @@ return 993322;\
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(3, prog.stmts.len, "wrong prog.statements length");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            3, prog.stmts.length, "wrong prog.statements length");
 
-    for (size_t i = 0; i < prog.stmts.len; i++) {
-        Node* stmt = buffer_nth(&prog.stmts, i);
-        TEST_ASSERT_MESSAGE(n_ReturnStatement == stmt->typ,
+    for (int i = 0; i < prog.stmts.length; i++) {
+        Node stmt = prog.stmts.data[i];
+        TEST_ASSERT_MESSAGE(n_ReturnStatement == stmt.typ,
                 "type not ReturnStatement");
         TEST_ASSERT_EQUAL_STRING_MESSAGE(
-                "return", ((Token*)stmt->obj)->literal,
+                "return", ((Token*)stmt.obj)->literal,
                 "wrong ReturnStatement.Token.literal");
     }
 
@@ -77,13 +77,16 @@ void test_identifier_expression(void) {
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.len, "wrong prog.statements length");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            1, prog.stmts.length, "wrong prog.statements length");
 
-    Node* n = buffer_nth(&prog.stmts, 0);
-    TEST_ASSERT_MESSAGE(n_ExpressionStatement == n->typ, "type not ExpressionStatement");
+    Node n = prog.stmts.data[0];
+    TEST_ASSERT_MESSAGE(
+            n_ExpressionStatement == n.typ, "type not ExpressionStatement");
 
-    ExpressionStatement* es = n->obj;
-    TEST_ASSERT_MESSAGE(n_Identifier == es->expression.typ, "type not Identifier");
+    ExpressionStatement* es = n.obj;
+    TEST_ASSERT_MESSAGE(
+            n_Identifier == es->expression.typ, "type not Identifier");
 
     Identifier* ident = es->expression.obj;
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
@@ -137,12 +140,14 @@ void test_integer_literal_expression(void) {
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.len, "wrong prog.statements length");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            1, prog.stmts.length, "wrong prog.statements length");
 
-    Node* n = buffer_nth(&prog.stmts, 0);
-    TEST_ASSERT_MESSAGE(n_ExpressionStatement == n->typ, "type not ExpressionStatement");
+    Node n = prog.stmts.data[0];
+    TEST_ASSERT_MESSAGE(
+            n_ExpressionStatement == n.typ, "type not ExpressionStatement");
 
-    ExpressionStatement* es = n->obj;
+    ExpressionStatement* es = n.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             n_IntegerLiteral, es->expression.typ, "wrong IntegerLiteral");
 
@@ -167,12 +172,14 @@ void test_float_literal_expression(void) {
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.len, "wrong prog.statements length");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            1, prog.stmts.length, "wrong prog.statements length");
 
-    Node* n = buffer_nth(&prog.stmts, 0);
-    TEST_ASSERT_MESSAGE(n_ExpressionStatement == n->typ, "type not ExpressionStatement");
+    Node n = prog.stmts.data[0];
+    TEST_ASSERT_MESSAGE(
+            n_ExpressionStatement == n.typ, "type not ExpressionStatement");
 
-    ExpressionStatement* es = n->obj;
+    ExpressionStatement* es = n.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             n_FloatLiteral, es->expression.typ, "wrong FloatLiteral");
 
@@ -255,21 +262,22 @@ void test_let_statements(void) {
         {"let y = true;", "y", {true}, l_BooleanLiteral},
         {"let foobar = y;", "foobar", (L_Test){ .string = "y" }, l_String},
     };
-    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
-    for (size_t i = 0; i < tests_len; i++) {
+    int tests_len = sizeof(tests) / sizeof(tests[0]);
+    for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
         Lexer l = lexer_new(test.input);
         Parser p;
         parser_init(&p, &l);
         Program prog = parse_program(&p);
-        TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
+        TEST_ASSERT_NOT_NULL_MESSAGE(
+                prog.stmts.data, "program.statements NULL");
         check_parser_errors(&p);
 
-        Node* stmt = buffer_nth(&prog.stmts, 0);
-        test_let_statement(*stmt, test.expectedIdent);
+        Node stmt = prog.stmts.data[0];
+        test_let_statement(stmt, test.expectedIdent);
 
-        LetStatement* ls = stmt->obj;
+        LetStatement* ls = stmt.obj;
         test_literal_expression(ls->value, test.expectedVal, test.t);
 
         program_destroy(&prog);
@@ -287,9 +295,8 @@ void test_parsing_prefix_expressions(void) {
         {"!5;", "!", {5}, l_Integer},
         {"-15;", "-", {15}, l_Integer},
     };
-    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
-
-    for (size_t i = 0; i < tests_len; i++) {
+    int tests_len = sizeof(tests) / sizeof(tests[0]);
+    for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
         Lexer l = lexer_new(test.input);
@@ -299,14 +306,18 @@ void test_parsing_prefix_expressions(void) {
         TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
         check_parser_errors(&p);
-        TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.len, "wrong prog.statements length");
-
-        Node* n = buffer_nth(&prog.stmts, 0);
-        TEST_ASSERT_MESSAGE(n_ExpressionStatement == n->typ, "type not ExpressionStatement");
-
-        ExpressionStatement* es = n->obj;
         TEST_ASSERT_EQUAL_INT_MESSAGE(
-                n_PrefixExpression, es->expression.typ, "wrong PrefixExpression");
+                1, prog.stmts.length, "wrong prog.statements length");
+
+        Node n = prog.stmts.data[0];
+        TEST_ASSERT_MESSAGE(
+                n_ExpressionStatement == n.typ,
+                "type not ExpressionStatement");
+
+        ExpressionStatement* es = n.obj;
+        TEST_ASSERT_EQUAL_INT_MESSAGE(
+                n_PrefixExpression, es->expression.typ,
+                "wrong PrefixExpression");
 
         PrefixExpression* pe = es->expression.obj;
         TEST_ASSERT_EQUAL_STRING_MESSAGE(
@@ -339,26 +350,29 @@ void test_parsing_infix_expressions(void) {
         {"true != false", {true}, "!=", {false}, l_BooleanLiteral},
         {"false == false", {false}, "==", {false}, l_BooleanLiteral},
     };
-    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
-
-    for (size_t i = 0; i < tests_len; i++) {
+    int tests_len = sizeof(tests) / sizeof(tests[0]);
+    for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
         Lexer l = lexer_new(test.input);
         Parser p;
         parser_init(&p, &l);
         Program prog = parse_program(&p);
-        TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
+        TEST_ASSERT_NOT_NULL_MESSAGE
+            (prog.stmts.data, "program.statements NULL");
 
         check_parser_errors(&p);
-        TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.len, "wrong prog.statements length");
+        TEST_ASSERT_EQUAL_INT_MESSAGE
+            (1, prog.stmts.length, "wrong prog.statements length");
 
-        Node* n = buffer_nth(&prog.stmts, 0);
-        TEST_ASSERT_MESSAGE(n_ExpressionStatement == n->typ, "type not ExpressionStatement");
+        Node n = prog.stmts.data[0];
+        TEST_ASSERT_MESSAGE
+            (n_ExpressionStatement == n.typ, "type not ExpressionStatement");
 
-        ExpressionStatement* es = n->obj;
+        ExpressionStatement* es = n.obj;
         TEST_ASSERT_EQUAL_INT_MESSAGE(
-                n_InfixExpression, es->expression.typ, "wrong InfixExpression");
+                n_InfixExpression, es->expression.typ,
+                "wrong InfixExpression");
 
         InfixExpression* ie = es->expression.obj;
 
@@ -488,22 +502,23 @@ void test_operator_precedence_parsing(void) {
             "add((((a + b) + ((c * d) / f)) + g))",
         },
     };
-    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
-
-    for (size_t i = 0; i < tests_len; i++) {
+    int tests_len = sizeof(tests) / sizeof(tests[0]);
+    for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
         Lexer l = lexer_new(test.input);
         Parser p;
         parser_init(&p, &l);
         Program prog = parse_program(&p);
-        TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
+        TEST_ASSERT_NOT_NULL_MESSAGE
+            (prog.stmts.data, "program.statements NULL");
         check_parser_errors(&p);
 
-        Node* n = buffer_nth(&prog.stmts, 0);
-        TEST_ASSERT_MESSAGE(n_ExpressionStatement == n->typ, "type not ExpressionStatement");
+        Node n = prog.stmts.data[0];
+        TEST_ASSERT_MESSAGE
+            (n_ExpressionStatement == n.typ, "type not ExpressionStatement");
 
-        size_t len = strlen(test.expected) + 2;
+        int len = strlen(test.expected) + 2;
         char* buf = calloc(len, sizeof(char));
         FILE* fp = fmemopen(buf, len, "w");
         if (fp == NULL) {
@@ -511,7 +526,8 @@ void test_operator_precedence_parsing(void) {
             exit(1);
         }
 
-        TEST_ASSERT_MESSAGE(program_fprint(&prog, fp) != -1, "program_fprint fail");
+        TEST_ASSERT_MESSAGE
+            (program_fprint(&prog, fp) != -1, "program_fprint fail");
         fflush(fp);
         TEST_ASSERT_EQUAL_STRING_MESSAGE(
                 test.expected, buf, "program_fprint wrong");
@@ -526,7 +542,8 @@ void test_operator_precedence_parsing(void) {
 static void
 test_infix_expression(Node n, L_Test left, char* operator,
         L_Test right, L_Type typ) {
-    TEST_ASSERT_MESSAGE(n_InfixExpression == n.typ, "type not type InfixExpression");
+    TEST_ASSERT_MESSAGE
+        (n_InfixExpression == n.typ, "type not type InfixExpression");
 
     InfixExpression* ie = n.obj;
     test_literal_expression(ie->left, left, typ);
@@ -543,26 +560,29 @@ void test_boolean_expression(void) {
         {"true;", true},
         {"false;", false},
     };
-    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
-
-    for (size_t i = 0; i < tests_len; i++) {
+    int tests_len = sizeof(tests) / sizeof(tests[0]);
+    for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
         Lexer l = lexer_new(test.input);
         Parser p;
         parser_init(&p, &l);
         Program prog = parse_program(&p);
-        TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
+        TEST_ASSERT_NOT_NULL_MESSAGE
+            (prog.stmts.data, "program.statements NULL");
         check_parser_errors(&p);
 
-        TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.len, "wrong prog.statements length");
+        TEST_ASSERT_EQUAL_INT_MESSAGE
+            (1, prog.stmts.length, "wrong prog.statements length");
 
-        Node* n = buffer_nth(&prog.stmts, 0);
-        TEST_ASSERT_MESSAGE(n_ExpressionStatement == n->typ, "type not ExpressionStatement");
+        Node n = prog.stmts.data[0];
+        TEST_ASSERT_MESSAGE
+            (n_ExpressionStatement == n.typ, "type not ExpressionStatement");
 
-        ExpressionStatement* es = n->obj;
+        ExpressionStatement* es = n.obj;
         TEST_ASSERT_EQUAL_INT_MESSAGE(
-                n_BooleanLiteral, es->expression.typ, "wrong BooleanLiteral type");
+                n_BooleanLiteral, es->expression.typ,
+                "wrong BooleanLiteral type");
 
         BooleanLiteral* b = es->expression.obj;
         TEST_ASSERT_MESSAGE(
@@ -583,12 +603,14 @@ void test_if_expression(void) {
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.len, "wrong prog.statements length");
+    TEST_ASSERT_EQUAL_INT_MESSAGE
+        (1, prog.stmts.length, "wrong prog.statements length");
 
-    Node* n = buffer_nth(&prog.stmts, 0);
-    TEST_ASSERT_MESSAGE(n_ExpressionStatement == n->typ, "type not ExpressionStatement");
+    Node n = prog.stmts.data[0];
+    TEST_ASSERT_MESSAGE
+        (n_ExpressionStatement == n.typ, "type not ExpressionStatement");
 
-    ExpressionStatement* es = n->obj;
+    ExpressionStatement* es = n.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             n_IfExpression, es->expression.typ, "wrong IfExpression");
 
@@ -596,12 +618,13 @@ void test_if_expression(void) {
     test_infix_expression(ie->condition, (L_Test){ .string = "x" }, "<",
             (L_Test){ .string = "y" }, l_String);
 
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, ie->consequence->len,
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, ie->consequence->stmts.length,
             "wrong IfExpression.consequence length");
-    TEST_ASSERT_MESSAGE(n_ExpressionStatement == ie->consequence->stmts[0].typ,
+    TEST_ASSERT_MESSAGE(
+            n_ExpressionStatement == ie->consequence->stmts.data[0].typ,
             "IfExpression.consequence.statements[0].typ ExpressionStatement");
 
-    ExpressionStatement* consequence = ie->consequence->stmts[0].obj;
+    ExpressionStatement* consequence = ie->consequence->stmts.data[0].obj;
     test_identifier(consequence->expression, "x");
 
     TEST_ASSERT_NULL_MESSAGE(ie->alternative,
@@ -621,12 +644,14 @@ void test_if_else_expression(void) {
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.len, "wrong prog.statements length");
+    TEST_ASSERT_EQUAL_INT_MESSAGE
+        (1, prog.stmts.length, "wrong prog.statements length");
 
-    Node* n = buffer_nth(&prog.stmts, 0);
-    TEST_ASSERT_MESSAGE(n_ExpressionStatement == n->typ, "type not ExpressionStatement");
+    Node n = prog.stmts.data[0];
+    TEST_ASSERT_MESSAGE
+        (n_ExpressionStatement == n.typ, "type not ExpressionStatement");
 
-    ExpressionStatement* es = n->obj;
+    ExpressionStatement* es = n.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             n_IfExpression, es->expression.typ, "wrong IfExpression");
 
@@ -634,20 +659,22 @@ void test_if_else_expression(void) {
     test_infix_expression(ie->condition, (L_Test){ .string = "x" }, "<",
             (L_Test){ .string = "y" }, l_String);
 
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, ie->consequence->len,
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, ie->consequence->stmts.length,
             "wrong IfExpression.consequence length");
-    TEST_ASSERT_MESSAGE(n_ExpressionStatement == ie->consequence->stmts[0].typ,
+    TEST_ASSERT_MESSAGE(
+            n_ExpressionStatement == ie->consequence->stmts.data[0].typ,
             "IfExpression.consequence.statements[0].typ is not ExpressionStatement");
 
-    ExpressionStatement* consequence = ie->consequence->stmts[0].obj;
+    ExpressionStatement* consequence = ie->consequence->stmts.data[0].obj;
     test_identifier(consequence->expression, "x");
 
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, ie->alternative->len,
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, ie->alternative->stmts.length,
             "IfExpression.alternative length");
-    TEST_ASSERT_MESSAGE(n_ExpressionStatement == ie->alternative->stmts[0].typ,
+    TEST_ASSERT_MESSAGE(
+            n_ExpressionStatement == ie->alternative->stmts.data[0].typ,
             "IfExpression.alternative.statements[0].typ is not ExpressionStatement");
 
-    ExpressionStatement* alternative = ie->alternative->stmts[0].obj;
+    ExpressionStatement* alternative = ie->alternative->stmts.data[0].obj;
     test_identifier(alternative->expression, "y");
 
     program_destroy(&prog);
@@ -664,31 +691,34 @@ void test_function_literal_parsing(void) {
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.len, "wrong prog.statements length");
+    TEST_ASSERT_EQUAL_INT_MESSAGE
+        (1, prog.stmts.length, "wrong prog.statements length");
 
-    Node* n = buffer_nth(&prog.stmts, 0);
-    TEST_ASSERT_MESSAGE(n_ExpressionStatement == n->typ, "type not ExpressionStatement");
+    Node n = prog.stmts.data[0];
+    TEST_ASSERT_MESSAGE
+        (n_ExpressionStatement == n.typ, "type not ExpressionStatement");
 
-    ExpressionStatement* es = n->obj;
+    ExpressionStatement* es = n.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             n_FunctionLiteral, es->expression.typ, "wrong n_FunctionLiteral");
 
     FunctionLiteral* fl = es->expression.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            2, fl->len, "wrong FunctionLiteral.paremeters_len");
+            2, fl->params.length, "wrong FunctionLiteral.parems.length");
 
-    test_literal_expression((Node){ n_Identifier, fl->params[0] },
+    test_literal_expression((Node){ n_Identifier, fl->params.data[0] },
             (L_Test){ .string = "x" }, l_String);
-    test_literal_expression((Node){ n_Identifier, fl->params[1] },
+    test_literal_expression((Node){ n_Identifier, fl->params.data[1] },
             (L_Test){ .string = "y" }, l_String);
 
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, fl->body->len,
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, fl->body->stmts.length,
             "wrong FunctionLiteral.body.len");
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            n_ExpressionStatement, fl->body->stmts[0].typ, "wrong ExpressionStatement");
+            n_ExpressionStatement, fl->body->stmts.data[0].typ,
+            "wrong ExpressionStatement");
 
-    ExpressionStatement* body_stmt = fl->body->stmts[0].obj;
+    ExpressionStatement* body_stmt = fl->body->stmts.data[0].obj;
 
     test_infix_expression(body_stmt->expression,
             (L_Test){ .string = "x" }, "+", (L_Test){ .string = "y" },
@@ -708,8 +738,8 @@ void test_function_parameter_parsing(void) {
         {"fn(x) {};", {"x"}, 1},
         {"fn(x, y, z) {};", {"x", "y", "z"}, 3},
     };
-    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
-    for (size_t i = 0; i < tests_len; i++) {
+    int tests_len = sizeof(tests) / sizeof(tests[0]);
+    for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
         Lexer l = lexer_new(test.input);
@@ -718,19 +748,20 @@ void test_function_parameter_parsing(void) {
         Program prog = parse_program(&p);
         TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
         check_parser_errors(&p);
-        TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.len, "wrong prog.statements length");
+        TEST_ASSERT_EQUAL_INT_MESSAGE
+            (1, prog.stmts.length, "wrong prog.statements length");
 
         // segfaults waiting to happen
-        Node* n = buffer_nth(&prog.stmts, 0);
-        ExpressionStatement* es = n->obj;
+        Node n = prog.stmts.data[0];
+        ExpressionStatement* es = n.obj;
         FunctionLiteral* fl = es->expression.obj;
 
         TEST_ASSERT_EQUAL_INT_MESSAGE(
-                test.len, fl->len,
+                test.len, fl->params.length,
                 "wrong FunctionLiteral.paremeters_len");
 
         for (int i = 0; i < test.len; i++) {
-            test_literal_expression((Node){ n_Identifier, fl->params[i] },
+            test_literal_expression((Node){ n_Identifier, fl->params.data[i] },
                     (L_Test){ .string = test.expectedParams[i] }, l_String);
         }
 
@@ -749,12 +780,14 @@ void test_call_expression_parsing(void) {
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.len, "wrong prog.statements length");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            1, prog.stmts.length, "wrong prog.statements length");
 
-    Node* n = buffer_nth(&prog.stmts, 0);
-    TEST_ASSERT_MESSAGE(n_ExpressionStatement == n->typ, "type not ExpressionStatement");
+    Node n = prog.stmts.data[0];
+    TEST_ASSERT_MESSAGE(
+            n_ExpressionStatement == n.typ, "type not ExpressionStatement");
 
-    ExpressionStatement* es = n->obj;
+    ExpressionStatement* es = n.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             n_CallExpression, es->expression.typ, "wrong n_CallExpression");
 
@@ -763,16 +796,18 @@ void test_call_expression_parsing(void) {
     test_identifier(ce->function, "add");
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            3, ce->len, "wrong CallExpression.args_len");
+            3, ce->args.length, "wrong CallExpression.args_len");
 
-    test_literal_expression(ce->args[0],
-            (L_Test){ .integer = 1 }, l_Integer);
+    test_literal_expression(
+            ce->args.data[0], (L_Test){ .integer = 1 }, l_Integer);
 
-    test_infix_expression(ce->args[1],
+    test_infix_expression(
+            ce->args.data[1],
             (L_Test){ .integer = 2 }, "*", (L_Test){ .integer = 3 },
             l_Integer);
 
-    test_infix_expression(ce->args[2],
+    test_infix_expression(
+            ce->args.data[2],
             (L_Test){ .integer = 4 }, "+", (L_Test){ .integer = 5 },
             l_Integer);
 

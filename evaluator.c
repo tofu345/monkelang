@@ -1,6 +1,5 @@
 #include "evaluator.h"
 #include "ast.h"
-#include "buffer.h"
 #include "environment.h"
 #include "object.h"
 
@@ -11,25 +10,14 @@
 
 Object eval(const Node n, Env* env);
 
-#define OBJ(t, d) (Object){ t, false, {d} }
-#define NULL_OBJ() (Object){} // `typ` == 0 == o_Null
-#define BOOL(b) (Object){ o_Boolean, false, {.boolean = b} }
-
 #define STR_EQ(exp, str) strcmp(exp, str) == 0
-#define IS_ERROR(obj) obj.typ == o_Error
-#define IS_NULL(obj) obj.typ == o_Null
-
-void alloc_fail() {
-    fprintf(stderr, "no memory");
-    exit(1);
-}
 
 Object new_error(char* format, ...) {
     va_list args;
     va_start(args, format);
     char* msg = NULL;
     if (vasprintf(&msg, format, args) == -1) {
-        alloc_fail();
+        ALLOC_FAIL();
     };
     va_end(args);
     return OBJ(o_Error, .error_msg = msg);
@@ -54,10 +42,10 @@ eval_float_literal(const FloatLiteral* fl) {
 }
 
 static Object
-eval_block_statement(const Node* stmt, size_t len, Env* env) {
+eval_block_statement(NodeBuffer stmts, Env* env) {
     Object result = {};
-    for (size_t i = 0; i < len; i++) {
-        result = eval(stmt[i], env);
+    for (int i = 0; i < stmts.length; i++) {
+        result = eval(stmts.data[i], env);
         switch (result.typ) {
             case o_ReturnValue: return result;
             case o_Error: return result;
@@ -256,40 +244,40 @@ eval_identifier(const Identifier* i, Env* env) {
     return val;
 }
 
-static Object*
-eval_expressions(int* len, const Node* args, int args_len, Env* env) {
-    Object* results = malloc(args_len * sizeof(Object));
-    if (results == NULL) alloc_fail();
-    *len = 0;
-    for (int i = 0; i < args_len; i++) {
-        Object evaluated = eval(args[i], env);
+static ObjectBuffer
+eval_arguments(NodeBuffer args, Env* env) {
+    ObjectBuffer results;
+    ObjectBufferInit(&results);
+    for (int i = 0; i < args.length; i++) {
+        Object evaluated = eval(args.data[i], env);
         if (IS_NULL(evaluated)) {
-            *len = 1;
-            results[0] = evaluated;
+            results.length = 1;
+            results.data[0] = evaluated;
             return results;
         }
-        results[(*len)++] = evaluated;
+        ObjectBufferPush(&results, evaluated);
     }
     return results;
 }
 
-Env* extend_function_env(Function* func, Object* args, int args_len) {
+Env* extend_function_env(Function* func, ObjectBuffer args) {
     Env* env = enclosed_env(func->env);
-    for (int i = 0; i < args_len; i++) {
-        if (env_set(env, func->params[i]->value, args[i]) == NULL)
-            alloc_fail();
+    for (int i = 0; i < args.length; i++) {
+        Identifier* param = func->params.data[i];
+        if (env_set(env, param->value, args.data[i]) == NULL)
+            ALLOC_FAIL();
     }
     return env;
 }
 
 // load args into enclosed env, run function with env and return result
 static Object
-apply_function(Object fn, Object* args, int args_len) {
+apply_function(Object fn, ObjectBuffer args) {
     if (fn.typ != o_Function)
         return new_error("not a function: %s",
                 show_object_type(fn.typ));
     Function* func = fn.data.func;
-    Env* extended_env = extend_function_env(func, args, args_len);
+    Env* extended_env = extend_function_env(func, args);
     Object evaluated = eval(NODE(n_BlockStatement, func->body), extended_env);
 
     // TODO: GC
@@ -319,9 +307,8 @@ Object eval(const Node n, Env* env) {
             {
                 const FunctionLiteral* fl = n.obj;
                 Function* fn = malloc(sizeof(Function));
-                if (fn == NULL) alloc_fail();
+                if (fn == NULL) ALLOC_FAIL();
                 fn->params = fl->params;
-                fn->len = fl->len;
                 fn->body = fl->body;
                 fn->env = env;
                 fn->lit = n.obj;
@@ -338,15 +325,13 @@ Object eval(const Node n, Env* env) {
                 if (IS_ERROR(function)) {
                     return function;
                 }
-                int args_len;
-                Object* args = eval_expressions(
-                        &args_len, ce->args, ce->len, env);
-                if (args_len == 1 && IS_ERROR(args[0])) {
-                    Object err = args[0];
-                    free(args);
+                ObjectBuffer args = eval_arguments(ce->args, env);
+                if (args.length == 1 && IS_ERROR(args.data[0])) {
+                    Object err = args.data[0];
+                    free(args.data);
                     return err;
                 }
-                return apply_function(function, args, args_len);
+                return apply_function(function, args);
             }
         case n_LetStatement:
             {
@@ -361,7 +346,7 @@ Object eval(const Node n, Env* env) {
         case n_BlockStatement:
             {
                 const BlockStatement* b = n.obj;
-                return eval_block_statement(b->stmts, b->len, env);
+                return eval_block_statement(b->stmts, env);
             }
         case n_ReturnStatement:
             {
@@ -384,9 +369,8 @@ Object eval(const Node n, Env* env) {
 
 Object eval_program(Program* p, Env* env) {
     Object result = {};
-    for (size_t i = 0; i < p->stmts.len; i++) {
-        Node* stmt = buffer_nth(&p->stmts, i);
-        result = eval(*stmt, env);
+    for (int i = 0; i < p->stmts.length; i++) {
+        result = eval(p->stmts.data[i], env);
         switch (result.typ) {
             case o_ReturnValue: return from_return_value(result);
             case o_Error: return result;
@@ -396,7 +380,7 @@ Object eval_program(Program* p, Env* env) {
 
     if (result.typ == o_Function) {
         FunctionLiteral* lit = result.data.func->lit;
-        lit->params = NULL;
+        lit->params.data = NULL;
         lit->body = NULL;
     }
 

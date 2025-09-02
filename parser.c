@@ -1,5 +1,4 @@
 #include "ast.h"
-#include "buffer.h"
 #include "utils.h"
 #include "lexer.h"
 #include "parser.h"
@@ -11,6 +10,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+DEFINE_BUFFER(String, char*);
 
 static Node parse_statement(Parser* p);
 
@@ -54,20 +55,8 @@ cur_precedence(Parser* p) {
 }
 
 static void
-exit_nomem() {
-    fprintf(stderr, "no memory");
-    exit(1);
-}
-
-static void
 parser_error(Parser* p, char* msg) {
-    struct ParserErrors* errs = &p->errors;
-    if (errs->len >= errs->cap) {
-        errs->cap *= 2;
-        errs->data = realloc(errs->data, errs->cap * sizeof(char*));
-        if (errs->data == NULL) exit_nomem();
-    }
-    errs->data[(errs->len)++] = msg;
+    StringBufferPush(&p->errors, msg);
 }
 
 static void
@@ -83,7 +72,7 @@ cur_tok_error(Parser* p, TokenType t) {
             ":%d,%d: expected token to be '%s', got '%s' instead",
             p->cur_token.line, p->cur_token.col,
             show_token_type(t), p->cur_token.literal);
-    if (len == -1) exit_nomem();
+    if (len == -1) ALLOC_FAIL();
     parser_error(p, msg);
 }
 
@@ -94,7 +83,7 @@ peek_error(Parser* p, TokenType t) {
             ":%d,%d: expected next token to be '%s', got '%s' instead",
             p->cur_token.line, p->cur_token.col,
             show_token_type(t), p->peek_token.literal);
-    if (len == -1) exit_nomem();
+    if (len == -1) ALLOC_FAIL();
     parser_error(p, msg);
 }
 
@@ -125,7 +114,7 @@ no_prefix_parse_error(Parser* p, Token t) {
     int err = asprintf(&msg,
             ":%d,%d: no prefix parse function for '%s' found",
             p->cur_token.line, p->cur_token.col, t.literal);
-    if (err == -1) exit_nomem();
+    if (err == -1) ALLOC_FAIL();
     parser_error(p, msg);
 }
 
@@ -161,7 +150,7 @@ parse_expression(Parser* p, enum Precedence precedence) {
 static Node
 parse_identifier(Parser* p) {
     Identifier* id = malloc(sizeof(Identifier));
-    if (id == NULL) exit_nomem();
+    if (id == NULL) ALLOC_FAIL();
     id->tok = p->cur_token;
     id->value = p->cur_token.literal;
     return NODE(n_Identifier, id);
@@ -171,7 +160,7 @@ static Node
 parse_integer_literal(Parser* p) {
     trace("parse_integer_literal");
     IntegerLiteral* int_lit = malloc(sizeof(IntegerLiteral));
-    if (int_lit == NULL) exit_nomem();
+    if (int_lit == NULL) ALLOC_FAIL();
     int_lit->tok = p->cur_token;
 
     char* endptr;
@@ -185,7 +174,7 @@ parse_integer_literal(Parser* p) {
     if (*endptr != '\0' || errno == ERANGE || errno == EINVAL) {
         char* msg = NULL;
         int err = asprintf(&msg, "could not parse '%s' as integer", lit);
-        if (err == -1) exit_nomem();
+        if (err == -1) ALLOC_FAIL();
         parser_error(p, msg);
         free(int_lit->tok.literal);
         free(int_lit);
@@ -200,7 +189,7 @@ parse_integer_literal(Parser* p) {
 static Node
 parse_float_literal(Parser* p) {
     FloatLiteral* fl_lit = malloc(sizeof(FloatLiteral));
-    if (fl_lit == NULL) exit_nomem();
+    if (fl_lit == NULL) ALLOC_FAIL();
     fl_lit->tok = p->cur_token;
 
     char* endptr;
@@ -209,7 +198,7 @@ parse_float_literal(Parser* p) {
         char* msg = NULL;
         int err = asprintf(&msg, "could not parse '%s' as float",
                 fl_lit->tok.literal);
-        if (err == -1) exit_nomem();
+        if (err == -1) ALLOC_FAIL();
         parser_error(p, msg);
         free(fl_lit->tok.literal);
         free(fl_lit);
@@ -287,24 +276,14 @@ static BlockStatement*
 parse_block_statement(Parser* p) {
     BlockStatement* bs = malloc(sizeof(BlockStatement));
     bs->tok = p->cur_token;
-    bs->stmts = malloc(DEFAULT_CAPACITY * sizeof(Node));
-    if (bs->stmts == NULL) exit_nomem();
-    bs->cap = DEFAULT_CAPACITY;
-    bs->len = 0;
+    NodeBufferInit(&bs->stmts);
 
     next_token(p);
 
     while (!cur_token_is(p, t_Rbrace) && !cur_token_is(p, t_Eof)) {
         Node stmt = parse_statement(p);
-        if (stmt.obj != NULL) {
-            if (bs->len >= bs->cap) {
-                bs->cap *= 2;
-                bs->stmts = realloc(bs->stmts, bs->cap * sizeof(Node));
-                if (bs->stmts == NULL) exit_nomem();
-            }
-            bs->stmts[bs->len] = stmt;
-            bs->len++;
-        }
+        if (stmt.obj != NULL)
+            NodeBufferPush(&bs->stmts, stmt);
         next_token(p);
     }
 
@@ -322,10 +301,7 @@ parse_block_statement(Parser* p) {
 // returns -1 on err
 static int
 parse_function_parameters(Parser* p, FunctionLiteral* fl) {
-    fl->params = malloc(DEFAULT_CAPACITY * sizeof(Identifier*));
-    if (fl->params == NULL) exit_nomem();
-    fl->len = 0;
-    fl->cap = DEFAULT_CAPACITY;
+    ParamBufferInit(&fl->params);
 
     if (peek_token_is(p, t_Rparen)) {
         free(p->cur_token.literal); // '(' tok
@@ -344,11 +320,10 @@ parse_function_parameters(Parser* p, FunctionLiteral* fl) {
     }
 
     Identifier* ident = malloc(sizeof(Identifier));
-    if (ident == NULL) exit_nomem();
+    if (ident == NULL) ALLOC_FAIL();
     ident->tok = p->cur_token;
     ident->value = p->cur_token.literal;
-    fl->params[0] = ident;
-    fl->len = 1;
+    ParamBufferPush(&fl->params, ident);
 
     while (peek_token_is(p, t_Comma)) {
         next_token(p);
@@ -359,13 +334,7 @@ parse_function_parameters(Parser* p, FunctionLiteral* fl) {
         ident = malloc(sizeof(Identifier));
         ident->tok = p->cur_token;
         ident->value = p->cur_token.literal;
-
-        if (fl->len >= fl->cap) {
-            fl->cap *= 2;
-            fl->params = realloc(fl->params, fl->cap * sizeof(Identifier*));
-            if (fl->params == NULL) exit_nomem();
-        }
-        fl->params[(fl->len)++] = ident;
+        ParamBufferPush(&fl->params, ident);
     }
 
     if (!expect_peek(p, t_Rparen))
@@ -404,9 +373,7 @@ parse_function_literal(Parser* p) {
 
 static int
 parse_call_arguments(Parser* p, CallExpression* ce) {
-    ce->args = malloc(DEFAULT_CAPACITY * sizeof(Node));
-    ce->len = 0;
-    ce->cap = DEFAULT_CAPACITY;
+    NodeBufferInit(&ce->args);
 
     if (peek_token_is(p, t_Rparen)) {
         next_token(p);
@@ -416,10 +383,9 @@ parse_call_arguments(Parser* p, CallExpression* ce) {
 
     next_token(p);
 
-    ce->args[0] = parse_expression(p, p_Lowest);
-    if (ce->args[0].obj == NULL)
-        return -1;
-    ce->len = 1;
+    Node exp = parse_expression(p, p_Lowest);
+    if (exp.obj == NULL) return -1;
+    NodeBufferPush(&ce->args, exp);
 
     while (peek_token_is(p, t_Comma)) {
         next_token(p);
@@ -427,15 +393,8 @@ parse_call_arguments(Parser* p, CallExpression* ce) {
         next_token(p);
 
         Node exp = parse_expression(p, p_Lowest);
-        if (exp.obj == NULL)
-            return -1;
-
-        if (ce->len >= ce->cap) {
-            ce->cap *= 2;
-            ce->args = realloc(ce->args, ce->cap * sizeof(Node));
-            if (ce->args == NULL) exit_nomem();
-        }
-        ce->args[(ce->len)++] = exp;
+        if (exp.obj == NULL) return -1;
+        NodeBufferPush(&ce->args, exp);
     }
 
     if (!expect_peek(p, t_Rparen))
@@ -450,10 +409,10 @@ parse_call_expression(Parser* p, Node function) {
     ce->tok = p->cur_token;
     ce->function = function;
     if (parse_call_arguments(p, ce) == -1) {
-        for (size_t i = 0; i < ce->len; i++) {
-            node_destroy(ce->args[i]);
+        for (int i = 0; i < ce->args.length; i++) {
+            node_destroy(ce->args.data[i]);
         }
-        free(ce->args);
+        free(ce->args.data);
         free(ce->tok.literal);
         node_destroy(function);
         free(ce);
@@ -516,7 +475,7 @@ parse_if_expression(Parser* p) {
 static Node
 parse_let_statement(Parser* p) {
     LetStatement* stmt = malloc(sizeof(LetStatement));
-    if (stmt == NULL) exit_nomem();
+    if (stmt == NULL) ALLOC_FAIL();
     stmt->tok = p->cur_token;
 
     if (!expect_peek(p, t_Ident)) {
@@ -526,7 +485,7 @@ parse_let_statement(Parser* p) {
     }
 
     stmt->name = malloc(sizeof(Identifier));
-    if (stmt->name == NULL) exit_nomem();
+    if (stmt->name == NULL) ALLOC_FAIL();
     stmt->name->tok = p->cur_token;
     stmt->name->value = p->cur_token.literal;
 
@@ -553,7 +512,7 @@ parse_let_statement(Parser* p) {
 static Node
 parse_return_statement(Parser* p) {
     ReturnStatement* stmt = malloc(sizeof(ReturnStatement));
-    if (stmt == NULL) exit_nomem();
+    if (stmt == NULL) ALLOC_FAIL();
     stmt->tok = p->cur_token;
 
     next_token(p);
@@ -576,7 +535,7 @@ static Node
 parse_expression_statement(Parser* p) {
     trace("parse_expression_statement");
     ExpressionStatement* stmt = malloc(sizeof(ExpressionStatement));
-    if (stmt == NULL) exit_nomem();
+    if (stmt == NULL) ALLOC_FAIL();
     stmt->tok = p->cur_token;
 
     stmt->expression = parse_expression(p, p_Lowest);
@@ -610,9 +569,7 @@ parse_statement(Parser* p) {
 
 void parser_init(Parser* p, Lexer* l) {
     p->l = l;
-    p->errors.data = malloc(DEFAULT_CAPACITY * sizeof(char*));
-    p->errors.cap = DEFAULT_CAPACITY;
-    p->errors.len = 0;
+    StringBufferInit(&p->errors);
 
     memset(p->prefix_parse_fns, 0, t_Return * sizeof(PrefixParseFn));
     p->prefix_parse_fns[t_Ident] = parse_identifier;
@@ -643,7 +600,7 @@ void parser_init(Parser* p, Lexer* l) {
 }
 
 void parser_destroy(Parser* p) {
-    for (size_t i = 0; i < p->errors.len; i++) {
+    for (int i = 0; i < p->errors.length; i++) {
         free(p->errors.data[i]);
     }
     free(p->errors.data);
@@ -652,24 +609,20 @@ void parser_destroy(Parser* p) {
 
 Program parse_program(Parser* p) {
     Program prog;
-    if (buffer_init(&prog.stmts, sizeof(Node)) == NULL)
-        exit_nomem();
-
+    NodeBufferInit(&prog.stmts);
     while (p->cur_token.type != t_Eof) {
         Node stmt = parse_statement(p);
         if (stmt.obj == NULL) break;
 
-        buffer_push(&prog.stmts, (void**)&stmt);
+        NodeBufferPush(&prog.stmts, stmt);
         next_token(p);
     }
     return prog;
 }
 
 void program_destroy(Program* p) {
-    Node* stmt;
-    for (size_t i = 0; i < p->stmts.len; i++) {
-        stmt = buffer_nth(&p->stmts, i);
-        node_destroy(*stmt);
+    for (int i = 0; i < p->stmts.length; i++) {
+        node_destroy(p->stmts.data[i]);
     }
-    buffer_destroy(&p->stmts);
+    free(p->stmts.data);
 }

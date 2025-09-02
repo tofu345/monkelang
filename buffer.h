@@ -1,30 +1,39 @@
 #pragma once
 
-#include <stddef.h>
-#include <stdbool.h>
+#include "utils.h"
 
-// dynamic array to store [data] of size [size]
-typedef struct {
-    void* data;
-    size_t len;
-    size_t cap;
-    size_t _size; // size of an element. avoid changing
-} buffer;
+// similar to wren DECLARE_BUFFER
+#define BUFFER(name, typ)                                                     \
+    typedef struct {                                                          \
+        typ* data;                                                            \
+        int length;                                                           \
+        int capacity;                                                         \
+    } name##Buffer;                                                           \
+                                                                              \
+    void name##Buffer##Init(name##Buffer* buf);                               \
+    void name##BufferPush(name##Buffer* buf, typ val);                        \
 
-// allocate new. returns NULL on err.
-buffer* buffer_new(size_t size);
+// similar to wren DEFINE_BUFFER
+#define DEFINE_BUFFER(name, typ)                                              \
+    void name##Buffer##Init(name##Buffer* buf) {                              \
+        buf->capacity = DEFAULT_CAPACITY;                                     \
+        buf->data = malloc(DEFAULT_CAPACITY * sizeof(typ));                   \
+        if (buf->data == NULL) {                                              \
+            printf("buffer malloc failed\n");                                 \
+            exit(1);                                                          \
+        }                                                                     \
+        buf->length = 0;                                                      \
+    }                                                                         \
+                                                                              \
+    void name##BufferPush(name##Buffer* buf, typ val) {                       \
+        if (buf->length >= buf->capacity) {                                   \
+            buf->capacity *= 2;                                               \
+            buf->data = realloc(buf->data, buf->capacity * sizeof(typ));      \
+            if (buf->data == NULL) {                                          \
+                printf("buffer alloc failed\n");                              \
+                exit(1);                                                      \
+            }                                                                 \
+        }                                                                     \
+        buf->data[(buf->length)++] = val;                                     \
+    }                                                                         \
 
-// initialise. returns NULL on err.
-void* buffer_init(buffer* buf, size_t size);
-
-// free [buffer] and [data].
-// NOTE: elements in [data] are not freed.
-void buffer_destroy(buffer* buf);
-
-// push [val] to end of [buf]. returns NULL on err.
-void* buffer_push(buffer* buf, void** val);
-// remove [val] frome end of [buf]. returns NULL on err.
-void* buffer_pop(buffer* buf);
-
-// returns pointer to [nth] elemnt of [buf]. if [nth] > [buf.len] returns NULL.
-void* buffer_nth(buffer* buf, size_t nth);

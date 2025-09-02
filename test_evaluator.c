@@ -16,12 +16,12 @@ void tearDown(void) {}
 
 static void
 check_parser_errors(Parser* p) {
-    if (p->errors.len == 0) {
+    if (p->errors.length == 0) {
         return;
     }
 
-    printf("parser had %d errors\n", (int)p->errors.len);
-    for (size_t i = 0; i < p->errors.len; i++) {
+    printf("parser had %d errors\n", p->errors.length);
+    for (int i = 0; i < p->errors.length; i++) {
         printf("parser error: %s\n", p->errors.data[i]);
     }
     TEST_FAIL();
@@ -212,40 +212,40 @@ void test_error_handling(void) {
         char* input;
         char* error_msg;
     } tests[] = {
-        // {
-        //     "5 + true;",
-        //     "type mismatch: Integer + Boolean",
-        // },
-        // {
-        //     "5 + true; 5;",
-        //     "type mismatch: Integer + Boolean",
-        // },
-        // {
-        //     "-true",
-        //     "unknown operator: -Boolean",
-        // },
-        // {
-        //     "true + false;",
-        //     "unknown operator: Boolean + Boolean",
-        // },
-        // {
-        //     "5; true + false; 5",
-        //     "unknown operator: Boolean + Boolean",
-        // },
-        // {
-        //     "if (10 > 1) { true + false; }",
-        //     "unknown operator: Boolean + Boolean",
-        // },
-        // {
-        //     "if (10 > 1) {\
-        //         if (10 > 1) {\
-        //             return true + false;\
-        //         }\
-        //     \
-        //         return 1;\
-        //     }",
-        //     "unknown operator: Boolean + Boolean",
-        // },
+        {
+            "5 + true;",
+            "type mismatch: Integer + Boolean",
+        },
+        {
+            "5 + true; 5;",
+            "type mismatch: Integer + Boolean",
+        },
+        {
+            "-true",
+            "unknown operator: -Boolean",
+        },
+        {
+            "true + false;",
+            "unknown operator: Boolean + Boolean",
+        },
+        {
+            "5; true + false; 5",
+            "unknown operator: Boolean + Boolean",
+        },
+        {
+            "if (10 > 1) { true + false; }",
+            "unknown operator: Boolean + Boolean",
+        },
+        {
+            "if (10 > 1) {\
+                if (10 > 1) {\
+                    return true + false;\
+                }\
+            \
+                return 1;\
+            }",
+            "unknown operator: Boolean + Boolean",
+        },
         {
             "foobar",
             "identifier not found: foobar",
@@ -301,9 +301,9 @@ void test_function_object(void) {
 
     Function* fn = evaluated.data.func;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            1, fn->len, "wrong number of parameters");
+            1, fn->params.length, "wrong number of parameters");
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            "x", fn->params[0]->value, "wrong paramater");
+            "x", fn->params.data[0]->value, "wrong paramater");
 
     char* expected_body = "(x + 2)";
 

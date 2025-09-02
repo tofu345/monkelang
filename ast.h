@@ -48,15 +48,18 @@ int node_fprint(const Node n, FILE* fp);
 // free `n.obj`
 void node_destroy(Node n);
 
+BUFFER(Node, Node);
+
 // Ast Root Node, created by parser
 typedef struct {
-    buffer stmts;
+    NodeBuffer stmts; // [Node]
 } Program;
 
 // Returns -1 on write to FILE err
 // TODO: return index of statement where fprint failed on to resume later
 int program_fprint(Program* p, FILE* fp);
 
+// TODO? remove tok or value?
 typedef struct {
     Token tok; // the 't_Ident' token
     char* value; // same as tok.literal
@@ -108,9 +111,7 @@ typedef struct {
 
 typedef struct {
     Token tok; // the '{' token
-    Node* stmts;
-    size_t len;
-    size_t cap;
+    NodeBuffer stmts;
 } BlockStatement;
 
 void destroy_block_statement(BlockStatement* bs);
@@ -123,18 +124,16 @@ typedef struct {
     BlockStatement* alternative;
 } IfExpression;
 
+BUFFER(Param, Identifier*);
+
 typedef struct {
     Token tok; // the 'fn' token
-    Identifier** params;
-    size_t len;
-    size_t cap;
+    ParamBuffer params;
     BlockStatement* body;
 } FunctionLiteral;
 
 typedef struct {
     Token tok; // the '(' token
     Node function; // Identifier or FunctionLiteral
-    Node* args;
-    size_t len;
-    size_t cap;
+    NodeBuffer args;
 } CallExpression;

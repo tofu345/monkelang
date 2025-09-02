@@ -5,6 +5,13 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+#define OBJ(t, d) (Object){ t, false, {d} }
+#define NULL_OBJ() (Object){} // `typ` == 0 == o_Null
+#define BOOL(b) (Object){ o_Boolean, false, {.boolean = b} }
+
+#define IS_ERROR(obj) obj.typ == o_Error
+#define IS_NULL(obj) obj.typ == o_Null
+
 typedef enum __attribute__ ((__packed__)) {
     // Primitives (not heap allocated)
     o_Null, // TODO? `null` tokens, lexing and parsing?
@@ -35,6 +42,8 @@ typedef struct {
     bool is_marked;
     ObjectData data;
 } Object;
+
+BUFFER(Object, Object);
 
 int object_fprint(Object o, FILE* fp);
 const char* show_object_type(ObjectType t);

@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+DEFINE_BUFFER(Object, Object);
+
 void object_destroy(Object* o) {
     switch (o->typ) {
         case o_Float:
@@ -21,11 +23,11 @@ void object_destroy(Object* o) {
         case o_Function:
             {
                 Function* fn = o->data.func;
-                for (size_t i = 0; i < fn->len; i++) {
-                    free(fn->params[i]->value);
-                    free(fn->params[i]);
+                for (int i = 0; i < fn->params.length; i++) {
+                    free(fn->params.data[i]->value);
+                    free(fn->params.data[i]);
                 }
-                free(fn->params);
+                free(fn->params.data);
                 destroy_block_statement(fn->body);
                 // env_destroy(fn->env);
                 free(fn);
@@ -70,11 +72,12 @@ static int
 fprint_function(ObjectData d, FILE* fp) {
     Function* fn = d.func;
     FPRINTF(fp, "fn(");
-    for (size_t i = 0; i < fn->len - 1; i++) {
-        FPRINTF(fp, "%s, ", fn->params[i]->value);
+    for (int i = 0; i < fn->params.length - 1; i++) {
+        FPRINTF(fp, "%s, ", fn->params.data[i]->value);
     }
-    if (fn->len >= 1)
-        FPRINTF(fp, "%s", fn->params[fn->len - 1]->value);
+    if (fn->params.length >= 1)
+        FPRINTF(fp, "%s",
+                fn->params.data[fn->params.length - 1]->value);
     FPRINTF(fp, ") {\n");
     fprint_block_statement(fn->body, fp);
     FPRINTF(fp, "\n}\n");
