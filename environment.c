@@ -7,7 +7,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-DEFINE_BUFFER(Frame, ht*);
+void* allocate(size_t size) {
+    void* ptr = malloc(size);
+    if (ptr == NULL) _ALLOC_FAIL();
+    return ptr;
+}
+
+DEFINE_BUFFER(Frame, Frame*);
 DEFINE_BUFFER(Alloc, Object*);
 
 // mark Objects [obj] contains references to.
@@ -41,10 +47,11 @@ trace_mark_object(Object* obj) {
 static void
 mark(Env* env) {
     for (int i = 0; i < env->frames.length; i++) {
-        ht* frame = env->frames.data[i];
-        for (size_t idx = 0; idx < frame->capacity; idx++) {
-            if (frame->entries[idx].key == NULL) continue;
-            Object* obj = frame->entries[idx].value;
+        // check if NULL?
+        ht* table = env->frames.data[i]->table;
+        for (size_t idx = 0; idx < table->capacity; idx++) {
+            if (table->entries[idx].key == NULL) continue;
+            Object* obj = table->entries[idx].value;
             trace_mark_object(obj);
         }
     }
@@ -58,25 +65,28 @@ allocs_remove_nulls(AllocBuffer* allocs) {
             allocs->data[i] = allocs->data[--new_length];
     }
     allocs->length = new_length;
-    for (int i = new_length; i < allocs->capacity; i++)
-        allocs->data[i] = NULL;
+    // To be safe.
+    // for (int i = new_length; i < allocs->capacity; i++)
+    //     allocs->data[i] = NULL;
 }
 
 static void
 sweep(Env* env) {
     for (int i = 0; i < env->allocs.length; i++) {
         Object* obj = env->allocs.data[i];
-        if (obj == NULL) {
-            printf("oh no\n env->allocs contents: ");
-            for (int j = 0; j < env->allocs.length; j++) {
-                Object* o = env->allocs.data[j];
-                if (o == NULL)
-                    printf("<null>");
-                else
-                    printf("%s", show_object_type(o->typ));
-            }
-            continue;
-        }
+
+        // if (obj == NULL) {
+        //     printf("oh no! allocs_remove_nulls did not work!\n env->allocs contents: ");
+        //     for (int j = 0; j < env->allocs.length; j++) {
+        //         Object* o = env->allocs.data[j];
+        //         if (o == NULL)
+        //             printf("<null>");
+        //         else
+        //             printf("%s", show_object_type(o->typ));
+        //     }
+        //     continue;
+        // }
+
         if (obj->is_marked) {
             obj->is_marked = false;
         } else {
@@ -94,14 +104,16 @@ void mark_and_sweep(Env* env) {
 }
 
 Env* env_new() {
-    Env* env = malloc(sizeof(Env));
-    if (env == NULL) ALLOC_FAIL();
+    Env* env = allocate(sizeof(Env));
     FrameBufferInit(&env->frames);
     AllocBufferInit(&env->allocs);
-    // base frame
-    ht* frame = ht_create();
-    if (frame == NULL) ALLOC_FAIL();
-    FrameBufferPush(&env->frames, frame);
+
+    Frame* current = allocate(sizeof(Frame));;
+    current->parent = NULL;
+    current->table = ht_create();
+    if (current->table == NULL) ALLOC_FAIL();
+    env->current = current;
+    FrameBufferPush(&env->frames, current);
     return env;
 }
 
@@ -113,51 +125,58 @@ void env_destroy(Env* env) {
     }
     free(env->allocs.data);
     for (int i = 0; i < env->frames.length; i++) {
-        ht_destroy(env->frames.data[i]);
+        Frame* frame = env->frames.data[i];
+        ht_destroy(frame->table);
+        free(frame);
     }
     free(env->frames.data);
     free(env);
 }
 
-void frame_new(Env* env) {
-    ht* frame = ht_create();
-    if (frame == NULL) ALLOC_FAIL();
-    FrameBufferPush(&env->frames, frame);
+Frame* frame_new(Env* env) {
+    Frame* new_frame = allocate(sizeof(Frame));;
+    new_frame->parent = NULL;
+    new_frame->table = ht_create();
+    if (new_frame->table == NULL) ALLOC_FAIL();
+    FrameBufferPush(&env->frames, new_frame);
+    return new_frame;
 }
 
-void frame_destroy(Env* env) {
-    if (env->frames.length <= 0) {
-        printf("frame_destroy: empty frame buffer\n");
-        exit(1);
+void frame_destroy(Frame* frame, Env* env) {
+    ht_destroy(frame->table);
+    for (int i = env->frames.length; i >= 0; i--) {
+        if (env->frames.data[i] == frame) {
+            env->frames.data[i] = env->frames.data[--env->frames.length];
+            break;
+        }
     }
-    ht* frame = FrameBufferPop(&env->frames);
-    ht_destroy(frame);
-    mark_and_sweep(env);
+    free(frame);
 }
 
 Object env_get(Env* env, char* name) {
-    if (env->frames.length <= 0) return NULL_OBJ();
-    for (int i = env->frames.length - 1; i >= 0; i--) {
-        ht* frame = env->frames.data[i];
-        if (frame == NULL) continue;
+    Frame* cur = env->current;
+    while (cur != NULL) {
+        ht* frame = cur->table;
         Object* value = ht_get(frame, name);
-        if (value == NULL) continue;
+        if (value == NULL) {
+            cur = cur->parent;
+            continue;
+        }
         return *value;
     }
     return NULL_OBJ();
 }
 
 void env_set(Env* env, char* name, Object obj) {
-    Object* value = malloc(sizeof(Object));
-    if (value == NULL) ALLOC_FAIL();
+    Object* value = allocate(sizeof(Object));
     memcpy(value, &obj, sizeof(Object));
     AllocBufferPush(&env->allocs, value);
-    ht* frame = env->frames.data[env->frames.length - 1];
-    if (ht_set(frame, name, value) == NULL) ALLOC_FAIL();
+    if (ht_set(env->current->table, name, value) == NULL)
+        ALLOC_FAIL();
 }
 
-// NOTE: could introduce a double free by inserting into [AllocBuffer] here and
-// with [env_set].
+// NOTE: could introduce a double free by inserting into [AllocBuffer]
+// here and with [env_set].
 // void track(Env* env, Object* ptr) {
 //     AllocBufferPush(&env->allocs, ptr);
 // }

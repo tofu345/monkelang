@@ -377,7 +377,6 @@ parse_call_arguments(Parser* p, CallExpression* ce) {
 
     if (peek_token_is(p, t_Rparen)) {
         next_token(p);
-        free(p->cur_token.literal); // ')' tok
         return 0;
     }
 
@@ -490,7 +489,9 @@ parse_let_statement(Parser* p) {
     stmt->name->value = p->cur_token.literal;
 
     if (!expect_peek(p, t_Assign)) {
-        node_destroy(NODE(n_LetStatement, stmt));
+        free(stmt->tok.literal);
+        free(stmt->name->value);
+        free(stmt);
         return (Node){};
     }
     free(p->cur_token.literal); // '=' tok
@@ -607,19 +608,15 @@ void parser_destroy(Parser* p) {
     free(p->peek_token.literal);
 }
 
-void parse_program_into(Parser* p, Program* prog) {
-    while (p->cur_token.type != t_Eof) {
-        Node stmt = parse_statement(p);
-        if (stmt.obj == NULL) break;
-        NodeBufferPush(&prog->stmts, stmt);
-        next_token(p);
-    }
-}
-
 Program parse_program(Parser* p) {
     Program prog;
     NodeBufferInit(&prog.stmts);
-    parse_program_into(p, &prog);
+    while (p->cur_token.type != t_Eof) {
+        Node stmt = parse_statement(p);
+        if (stmt.obj == NULL) break;
+        NodeBufferPush(&prog.stmts, stmt);
+        next_token(p);
+    }
     return prog;
 }
 

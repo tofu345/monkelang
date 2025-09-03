@@ -7,6 +7,8 @@
 #include "hash-table/ht.h"
 #include "object.h"
 
+void* allocate(size_t size);
+
 // garbage collector (mark and sweep).
 // based on [boot.dev: c memory mgmt course](https://www.youtube.com/watch?v=rJrd2QMVbGM)
 //
@@ -14,12 +16,18 @@
 // - an allocation fails
 // - a function returns
 
-BUFFER(Frame, ht*);
+// table of variable names and ptrs to heap allocated objects
+typedef struct Frame {
+    ht* table;
+    struct Frame* parent;
+} Frame;
+
+BUFFER(Frame, Frame*);
 BUFFER(Alloc, Object*);
 
 typedef struct {
-    FrameBuffer frames; // key-value pairs of variable name,
-                        // ptrs heap allocated objects
+    FrameBuffer frames;
+    Frame* current;
     AllocBuffer allocs; // tracks heap allocated [Objects]
 } Env;
 
@@ -28,15 +36,12 @@ void env_destroy(Env* env);
 
 void mark_and_sweep(Env* env);
 
-// Create new [Frame] and append to [env->frames] for use with [env_set].
-void frame_new(Env* env);
-
-// Pop current frame off [FrameBuffer] and perform garbage collection.
-void frame_destroy(Env* env);
+Frame* frame_new(Env* env);
+void frame_destroy(Frame* frame, Env* env);
 
 Object env_get(Env* env, char* name);
 
-// Copy [obj] to heap, add to current [Frame] (last [Frame]), and append to
+// Copy [obj] to heap, add to [env->current] Frame, and append to
 // [env->allocs].
 void env_set(Env* env, char* name, Object obj);
 

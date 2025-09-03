@@ -263,25 +263,30 @@ eval_argument_expressions(NodeBuffer args, Env* env) {
     return results;
 }
 
-// create new frame and insert variables with names [params] and values [args]
-void extend_new_frame_with(ParamBuffer params, ObjectBuffer args, Env* env) {
-    frame_new(env);
-    for (int i = 0; i < args.length; i++) {
-        env_set(env, params.data[i]->value, args.data[i]);
-    }
-}
-
 // load args into new frame, run function,
 // remove new frame and return result
 static Object
 apply_function(Object fn, ObjectBuffer args, Env* env) {
     if (fn.typ != o_Function)
-        return new_error("not a function: %s", show_object_type(fn.typ));
+        return new_error("not a function: %s",
+                show_object_type(fn.typ));
 
     FunctionLiteral* func = fn.data.func;
-    extend_new_frame_with(func->params, args, env);
+    Frame* func_frame = frame_new(env);
+    func_frame->parent = env->current;
+    env->current = func_frame;
+    // is there need to create ObjectBuffer?
+    for (int i = 0; i < args.length; i++)
+        env_set(env, func->params.data[i]->value, args.data[i]);
+
     Object result = eval_block_statement(func->body->stmts, env);
-    frame_destroy(env);
+    env->current = func_frame->parent;
+
+    // if [result] is a [FunctionLiteral], [result] is a Closure
+
+    frame_destroy(func_frame, env);
+
+    // mark_and_sweep(env);
 
     if (result.typ == o_ReturnValue)
         return from_return_value(result);
@@ -362,10 +367,11 @@ Object eval(Node n, Env* env) {
     }
 }
 
-Object eval_program_from(Program* p, int idx, Env* env) {
+
+Object eval_program(Program* p, Env* env) {
     Object result = {};
-    for (; idx < p->stmts.length; idx++) {
-        result = eval(p->stmts.data[idx], env);
+    for (int i = 0; i < p->stmts.length; i++) {
+        result = eval(p->stmts.data[i], env);
         switch (result.typ) {
             case o_ReturnValue: return from_return_value(result);
             case o_Error: return result;
@@ -373,8 +379,4 @@ Object eval_program_from(Program* p, int idx, Env* env) {
         }
     }
     return result;
-}
-
-Object eval_program(Program* p, Env* env) {
-    return eval_program_from(p, 0, env);
 }

@@ -17,13 +17,12 @@ void print_parser_errors(FILE* out, Parser* p) {
     }
 }
 
+BUFFER(Program, Program);
+DEFINE_BUFFER(Program, Program);
+
 void start(FILE* in, FILE* out) {
-    Lexer l = {};
-    Parser p;
-    parser_init(&p, &l);
-    Program prog;
-    NodeBufferInit(&prog.stmts);
-    int current_statement = 0;
+    ProgramBuffer progs;
+    ProgramBufferInit(&progs);
     Env* env = env_new();
 
     while (1) {
@@ -35,30 +34,31 @@ void start(FILE* in, FILE* out) {
             break;
         }
 
-        lexer_init(&l, input);
-        p.cur_token = lexer_next_token(&l);
-        p.peek_token = lexer_next_token(&l);
-        parse_program_into(&p, &prog);
+        Lexer l = lexer_new(input);
+        Parser p;
+        parser_init(&p, &l);
+        Program prog = parse_program(&p);
+        ProgramBufferPush(&progs, prog);
 
         if (p.errors.length != 0) {
             print_parser_errors(out, &p);
-            for (int i = 0; i < p.errors.length; i++)
-                free(p.errors.data[i]);
-            p.errors.length = 0;
+            free(input);
+            parser_destroy(&p);
             continue;
         }
 
-        Object evaluated = eval_program_from(&prog, current_statement, env);
-        current_statement = prog.stmts.length;
+        Object evaluated = eval_program(&prog, env);
         if (evaluated.typ != o_Null) {
             object_fprint(evaluated, out);
             fprintf(out, "\n");
             object_destroy(&evaluated);
         }
+
         free(input);
+        parser_destroy(&p);
     }
 
     env_destroy(env);
-    parser_destroy(&p);
-    program_destroy(&prog);
+    for (int i = 0; i < progs.length; i++)
+        program_destroy(&progs.data[i]);
 }

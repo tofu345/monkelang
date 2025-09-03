@@ -29,7 +29,6 @@ void parser_init(Parser* p, Lexer* l);
 void parser_destroy(Parser* p);
 
 Program parse_program(Parser* p);
-void parse_program_into(Parser* p, Program* prog);
 void program_destroy(Program* p);
 
 enum Precedence {
