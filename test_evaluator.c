@@ -344,6 +344,18 @@ void test_function_application(void) {
     }
 }
 
+void test_closures(void) {
+    char* input = " \
+let newAdder = fn(x) { \
+    fn(y) { x + y }; \
+}; \
+let addTwo = newAdder(2); \
+addTwo(2);";
+    Object evaluated = test_eval(input);
+    test_integer_object(evaluated, 4);
+    object_destroy(&evaluated);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_eval_integer_expression);
@@ -354,5 +366,6 @@ int main(void) {
     RUN_TEST(test_error_handling);
     RUN_TEST(test_function_object);
     RUN_TEST(test_function_application);
+    RUN_TEST(test_closures);
     return UNITY_END();
 }

@@ -362,7 +362,7 @@ apply_function(Object fn, ObjectBuffer args, Env* env) {
             Object* val = closure_frame->table->entries[i].value;
             env_set(env, key, object_copy(*val));
         }
-        func = fn.data.closure->lit;
+        func = fn.data.closure->func;
 
     } else
         return new_error("not a function: %s", show_object_type(fn.typ));
@@ -392,10 +392,10 @@ apply_function(Object fn, ObjectBuffer args, Env* env) {
         }
         free(captured_variables.data);
 
-        // memory leak
+        // TODO FIX memory leak
         Closure* closure = malloc(sizeof(Closure));
         closure->frame = closure_frame;
-        closure->lit = result.data.func;
+        closure->func = result.data.func;
         result = OBJ(o_Closure, .closure = closure );
     }
 
@@ -483,5 +483,16 @@ Object eval(Node n, Env* env) {
 
 
 Object eval_program(Program* p, Env* env) {
-    return eval_block_statement(p->stmts, env);
+    Object result = {};
+    for (int i = 0; i < p->stmts.length; i++) {
+        result = eval(p->stmts.data[i], env);
+        switch (result.typ) {
+            case o_ReturnValue: 
+                return from_return_value(result);
+            case o_Error: 
+                return result;
+            default: break;
+        }
+    }
+    return result;
 }

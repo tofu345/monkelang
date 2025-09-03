@@ -17,7 +17,7 @@ typedef struct Frame {
 
 struct Closure {
     Frame* frame;
-    FunctionLiteral* lit;
+    FunctionLiteral* func;
 };
 
 BUFFER(Frame, Frame*);
