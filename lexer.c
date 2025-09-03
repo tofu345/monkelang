@@ -24,12 +24,19 @@ static void read_char(Lexer* l) {
     }
 }
 
+void lexer_init(Lexer* l, const char* input) {
+    l->col = 0;
+    l->line = 1;
+    l->input = input;
+    l->input_len = strlen(input);
+    l->position = 0;
+    l->read_position = 0;
+    read_char(l);
+}
+
 Lexer lexer_new(const char* input) {
-    Lexer l = {};
-    l.line = 1;
-    l.input = input;
-    l.input_len = strlen(input);
-    read_char(&l);
+    Lexer l;
+    lexer_init(&l, input);
     return l;
 }
 

@@ -6,8 +6,8 @@
 #include <stdbool.h>
 
 #define OBJ(t, d) (Object){ t, false, {d} }
+#define BOOL(b) OBJ(o_Boolean, .boolean = b)
 #define NULL_OBJ() (Object){} // `typ` == 0 == o_Null
-#define BOOL(b) (Object){ o_Boolean, false, {.boolean = b} }
 
 #define IS_ERROR(obj) obj.typ == o_Error
 #define IS_NULL(obj) obj.typ == o_Null
@@ -26,15 +26,12 @@ typedef enum __attribute__ ((__packed__)) {
     o_Function,
 } ObjectType;
 
-// defined in "environment.h"
-typedef struct Function Function;
-
 typedef union {
     long integer;
     double floating;
     bool boolean;
     char* error_msg;
-    Function* func;
+    FunctionLiteral* func;
 } ObjectData;
 
 typedef struct {
@@ -47,10 +44,12 @@ BUFFER(Object, Object);
 
 int object_fprint(Object o, FILE* fp);
 const char* show_object_type(ObjectType t);
+
 void object_destroy(Object* o);
+
 bool object_cmp(Object left, Object right);
 
-// stores the actual type of `value` in second byte
+// stores the actual type of `value` in [value_typ]
 struct ReturnValue {
     ObjectType typ; // will be `o_ReturnValue`
     bool is_marked;

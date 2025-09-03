@@ -607,16 +607,19 @@ void parser_destroy(Parser* p) {
     free(p->peek_token.literal);
 }
 
-Program parse_program(Parser* p) {
-    Program prog;
-    NodeBufferInit(&prog.stmts);
+void parse_program_into(Parser* p, Program* prog) {
     while (p->cur_token.type != t_Eof) {
         Node stmt = parse_statement(p);
         if (stmt.obj == NULL) break;
-
-        NodeBufferPush(&prog.stmts, stmt);
+        NodeBufferPush(&prog->stmts, stmt);
         next_token(p);
     }
+}
+
+Program parse_program(Parser* p) {
+    Program prog;
+    NodeBufferInit(&prog.stmts);
+    parse_program_into(p, &prog);
     return prog;
 }
 

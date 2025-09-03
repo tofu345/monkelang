@@ -36,12 +36,11 @@ test_eval(char* input) {
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
     check_parser_errors(&p);
     Env* env = env_new();
-    TEST_ASSERT_NOT_NULL_MESSAGE(env, "env NULL");
-    Object evaluated = eval_program(&prog, env);
-    // env_destroy(env);
+    Object result = eval_program(&prog, env);
+    env_destroy(env);
     program_destroy(&prog);
     parser_destroy(&p);
-    return evaluated;
+    return result;
 }
 
 static void
@@ -299,7 +298,7 @@ void test_function_object(void) {
             show_object_type(o_Function), show_object_type(evaluated.typ),
             "wrong object type");
 
-    Function* fn = evaluated.data.func;
+    FunctionLiteral* fn = evaluated.data.func;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             1, fn->params.length, "wrong number of parameters");
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
@@ -319,6 +318,7 @@ void test_function_object(void) {
 
     free(buf);
     object_destroy(&evaluated);
+    env_destroy(env);
     program_destroy(&prog);
     parser_destroy(&p);
 }

@@ -26,8 +26,10 @@ struct Parser {
 };
 
 void parser_init(Parser* p, Lexer* l);
-
 void parser_destroy(Parser* p);
+
+Program parse_program(Parser* p);
+void parse_program_into(Parser* p, Program* prog);
 void program_destroy(Program* p);
 
 enum Precedence {
@@ -39,6 +41,3 @@ enum Precedence {
     p_Prefix,
     p_Call,
 };
-
-// returns a program with `cap` 0 on fail
-Program parse_program(Parser* p);

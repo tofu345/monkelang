@@ -52,7 +52,7 @@ BUFFER(Node, Node);
 
 // Ast Root Node, created by parser
 typedef struct {
-    NodeBuffer stmts; // [Node]
+    NodeBuffer stmts;
 } Program;
 
 // Returns -1 on write to FILE err
@@ -131,6 +131,8 @@ typedef struct {
     ParamBuffer params;
     BlockStatement* body;
 } FunctionLiteral;
+
+void destroy_function_literal(FunctionLiteral* fl);
 
 typedef struct {
     Token tok; // the '(' token

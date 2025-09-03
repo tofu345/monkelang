@@ -12,6 +12,7 @@
                                                                               \
     void name##Buffer##Init(name##Buffer* buf);                               \
     void name##BufferPush(name##Buffer* buf, typ val);                        \
+    typ name##BufferPop(name##Buffer* buf);                                   \
 
 // similar to wren DEFINE_BUFFER
 #define DEFINE_BUFFER(name, typ)                                              \
@@ -35,5 +36,9 @@
             }                                                                 \
         }                                                                     \
         buf->data[(buf->length)++] = val;                                     \
+    }                                                                         \
+                                                                              \
+    typ name##BufferPop(name##Buffer* buf) {                                  \
+        return buf->data[--(buf->length)];                                    \
     }                                                                         \
 

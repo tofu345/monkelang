@@ -14,37 +14,31 @@
 // - an allocation fails
 // - a function returns
 
-struct HeapObject {
-    ObjectType typ;
-    void* ptr;
-};
-
 BUFFER(Frame, ht*);
-BUFFER(Alloc, struct HeapObject);
+BUFFER(Alloc, Object*);
 
 typedef struct {
-    FrameBuffer frames;
-    AllocBuffer allocs; // heap allocated [Objects]
+    FrameBuffer frames; // key-value pairs of variable name,
+                        // ptrs heap allocated objects
+    AllocBuffer allocs; // tracks heap allocated [Objects]
 } Env;
 
-struct Function {
-    ParamBuffer params;
-    BlockStatement* body;
-    Env* env;
-    FunctionLiteral* lit; // [params] and [body] point to the same
-                          // value as `FunctionLiteral`. When the
-                          // result of an evaluation is `Function`,
-                          // set NULL on `FunctionLiteral`.
-};
-
-// `malloc` new `Object`, store ptr in [env.allocs] and return ptr
-Object* allocate_object(Env* env);
-
 Env* env_new();
-void* enclosed_env(Env* env);
 void env_destroy(Env* env);
 
-Object env_get(Env* e, char* name);
+void mark_and_sweep(Env* env);
 
-// copies obj into env
-void* env_set(Env* e, char* name, Object obj);
+// Create new [Frame] and append to [env->frames] for use with [env_set].
+void frame_new(Env* env);
+
+// Pop current frame off [FrameBuffer] and perform garbage collection.
+void frame_destroy(Env* env);
+
+Object env_get(Env* env, char* name);
+
+// Copy [obj] to heap, add to current [Frame] (last [Frame]), and append to
+// [env->allocs].
+void env_set(Env* env, char* name, Object obj);
+
+// append [ptr] to [env->allcs].
+void track(Env* env, Object* ptr);

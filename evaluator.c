@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-Object eval(const Node n, Env* env);
+Object eval(Node n, Env* env);
 
 #define STR_EQ(exp, str) strcmp(exp, str) == 0
 
@@ -32,12 +32,12 @@ bool is_truthy(Object o) {
 }
 
 static Object
-eval_integer_literal(const IntegerLiteral* il) {
+eval_integer_literal(IntegerLiteral* il) {
     return OBJ(o_Integer, il->value);
 }
 
 static Object
-eval_float_literal(const FloatLiteral* fl) {
+eval_float_literal(FloatLiteral* fl) {
     return OBJ(o_Float, fl->value);
 }
 
@@ -81,7 +81,7 @@ eval_bang_operator_expression(Object right) {
 }
 
 static Object
-eval_prefix_expression(const PrefixExpression* pe, Env* env) {
+eval_prefix_expression(PrefixExpression* pe, Env* env) {
     Object right = eval(pe->right, env);
     if (IS_ERROR(right))
         return right;
@@ -189,7 +189,7 @@ eval_integer_infix_expression(char* op, Object left, Object right) {
 }
 
 static Object
-eval_infix_expression(const InfixExpression* ie, Env* env) {
+eval_infix_expression(InfixExpression* ie, Env* env) {
     Object left = eval(ie->left, env);
     if (IS_ERROR(left))
         return left;
@@ -223,20 +223,20 @@ eval_infix_expression(const InfixExpression* ie, Env* env) {
 }
 
 static Object
-eval_if_expression(const IfExpression* ie, Env* env) {
+eval_if_expression(IfExpression* ie, Env* env) {
     Object condition = eval(ie->condition, env);
     if (is_truthy(condition)) {
-        return eval(NODE(n_BlockStatement, ie->consequence), env);
+        return eval_block_statement(ie->consequence->stmts, env);
 
     } else if (ie->alternative != NULL) {
-        return eval(NODE(n_BlockStatement, ie->alternative), env);
+        return eval_block_statement(ie->alternative->stmts, env);
     }
 
     return NULL_OBJ();
 }
 
 static Object
-eval_identifier(const Identifier* i, Env* env) {
+eval_identifier(Identifier* i, Env* env) {
     Object val = env_get(env, i->value);
     if (IS_NULL(val)) {
         return new_error("identifier not found: %s", i->value);
@@ -245,50 +245,50 @@ eval_identifier(const Identifier* i, Env* env) {
 }
 
 static ObjectBuffer
-eval_arguments(NodeBuffer args, Env* env) {
+eval_argument_expressions(NodeBuffer args, Env* env) {
     ObjectBuffer results;
     ObjectBufferInit(&results);
     for (int i = 0; i < args.length; i++) {
-        Object evaluated = eval(args.data[i], env);
-        if (IS_NULL(evaluated)) {
+        Object result = eval(args.data[i], env);
+        if (IS_ERROR(result)) {
+            for (int j = 0; j < i; i++)
+                object_destroy(&results.data[j]);
+
             results.length = 1;
-            results.data[0] = evaluated;
+            results.data[0] = result;
             return results;
         }
-        ObjectBufferPush(&results, evaluated);
+        ObjectBufferPush(&results, result);
     }
     return results;
 }
 
-Env* extend_function_env(Function* func, ObjectBuffer args) {
-    Env* env = enclosed_env(func->env);
+// create new frame and insert variables with names [params] and values [args]
+void extend_new_frame_with(ParamBuffer params, ObjectBuffer args, Env* env) {
+    frame_new(env);
     for (int i = 0; i < args.length; i++) {
-        Identifier* param = func->params.data[i];
-        if (env_set(env, param->value, args.data[i]) == NULL)
-            ALLOC_FAIL();
+        env_set(env, params.data[i]->value, args.data[i]);
     }
-    return env;
 }
 
-// load args into enclosed env, run function with env and return result
+// load args into new frame, run function,
+// remove new frame and return result
 static Object
-apply_function(Object fn, ObjectBuffer args) {
+apply_function(Object fn, ObjectBuffer args, Env* env) {
     if (fn.typ != o_Function)
-        return new_error("not a function: %s",
-                show_object_type(fn.typ));
-    Function* func = fn.data.func;
-    Env* extended_env = extend_function_env(func, args);
-    Object evaluated = eval(NODE(n_BlockStatement, func->body), extended_env);
+        return new_error("not a function: %s", show_object_type(fn.typ));
 
-    // TODO: GC
-    // env_destroy(func->env);
+    FunctionLiteral* func = fn.data.func;
+    extend_new_frame_with(func->params, args, env);
+    Object result = eval_block_statement(func->body->stmts, env);
+    frame_destroy(env);
 
-    if (evaluated.typ == o_ReturnValue)
-        return from_return_value(evaluated);
-    return evaluated;
+    if (result.typ == o_ReturnValue)
+        return from_return_value(result);
+    return result;
 }
 
-Object eval(const Node n, Env* env) {
+Object eval(Node n, Env* env) {
     switch (n.typ) {
         case n_Identifier:
             return eval_identifier(n.obj, env);
@@ -300,42 +300,37 @@ Object eval(const Node n, Env* env) {
             return eval_float_literal(n.obj);
         case n_BooleanLiteral:
             {
-                const BooleanLiteral* b = n.obj;
+                BooleanLiteral* b = n.obj;
                 return BOOL(b->value);
             }
         case n_FunctionLiteral:
-            {
-                const FunctionLiteral* fl = n.obj;
-                Function* fn = malloc(sizeof(Function));
-                if (fn == NULL) ALLOC_FAIL();
-                fn->params = fl->params;
-                fn->body = fl->body;
-                fn->env = env;
-                fn->lit = n.obj;
-                return OBJ(o_Function, .func = fn);
-            }
+            return OBJ(o_Function, .func = n.obj);
         case n_PrefixExpression:
             return eval_prefix_expression(n.obj, env);
         case n_InfixExpression:
             return eval_infix_expression(n.obj, env);
         case n_CallExpression:
             {
-                const CallExpression* ce = n.obj;
+                CallExpression* ce = n.obj;
                 Object function = eval(ce->function, env);
                 if (IS_ERROR(function)) {
                     return function;
                 }
-                ObjectBuffer args = eval_arguments(ce->args, env);
+                ObjectBuffer args = eval_argument_expressions(ce->args, env);
                 if (args.length == 1 && IS_ERROR(args.data[0])) {
                     Object err = args.data[0];
                     free(args.data);
                     return err;
                 }
-                return apply_function(function, args);
+                Object result = apply_function(function, args, env);
+                for (int i = 0; i < args.length; i++)
+                    object_destroy(&args.data[i]);
+                free(args.data);
+                return result;
             }
         case n_LetStatement:
             {
-                const LetStatement* ls = n.obj;
+                LetStatement* ls = n.obj;
                 Object val = eval(ls->value, env);
                 if (IS_ERROR(val)) {
                     return val;
@@ -345,12 +340,12 @@ Object eval(const Node n, Env* env) {
             }
         case n_BlockStatement:
             {
-                const BlockStatement* b = n.obj;
+                BlockStatement* b = n.obj;
                 return eval_block_statement(b->stmts, env);
             }
         case n_ReturnStatement:
             {
-                const ReturnStatement* ns = n.obj;
+                ReturnStatement* ns = n.obj;
                 Object res = eval(ns->return_value, env);
                 if (IS_ERROR(res)) {
                     return res;
@@ -367,22 +362,19 @@ Object eval(const Node n, Env* env) {
     }
 }
 
-Object eval_program(Program* p, Env* env) {
+Object eval_program_from(Program* p, int idx, Env* env) {
     Object result = {};
-    for (int i = 0; i < p->stmts.length; i++) {
-        result = eval(p->stmts.data[i], env);
+    for (; idx < p->stmts.length; idx++) {
+        result = eval(p->stmts.data[idx], env);
         switch (result.typ) {
             case o_ReturnValue: return from_return_value(result);
             case o_Error: return result;
             default: break;
         }
     }
-
-    if (result.typ == o_Function) {
-        FunctionLiteral* lit = result.data.func->lit;
-        lit->params.data = NULL;
-        lit->body = NULL;
-    }
-
     return result;
+}
+
+Object eval_program(Program* p, Env* env) {
+    return eval_program_from(p, 0, env);
 }

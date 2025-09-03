@@ -9,6 +9,7 @@
     if (fprintf(fp, __VA_ARGS__) <= 0) \
         return -1;
 
+// perform gc?
 #define ALLOC_FAIL() \
     do { \
         fprintf(stderr, "allocation failed: %s\n", strerror(errno)); \

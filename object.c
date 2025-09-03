@@ -1,9 +1,8 @@
 #include "object.h"
-#include "ast.h"
-#include "environment.h"
 #include "utils.h"
 
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -11,30 +10,20 @@ DEFINE_BUFFER(Object, Object);
 
 void object_destroy(Object* o) {
     switch (o->typ) {
+        case o_Null:
         case o_Float:
         case o_Integer:
         case o_Boolean:
-        case o_Null:
         case o_ReturnValue:
+        case o_Function:
             break;
         case o_Error:
             free(o->data.error_msg);
-            break;
-        case o_Function:
-            {
-                Function* fn = o->data.func;
-                for (int i = 0; i < fn->params.length; i++) {
-                    free(fn->params.data[i]->value);
-                    free(fn->params.data[i]);
-                }
-                free(fn->params.data);
-                destroy_block_statement(fn->body);
-                // env_destroy(fn->env);
-                free(fn);
-            }
+            return;
         default:
-            // TODO: panic if type not handled
-            break;
+            printf("object_destroy: %d typ not handled\n", o->typ);
+            exit(1);
+            return;
     }
 }
 
@@ -69,18 +58,11 @@ fprintf_error(ObjectData e, FILE* fp) {
 }
 
 static int
-fprint_function(ObjectData d, FILE* fp) {
-    Function* fn = d.func;
-    FPRINTF(fp, "fn(");
-    for (int i = 0; i < fn->params.length - 1; i++) {
-        FPRINTF(fp, "%s, ", fn->params.data[i]->value);
-    }
-    if (fn->params.length >= 1)
-        FPRINTF(fp, "%s",
-                fn->params.data[fn->params.length - 1]->value);
-    FPRINTF(fp, ") {\n");
-    fprint_block_statement(fn->body, fp);
-    FPRINTF(fp, "\n}\n");
+fprint_function(FILE* fp) {
+    // [Object] with type [o_Function] points to [FunctionLiteral] which
+    // is managed by [Program] i.e freed with [Program]. For simplicity,
+    // printing functions is disabled.
+    FPRINTF(fp, "<function>");
     return 0;
 }
 
@@ -97,7 +79,7 @@ int object_fprint(Object o, FILE* fp) {
         case o_Error:
             return fprintf_error(o.data, fp);
         case o_Function:
-            return fprint_function(o.data, fp);
+            return fprint_function(fp);
         default:
             fprintf(stderr, "object_fprint: object type not handled %d\n",
                     o.typ);
@@ -140,6 +122,7 @@ Object to_return_value(Object obj) {
 }
 
 Object from_return_value(Object obj) {
+    if (obj.typ != o_ReturnValue) return obj;
     struct ReturnValue* return_val = (void*)&obj;
     return_val->typ = return_val->value_typ;
     return obj;
