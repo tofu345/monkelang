@@ -9,7 +9,7 @@
 
 void* allocate(size_t size) {
     void* ptr = malloc(size);
-    if (ptr == NULL) _ALLOC_FAIL();
+    if (ptr == NULL) ALLOC_FAIL();
     return ptr;
 }
 
@@ -27,13 +27,11 @@ trace_blacken_object(Object* obj) {
         case o_ReturnValue:
         case o_Error:
         case o_Function:
+        case o_Closure:
             return;
         default:
-            {
-                fprintf(stderr,
-                        "trace_blacken_object: type %d not handled",
-                        obj->typ);
-            }
+            fprintf(stderr, "trace_blacken_object: type %d not handled",
+                    obj->typ);
     }
 }
 
@@ -65,31 +63,21 @@ allocs_remove_nulls(AllocBuffer* allocs) {
             allocs->data[i] = allocs->data[--new_length];
     }
     allocs->length = new_length;
-    // To be safe.
-    // for (int i = new_length; i < allocs->capacity; i++)
-    //     allocs->data[i] = NULL;
+    for (int i = new_length; i < allocs->capacity; i++)
+        allocs->data[i] = NULL;
 }
 
 static void
 sweep(Env* env) {
     for (int i = 0; i < env->allocs.length; i++) {
         Object* obj = env->allocs.data[i];
-
-        // if (obj == NULL) {
-        //     printf("oh no! allocs_remove_nulls did not work!\n env->allocs contents: ");
-        //     for (int j = 0; j < env->allocs.length; j++) {
-        //         Object* o = env->allocs.data[j];
-        //         if (o == NULL)
-        //             printf("<null>");
-        //         else
-        //             printf("%s", show_object_type(o->typ));
-        //     }
-        //     continue;
-        // }
-
+        if (obj == NULL) continue;
         if (obj->is_marked) {
             obj->is_marked = false;
         } else {
+            if (obj->typ == o_Closure) {
+                frame_destroy(obj->data.closure->frame, env);
+            }
             object_destroy(obj);
             free(obj);
             env->allocs.data[i] = NULL;
@@ -143,17 +131,17 @@ Frame* frame_new(Env* env) {
 }
 
 void frame_destroy(Frame* frame, Env* env) {
-    ht_destroy(frame->table);
     for (int i = env->frames.length; i >= 0; i--) {
         if (env->frames.data[i] == frame) {
             env->frames.data[i] = env->frames.data[--env->frames.length];
             break;
         }
     }
+    ht_destroy(frame->table);
     free(frame);
 }
 
-Object env_get(Env* env, char* name) {
+Object* env_get(Env* env, char* name) {
     Frame* cur = env->current;
     while (cur != NULL) {
         ht* frame = cur->table;
@@ -162,9 +150,9 @@ Object env_get(Env* env, char* name) {
             cur = cur->parent;
             continue;
         }
-        return *value;
+        return value;
     }
-    return NULL_OBJ();
+    return NULL;
 }
 
 void env_set(Env* env, char* name, Object obj) {

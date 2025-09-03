@@ -21,10 +21,15 @@ typedef enum __attribute__ ((__packed__)) {
     o_ReturnValue, // if `ObjectType` is `o_ReturnValue`
                    // `Object` is cast into `struct ReturnValue` with
                    // `to_return_value`.
+
     // Heap allocated
     o_Error,
     o_Function,
+    o_Closure, // a [Frame] with captured variables, to keep them
+               // in scope.
 } ObjectType;
+
+typedef struct Closure Closure;
 
 typedef union {
     long integer;
@@ -32,6 +37,7 @@ typedef union {
     bool boolean;
     char* error_msg;
     FunctionLiteral* func;
+    Closure* closure;
 } ObjectData;
 
 typedef struct {
@@ -48,6 +54,9 @@ const char* show_object_type(ObjectType t);
 void object_destroy(Object* o);
 
 bool object_cmp(Object left, Object right);
+
+// create a complete copy of [obj]
+Object object_copy(Object obj);
 
 // stores the actual type of `value` in [value_typ]
 struct ReturnValue {

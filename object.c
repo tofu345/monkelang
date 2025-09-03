@@ -17,6 +17,9 @@ void object_destroy(Object* o) {
         case o_ReturnValue:
         case o_Function:
             break;
+        case o_Closure:
+            free(o->data.closure);
+            break;
         case o_Error:
             free(o->data.error_msg);
             return;
@@ -79,6 +82,7 @@ int object_fprint(Object o, FILE* fp) {
         case o_Error:
             return fprintf_error(o.data, fp);
         case o_Function:
+        case o_Closure:
             return fprint_function(fp);
         default:
             fprintf(stderr, "object_fprint: object type not handled %d\n",
@@ -114,6 +118,25 @@ bool object_cmp(Object left, Object right) {
     }
 }
 
+Object object_copy(Object obj) {
+    switch (obj.typ) {
+        case o_Null:
+        case o_Integer:
+        case o_Float:
+        case o_Boolean:
+        case o_Error:
+        case o_Function:
+        case o_Closure:
+            return obj;
+        case o_ReturnValue:
+            return to_return_value(object_copy(from_return_value(obj)));
+        default:
+            fprintf(stderr, "object_copy: object type not handled %d\n",
+                    obj.typ);
+            exit(1);
+    }
+}
+
 Object to_return_value(Object obj) {
     struct ReturnValue* return_val = (void*)&obj;
     return_val->value_typ = return_val->typ;
@@ -136,6 +159,7 @@ const char* object_types[] = {
     "ReturnValue",
     "Error",
     "Function",
+    "Closure",
 };
 
 const char* show_object_type(ObjectType t) {

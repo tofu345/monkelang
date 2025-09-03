@@ -18,7 +18,7 @@
 #define DEFINE_BUFFER(name, typ)                                              \
     void name##Buffer##Init(name##Buffer* buf) {                              \
         buf->capacity = DEFAULT_CAPACITY;                                     \
-        buf->data = malloc(DEFAULT_CAPACITY * sizeof(typ));                   \
+        buf->data = calloc(DEFAULT_CAPACITY, sizeof(typ));                    \
         if (buf->data == NULL) {                                              \
             printf("buffer malloc failed\n");                                 \
             exit(1);                                                          \

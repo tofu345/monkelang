@@ -2,6 +2,7 @@
 #include "ast.h"
 #include "environment.h"
 #include "object.h"
+#include "utils.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -237,11 +238,11 @@ eval_if_expression(IfExpression* ie, Env* env) {
 
 static Object
 eval_identifier(Identifier* i, Env* env) {
-    Object val = env_get(env, i->value);
-    if (IS_NULL(val)) {
+    Object* val = env_get(env, i->value);
+    if (val == NULL) {
         return new_error("identifier not found: %s", i->value);
     }
-    return val;
+    return *val;
 }
 
 static ObjectBuffer
@@ -263,33 +264,145 @@ eval_argument_expressions(NodeBuffer args, Env* env) {
     return results;
 }
 
+// append all [Identifiers] in Node to [buf]
+static void
+captures_in(Node n, ParamBuffer* buf) {
+    switch (n.typ) {
+        case n_Identifier:
+            return ParamBufferPush(buf, n.obj);
+        case n_PrefixExpression:
+            {
+                PrefixExpression* pe = n.obj;
+                captures_in(pe->right, buf);
+                return;
+            }
+        case n_InfixExpression:
+            {
+                InfixExpression* ie = n.obj;
+                captures_in(ie->left, buf);
+                captures_in(ie->right, buf);
+                return;
+            }
+        case n_IfExpression:
+            {
+                IfExpression* ie = n.obj;
+                captures_in(ie->condition, buf);
+                captures_in(NODE(n_BlockStatement, ie->consequence), buf);
+                if (ie->alternative != NULL)
+                    captures_in(
+                            NODE(n_BlockStatement, ie->alternative), buf);
+                return;
+            }
+        case n_FunctionLiteral:
+            {
+                FunctionLiteral* fl = n.obj;
+                captures_in(NODE(n_BlockStatement, fl->body), buf);
+                for (int i = 0; i < fl->params.length; i++)
+                    ParamBufferPush(buf, fl->params.data[i]);
+                return;
+            }
+        case n_CallExpression:
+            {
+                CallExpression* ce = n.obj;
+                for (int i = 0; i < ce->args.length; i++)
+                    captures_in(ce->args.data[i], buf);
+                return;
+            }
+        case n_LetStatement:
+            {
+                LetStatement* ls = n.obj;
+                captures_in(ls->value, buf);
+                return;
+            }
+        case n_ReturnStatement:
+            {
+                ReturnStatement* rs = n.obj;
+                captures_in(rs->return_value, buf);
+                return;
+            }
+        case n_ExpressionStatement:
+            {
+                ExpressionStatement* es = n.obj;
+                captures_in(es->expression, buf);
+                return;
+            }
+        case n_BlockStatement:
+            {
+                BlockStatement* bs = n.obj;
+                for (int i = 0; i < bs->stmts.length; i++)
+                    captures_in(bs->stmts.data[i], buf);
+                return;
+            }
+        default: return;
+    }
+}
+
 // load args into new frame, run function,
 // remove new frame and return result
 static Object
 apply_function(Object fn, ObjectBuffer args, Env* env) {
-    if (fn.typ != o_Function)
-        return new_error("not a function: %s",
-                show_object_type(fn.typ));
-
     FunctionLiteral* func = fn.data.func;
-    Frame* func_frame = frame_new(env);
-    func_frame->parent = env->current;
-    env->current = func_frame;
-    // is there need to create ObjectBuffer?
-    for (int i = 0; i < args.length; i++)
+    Object result;
+    Frame *previous,
+          *new_frame = frame_new(env);
+
+    if (fn.typ == o_Function) {
+        new_frame->parent = env->current;
+        previous = env->current;
+        env->current = new_frame;
+
+    } else if (fn.typ == o_Closure) {
+        previous = env->current;
+        env->current = new_frame;
+        Frame* closure_frame = fn.data.closure->frame;
+        // copy variables in [Closure] Frame into new [Frame].
+        for (size_t i = 0; i < closure_frame->table->capacity; i++) {
+            char* key = closure_frame->table->entries[i].key;
+            if (key == NULL) continue;
+            Object* val = closure_frame->table->entries[i].value;
+            env_set(env, key, object_copy(*val));
+        }
+        func = fn.data.closure->lit;
+
+    } else
+        return new_error("not a function: %s", show_object_type(fn.typ));
+
+    for (int i = 0; i < func->params.length; i++) {
         env_set(env, func->params.data[i]->value, args.data[i]);
-
-    Object result = eval_block_statement(func->body->stmts, env);
-    env->current = func_frame->parent;
-
-    // if [result] is a [FunctionLiteral], [result] is a Closure
-
-    frame_destroy(func_frame, env);
-
-    // mark_and_sweep(env);
-
+    }
+    result = eval_block_statement(func->body->stmts, env);
     if (result.typ == o_ReturnValue)
-        return from_return_value(result);
+        result = from_return_value(result);
+
+    if (result.typ == o_Function) {
+        // [result] is a Closure
+        ParamBuffer captured_variables;
+        ParamBufferInit(&captured_variables);
+        captures_in(NODE(n_BlockStatement, result.data.func->body),
+                &captured_variables);
+
+        // copy [captured_variables] into new [Frame] for Closure
+        Frame* closure_frame = frame_new(env);
+        for (int i = 0; i < captured_variables.length; i++) {
+            char* name = captured_variables.data[i]->value;
+            Object* value = env_get(env, name);
+            if (value == NULL) continue;
+            if (ht_set(closure_frame->table, name, value) == NULL)
+                ALLOC_FAIL();
+        }
+        free(captured_variables.data);
+
+        // memory leak
+        Closure* closure = malloc(sizeof(Closure));
+        closure->frame = closure_frame;
+        closure->lit = result.data.func;
+        result = OBJ(o_Closure, .closure = closure );
+    }
+
+    env->current = previous;
+    frame_destroy(new_frame, env);
+    mark_and_sweep(env);
+
     return result;
 }
 
@@ -321,6 +434,7 @@ Object eval(Node n, Env* env) {
                 if (IS_ERROR(function)) {
                     return function;
                 }
+                // necessary?
                 ObjectBuffer args = eval_argument_expressions(ce->args, env);
                 if (args.length == 1 && IS_ERROR(args.data[0])) {
                     Object err = args.data[0];
@@ -369,14 +483,5 @@ Object eval(Node n, Env* env) {
 
 
 Object eval_program(Program* p, Env* env) {
-    Object result = {};
-    for (int i = 0; i < p->stmts.length; i++) {
-        result = eval(p->stmts.data[i], env);
-        switch (result.typ) {
-            case o_ReturnValue: return from_return_value(result);
-            case o_Error: return result;
-            default: break;
-        }
-    }
-    return result;
+    return eval_block_statement(p->stmts, env);
 }

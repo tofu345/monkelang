@@ -13,15 +13,8 @@
     if (fprintf(fp, __VA_ARGS__) <= 0) \
         return -1;
 
-#define ALLOC_FAIL() \
-    do { \
-        fprintf(stderr, "allocation failed: %s\n", strerror(errno)); \
-        exit(1); \
-    } while(0);
-
-// for use in evaluator.c
 // TODO? gc?
-#define _ALLOC_FAIL() \
+#define ALLOC_FAIL() \
     do { \
         fprintf(stderr, "allocation failed: %s\n", strerror(errno)); \
         exit(1); \

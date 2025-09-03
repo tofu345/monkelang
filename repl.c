@@ -61,4 +61,5 @@ void start(FILE* in, FILE* out) {
     env_destroy(env);
     for (int i = 0; i < progs.length; i++)
         program_destroy(&progs.data[i]);
+    free(progs.data);
 }
