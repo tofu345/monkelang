@@ -25,6 +25,7 @@ void start(FILE* in, FILE* out) {
     ProgramBufferInit(&progs);
     Env* env = env_new();
 
+    Parser p;
     while (1) {
         fprintf(out, ">> ");
         char* input = NULL;
@@ -35,7 +36,6 @@ void start(FILE* in, FILE* out) {
         }
 
         Lexer l = lexer_new(input);
-        Parser p;
         parser_init(&p, &l);
         Program prog = parse_program(&p);
         ProgramBufferPush(&progs, prog);

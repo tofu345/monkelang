@@ -9,7 +9,7 @@
 
 void* allocate(size_t size);
 
-// table of variable names and ptrs to heap allocated objects
+// Table of variable names and ptrs to heap allocated objects.
 typedef struct Frame {
     ht* table;
     struct Frame* parent;
@@ -21,33 +21,36 @@ struct Closure {
 };
 
 BUFFER(Frame, Frame*);
-BUFFER(Alloc, Object*);
+BUFFER(HeapObject, Object*);
 
 typedef struct {
     FrameBuffer frames;
     Frame* current;
-    AllocBuffer allocs; // tracks allocated [Objects]
+    HeapObjectBuffer objects; // [Objects] added to [frames] with env_set.
+
+    // [Objects] with heap allocated members, that need to be tracked.
+    HeapObjectBuffer tracked;
 } Env;
 
 Env* env_new();
 void env_destroy(Env* env);
 
-// garbage collector (mark and sweep).
 // based on boot.dev: c memory mgmt course - https://www.youtube.com/watch?v=rJrd2QMVbGM
 //
-// To run when:
-// - an allocation fails
-// - a function returns
+// To run when: an allocation fails, or a function returns
 void mark_and_sweep(Env* env);
 
+// new [Frame] with [parent] set to NULL.
 Frame* frame_new(Env* env);
 void frame_destroy(Frame* frame, Env* env);
 
 Object* env_get(Env* env, char* name);
 
-// Copy [obj] to heap, add to [env->current] Frame, and append to
-// [env->allocs].
+// Copy [Object] to heap, add to [env->current] Frame, and append to
+// [env->objects].
 void env_set(Env* env, char* name, Object obj);
 
-// append [ptr] to [env->allcs].
-void track(Env* env, Object* ptr);
+// Copy [Object] to heap, and append to [env->tracked].
+//
+// Meant for objects that require allocation like Closures, Arrays, Maps etc.
+void env_track(Env* env, Object obj);

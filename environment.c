@@ -14,7 +14,7 @@ void* allocate(size_t size) {
 }
 
 DEFINE_BUFFER(Frame, Frame*);
-DEFINE_BUFFER(Alloc, Object*);
+DEFINE_BUFFER(HeapObject, Object*);
 
 // mark Objects [obj] contains references to.
 static void
@@ -55,35 +55,41 @@ mark(Env* env) {
     }
 }
 
-static void
-allocs_remove_nulls(AllocBuffer* allocs) {
-    int new_length = allocs->length;
-    for (int i = 0; i < allocs->length; i++) {
-        if (allocs->data[i] == NULL)
-            allocs->data[i] = allocs->data[--new_length];
+void print_heap_object_buffer(HeapObjectBuffer* buf) {
+    for (int i = 0; i < buf->capacity; i++) {
+        printf("%c", buf->data[i] != NULL ? 'X' : 'O');
     }
-    allocs->length = new_length;
-    for (int i = new_length; i < allocs->capacity; i++)
-        allocs->data[i] = NULL;
+    printf("\n");
+}
+
+static void
+sweep_heap_objects(HeapObjectBuffer* buf, Env* env) {
+    // printf("before: \n");
+    // print_heap_object_buffer(buf);
+
+    for (int i = 0; i < buf->length; i++) {
+        Object* obj = buf->data[i];
+        if (obj->is_marked) {
+            obj->is_marked = false;
+            continue;
+        }
+        if (obj->typ == o_Closure) {
+            frame_destroy(obj->data.closure->frame, env);
+        }
+        object_destroy(obj);
+        free(obj);
+        buf->data[i] = buf->data[--buf->length];
+        buf->data[buf->length] = NULL;
+    }
+
+    // printf("after: \n");
+    // print_heap_object_buffer(buf);
 }
 
 static void
 sweep(Env* env) {
-    for (int i = 0; i < env->allocs.length; i++) {
-        Object* obj = env->allocs.data[i];
-        if (obj == NULL) continue;
-        if (obj->is_marked) {
-            obj->is_marked = false;
-        } else {
-            if (obj->typ == o_Closure) {
-                frame_destroy(obj->data.closure->frame, env);
-            }
-            object_destroy(obj);
-            free(obj);
-            env->allocs.data[i] = NULL;
-        }
-    }
-    allocs_remove_nulls(&env->allocs);
+    sweep_heap_objects(&env->objects, env);
+    sweep_heap_objects(&env->tracked, env);
 }
 
 void mark_and_sweep(Env* env) {
@@ -94,8 +100,8 @@ void mark_and_sweep(Env* env) {
 Env* env_new() {
     Env* env = allocate(sizeof(Env));
     FrameBufferInit(&env->frames);
-    AllocBufferInit(&env->allocs);
-
+    HeapObjectBufferInit(&env->objects);
+    HeapObjectBufferInit(&env->tracked);
     Frame* current = allocate(sizeof(Frame));;
     current->parent = NULL;
     current->table = ht_create();
@@ -105,20 +111,13 @@ Env* env_new() {
     return env;
 }
 
-void env_destroy(Env* env) {
-    for (int i = 0; i < env->allocs.length; i++) {
-        Object* obj = env->allocs.data[i];
+void destroy_heap_object(HeapObjectBuffer* buf) {
+    for (int i = 0; i < buf->length; i++) {
+        Object* obj = buf->data[i];
         object_destroy(obj);
         free(obj);
     }
-    free(env->allocs.data);
-    for (int i = 0; i < env->frames.length; i++) {
-        Frame* frame = env->frames.data[i];
-        ht_destroy(frame->table);
-        free(frame);
-    }
-    free(env->frames.data);
-    free(env);
+    free(buf->data);
 }
 
 Frame* frame_new(Env* env) {
@@ -141,6 +140,15 @@ void frame_destroy(Frame* frame, Env* env) {
     free(frame);
 }
 
+void env_destroy(Env* env) {
+    destroy_heap_object(&env->objects);
+    destroy_heap_object(&env->tracked);
+    for (int i = 0; i < env->frames.length; i++)
+        frame_destroy(env->frames.data[i], env);
+    free(env->frames.data);
+    free(env);
+}
+
 Object* env_get(Env* env, char* name) {
     Frame* cur = env->current;
     while (cur != NULL) {
@@ -155,16 +163,45 @@ Object* env_get(Env* env, char* name) {
     return NULL;
 }
 
+// search for [obj.data] in [env->tracked], remove and return if found.
+//
+// could always be found at the last index, but not sure
+static Object*
+search_tracked_for(Object obj, Env* env) {
+    // printf("search_tracked_for: tracked length = %d\n", env->tracked.length);
+    for (int i = env->tracked.length; i >= 0; i--) {
+        Object* tracked_obj = env->tracked.data[i];
+        if (tracked_obj == NULL) continue;
+        if (memcmp(&tracked_obj->data, &obj.data, sizeof(ObjectData)) == 0) {
+            // printf("tracked object found at %d\n", i);
+            env->tracked.data[i] = env->tracked.data[--env->tracked.length];
+            env->tracked.data[env->tracked.length] = NULL;
+            return tracked_obj;
+        }
+    }
+    return NULL;
+}
+
 void env_set(Env* env, char* name, Object obj) {
-    Object* value = allocate(sizeof(Object));
-    memcpy(value, &obj, sizeof(Object));
-    AllocBufferPush(&env->allocs, value);
+    Object* value = NULL;
+    switch (obj.typ) {
+        case o_Closure:
+            value = search_tracked_for(obj, env);
+            // printf("env_set: closure %s\n", value == NULL ? "null" : "not null");
+            break;
+        default: break;
+    }
+    if (value == NULL) {
+        value = allocate(sizeof(Object));
+        memcpy(value, &obj, sizeof(Object));
+    }
+    HeapObjectBufferPush(&env->objects, value);
     if (ht_set(env->current->table, name, value) == NULL)
         ALLOC_FAIL();
 }
 
-// NOTE: could introduce a double free by inserting into [AllocBuffer]
-// here and with [env_set].
-// void track(Env* env, Object* ptr) {
-//     AllocBufferPush(&env->allocs, ptr);
-// }
+void env_track(Env* env, Object obj) {
+    Object* ptr = allocate(sizeof(Object));
+    memcpy(ptr, &obj, sizeof(Object));
+    HeapObjectBufferPush(&env->tracked, ptr);
+}

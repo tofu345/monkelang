@@ -2,11 +2,8 @@
 #include "utils.h"
 #include "lexer.h"
 #include "parser.h"
-#include "parser_tracing.h"
 #include "token.h"
 
-#include <asm-generic/errno-base.h>
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -120,11 +117,11 @@ no_prefix_parse_error(Parser* p, Token t) {
 
 static Node
 parse_expression(Parser* p, enum Precedence precedence) {
-    trace("parse_expression");
     PrefixParseFn prefix = p->prefix_parse_fns[p->cur_token.type];
     if (prefix == NULL) {
         // TODO: better error message
         no_prefix_parse_error(p, p->cur_token);
+        free(p->cur_token.literal);
         return (Node){};
     }
     Node left_exp = prefix(p);
@@ -143,7 +140,6 @@ parse_expression(Parser* p, enum Precedence precedence) {
         if (left_exp.obj == NULL)
             return (Node){};
     };
-    untrace("parse_expression");
     return left_exp;
 }
 
@@ -158,7 +154,6 @@ parse_identifier(Parser* p) {
 
 static Node
 parse_integer_literal(Parser* p) {
-    trace("parse_integer_literal");
     IntegerLiteral* int_lit = malloc(sizeof(IntegerLiteral));
     if (int_lit == NULL) ALLOC_FAIL();
     int_lit->tok = p->cur_token;
@@ -182,7 +177,6 @@ parse_integer_literal(Parser* p) {
     }
 
     int_lit->value = value;
-    untrace("parse_integer_literal");
     return NODE(n_IntegerLiteral, int_lit);
 }
 
@@ -211,7 +205,6 @@ parse_float_literal(Parser* p) {
 
 static Node
 parse_infix_expression(Parser* p, Node left) {
-    trace("parse_infix_expression");
     InfixExpression* ie = malloc(sizeof(InfixExpression));
     ie->tok = p->cur_token;
     ie->op = p->cur_token.literal;
@@ -227,13 +220,11 @@ parse_infix_expression(Parser* p, Node left) {
         return (Node){};
     }
 
-    untrace("parse_infix_expression");
     return NODE(n_InfixExpression, ie);
 }
 
 static Node
 parse_prefix_expression(Parser* p) {
-    trace("parse_prefix_expression");
     PrefixExpression* pe = malloc(sizeof(PrefixExpression));
     pe->tok = p->cur_token;
     pe->op = p->cur_token.literal;
@@ -247,7 +238,6 @@ parse_prefix_expression(Parser* p) {
         return (Node){};
     }
 
-    untrace("parse_prefix_expression");
     return NODE(n_PrefixExpression, pe);
 }
 
@@ -490,7 +480,8 @@ parse_let_statement(Parser* p) {
 
     if (!expect_peek(p, t_Assign)) {
         free(stmt->tok.literal);
-        free(stmt->name->value);
+        free(stmt->name->tok.literal);
+        free(stmt->name);
         free(stmt);
         return (Node){};
     }
@@ -534,7 +525,6 @@ parse_return_statement(Parser* p) {
 
 static Node
 parse_expression_statement(Parser* p) {
-    trace("parse_expression_statement");
     ExpressionStatement* stmt = malloc(sizeof(ExpressionStatement));
     if (stmt == NULL) ALLOC_FAIL();
     stmt->tok = p->cur_token;
@@ -551,7 +541,6 @@ parse_expression_statement(Parser* p) {
         free(p->cur_token.literal);
     }
 
-    untrace("parse_expression_statement");
     return NODE(n_ExpressionStatement, stmt);
 }
 

@@ -341,38 +341,30 @@ captures_in(Node n, ParamBuffer* buf) {
 // remove new frame and return result
 static Object
 apply_function(Object fn, ObjectBuffer args, Env* env) {
-    FunctionLiteral* func = fn.data.func;
+    FunctionLiteral* func;
     Object result;
     Frame *previous,
           *new_frame = frame_new(env);
 
     if (fn.typ == o_Function) {
+        func = fn.data.func;
         new_frame->parent = env->current;
         previous = env->current;
         env->current = new_frame;
 
     } else if (fn.typ == o_Closure) {
-        previous = env->current;
-        env->current = new_frame;
-        Frame* closure_frame = fn.data.closure->frame;
-        // copy variables in [Closure] Frame into new [Frame].
-        for (size_t i = 0; i < closure_frame->table->capacity; i++) {
-            char* key = closure_frame->table->entries[i].key;
-            if (key == NULL) continue;
-            Object* val = closure_frame->table->entries[i].value;
-            env_set(env, key, object_copy(*val));
-        }
         func = fn.data.closure->func;
-
-    } else
-        return new_error("not a function: %s", show_object_type(fn.typ));
+        previous = env->current;
+        // can only [env_set()] on [env->current]
+        env->current = new_frame;
+        new_frame->parent = fn.data.closure->frame;
+    }
 
     for (int i = 0; i < func->params.length; i++) {
         env_set(env, func->params.data[i]->value, args.data[i]);
     }
-    result = eval_block_statement(func->body->stmts, env);
-    if (result.typ == o_ReturnValue)
-        result = from_return_value(result);
+
+    result = from_return_value(eval_block_statement(func->body->stmts, env));
 
     if (result.typ == o_Function) {
         // [result] is a Closure
@@ -397,12 +389,56 @@ apply_function(Object fn, ObjectBuffer args, Env* env) {
         closure->frame = closure_frame;
         closure->func = result.data.func;
         result = OBJ(o_Closure, .closure = closure );
+        result.is_marked = true; // keep for next round of garbage collection
+        env_track(env, result);
     }
 
     env->current = previous;
     frame_destroy(new_frame, env);
     mark_and_sweep(env);
 
+    return result;
+}
+
+Object eval_call_expression(CallExpression* ce, Env* env) {
+    Object function = eval(ce->function, env);
+    int args_len;
+    switch (function.typ) {
+        case o_Error: return function;
+        case o_Function:
+            args_len = function.data.func->params.length;
+            break;
+        case o_Closure:
+            args_len = function.data.closure->func->params.length;
+            break;
+        default:
+            fprintf(stderr,
+                    "eval(n_CallExpression): function type %s not handled\n",
+                    show_object_type(function.typ));
+            exit(1);
+    }
+
+    char* fn_name = ce->function.typ == n_Identifier
+        ? ((Identifier*)ce->function.obj)->value
+        : "<anonymous function>";
+    if (args_len != ce->args.length)
+        return new_error(
+                "function %s() takes %d arguments got %d",
+                fn_name, args_len, ce->args.length);
+
+    // necessary?
+    ObjectBuffer args = eval_argument_expressions(ce->args, env);
+    if (args.length == 1 && IS_ERROR(args.data[0])) {
+        Object err = args.data[0];
+        free(args.data);
+        return err;
+    }
+
+    Object result = apply_function(function, args, env);
+
+    for (int i = 0; i < args.length; i++)
+        object_destroy(&args.data[i]);
+    free(args.data);
     return result;
 }
 
@@ -428,25 +464,7 @@ Object eval(Node n, Env* env) {
         case n_InfixExpression:
             return eval_infix_expression(n.obj, env);
         case n_CallExpression:
-            {
-                CallExpression* ce = n.obj;
-                Object function = eval(ce->function, env);
-                if (IS_ERROR(function)) {
-                    return function;
-                }
-                // necessary?
-                ObjectBuffer args = eval_argument_expressions(ce->args, env);
-                if (args.length == 1 && IS_ERROR(args.data[0])) {
-                    Object err = args.data[0];
-                    free(args.data);
-                    return err;
-                }
-                Object result = apply_function(function, args, env);
-                for (int i = 0; i < args.length; i++)
-                    object_destroy(&args.data[i]);
-                free(args.data);
-                return result;
-            }
+            return eval_call_expression(n.obj, env);
         case n_LetStatement:
             {
                 LetStatement* ls = n.obj;
@@ -487,10 +505,13 @@ Object eval_program(Program* p, Env* env) {
     for (int i = 0; i < p->stmts.length; i++) {
         result = eval(p->stmts.data[i], env);
         switch (result.typ) {
-            case o_ReturnValue: 
+            case o_ReturnValue:
                 return from_return_value(result);
-            case o_Error: 
+            case o_Error:
                 return result;
+            case o_Closure:
+                result.data.closure = NULL;
+                break;
             default: break;
         }
     }

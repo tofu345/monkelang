@@ -221,6 +221,7 @@ destroy_if_expression(IfExpression* ie) {
 }
 
 void destroy_function_literal(FunctionLiteral* fl) {
+    free(fl->tok.literal);
     if (fl->params.data != NULL) {
         for (int i = 0; i < fl->params.length; i++) {
             free(fl->params.data[i]->value);
@@ -230,8 +231,6 @@ void destroy_function_literal(FunctionLiteral* fl) {
     }
     if (fl->body != NULL)
         destroy_block_statement(fl->body);
-    if (fl->tok.type != t_Illegal)
-        free(fl->tok.literal);
     free(fl);
 }
 
@@ -249,11 +248,11 @@ destroy_call_expression(CallExpression* ce) {
 static void
 destroy_let_statement(LetStatement* ls) {
     free(ls->tok.literal);
-    node_destroy(ls->value);
     if (ls->name != NULL) {
         free(ls->name->tok.literal);
         free(ls->name);
     }
+    node_destroy(ls->value);
     free(ls);
 }
 

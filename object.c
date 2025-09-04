@@ -137,14 +137,14 @@ Object object_copy(Object obj) {
     }
 }
 
-Object to_return_value(Object obj) {
+inline Object to_return_value(Object obj) {
     struct ReturnValue* return_val = (void*)&obj;
     return_val->value_typ = return_val->typ;
     return_val->typ = o_ReturnValue;
     return obj;
 }
 
-Object from_return_value(Object obj) {
+inline Object from_return_value(Object obj) {
     if (obj.typ != o_ReturnValue) return obj;
     struct ReturnValue* return_val = (void*)&obj;
     return_val->typ = return_val->value_typ;
