@@ -3,6 +3,14 @@
 #include "utils.h"
 #include "evaluator.h"
 
+Object* builtin_copy(Env* env, ObjectBuffer* args) {
+    if (args->length != 1)
+        return new_error(env, "builtin copy() takes 1 argument got %d",
+                args->length);
+
+    return object_copy(env, args->data[0]);
+}
+
 Object* builtin_len([[maybe_unused]] Env* env, ObjectBuffer* args) {
     if (args->length != 1)
         return new_error(env, "builtin len() takes 1 argument got %d",
@@ -111,17 +119,16 @@ Object* builtin_puts([[maybe_unused]] Env* env, ObjectBuffer* args) {
     return NULL;
 }
 
-struct Builtin_ {
-    const char* name;
-    Object obj;
-};
-
 #define BUILTIN(fn) \
     {#fn, (Object){ \
         o_BuiltinFunction, false, {.builtin = (Builtin*)builtin_##fn} \
     }}
 
-struct Builtin_ builtins[] = {
+struct {
+    const char* name;
+    Object obj;
+} builtins[] = {
+    BUILTIN(copy),
     BUILTIN(len),
     BUILTIN(first),
     BUILTIN(last),
@@ -133,7 +140,6 @@ struct Builtin_ builtins[] = {
 ht* builtins_init() {
     ht* tbl = ht_create();
     if (tbl == NULL) ALLOC_FAIL();
-
     int len = sizeof(builtins) / sizeof(builtins[0]);
     for (int i = 0; i < len; i++) {
         if (ht_set(tbl, builtins[i].name, &builtins[i].obj) == NULL)

@@ -9,14 +9,13 @@
 #include <string.h>
 
 DEFINE_BUFFER(Frame, Frame*);
-DEFINE_BUFFER(HeapObject, Object*);
 
 Object* object_new(Env* env, ObjectType typ, ObjectData data) {
     Object* obj = allocate(sizeof(Object));
     obj->typ = typ;
     obj->data = data;
     obj->is_marked = false;
-    HeapObjectBufferPush(&env->objects, obj);
+    ObjectBufferPush(&env->objects, obj);
     return obj;
 }
 
@@ -65,7 +64,7 @@ mark(Env* env) {
 
 static void
 sweep(Env* env) {
-    HeapObjectBuffer* objs = &env->objects;
+    ObjectBuffer* objs = &env->objects;
     for (int i = 0; i < objs->length; i++) {
         Object* obj = objs->data[i];
         if (obj->is_marked) {
@@ -117,8 +116,8 @@ Env* env_new() {
     env->builtins = builtins_init();
     FrameBufferInit(&env->frames);
     env->current = frame_new(env);
-    HeapObjectBufferInit(&env->objects);
-    HeapObjectBufferInit(&env->tracking);
+    ObjectBufferInit(&env->objects);
+    ObjectBufferInit(&env->tracking);
     return env;
 }
 
@@ -156,5 +155,5 @@ void env_set(Env* env, char* name, Object* obj) {
 }
 
 void track(Env *env, Object *obj) {
-    HeapObjectBufferPush(&env->tracking, obj);
+    ObjectBufferPush(&env->tracking, obj);
 }

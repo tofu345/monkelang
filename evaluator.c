@@ -46,6 +46,9 @@ Object* object_copy(Env* env, Object* obj) {
             {
                 ObjectBuffer* new_arr = allocate(sizeof(ObjectBuffer));
                 *new_arr = ObjectBufferCopy(obj->data.array);
+                for (int i = 0; i < new_arr->length; i++) {
+                    new_arr->data[i] = object_copy(env, new_arr->data[i]);
+                }
                 return OBJ(o_Array, .array = new_arr);
             }
         case o_ReturnValue:

@@ -11,8 +11,6 @@
 
 Object* object_new(Env* env, ObjectType typ, ObjectData data);
 
-BUFFER(HeapObject, Object*);
-
 typedef struct Frame {
     // Table of variable names and ptrs to heap allocated objects.
     ht* table;
@@ -29,8 +27,8 @@ BUFFER(Frame, Frame*);
 struct Env {
     FrameBuffer frames;
     Frame* current;
-    HeapObjectBuffer objects;
-    HeapObjectBuffer tracking; // [Objects] that must stay in scope
+    ObjectBuffer objects;
+    ObjectBuffer tracking; // [Objects] that must stay in scope
     ht* builtins;
 };
 
