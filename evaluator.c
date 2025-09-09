@@ -3,17 +3,62 @@
 #include "environment.h"
 #include "object.h"
 #include "utils.h"
+#include "builtin.h"
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-Object eval(Node n, Env* env);
+const Object o_true = (Object){ o_Boolean, false, {.boolean = true}};
+const Object o_false = (Object){ o_Boolean, false, {.boolean = false}};
+const Object o_null = (Object){ o_Null };
 
-#define STR_EQ(exp, str) strcmp(exp, str) == 0
+#define TRUE (Object*)&o_true
+#define FALSE (Object*)&o_false
+#define NULL_OBJ() (Object*)&o_null
 
-Object new_error(char* format, ...) {
+#define IS_ERROR(obj) (obj->typ == o_Error)
+#define IS_NULL(obj) (obj == &o_null)
+#define STR_EQ(exp, str) (strcmp(exp, str) == 0)
+
+Object* eval(Env* env, Node n);
+static ObjectBuffer eval_expressions(Env* env, NodeBuffer args);
+
+Object* object_copy(Env* env, Object* obj) {
+    switch (obj->typ) {
+        case o_Null:
+        case o_Integer:
+        case o_Float:
+        case o_Boolean:
+        case o_Error:
+        case o_Function:
+        case o_BuiltinFunction:
+        case o_Closure:
+            return obj;
+        case o_String:
+            {
+                CharBuffer* new_str = allocate(sizeof(CharBuffer));
+                *new_str = CharBufferCopy(obj->data.string);
+                return OBJ(o_String, .string = new_str);
+            }
+        case o_Array:
+            {
+                ObjectBuffer* new_arr = allocate(sizeof(ObjectBuffer));
+                *new_arr = ObjectBufferCopy(obj->data.array);
+                return OBJ(o_Array, .array = new_arr);
+            }
+        case o_ReturnValue:
+            return to_return_value(object_copy(env, from_return_value(obj)));
+        default:
+            fprintf(stderr, "object_copy: object type not handled %d\n",
+                    obj->typ);
+            exit(1);
+    }
+}
+
+
+Object* new_error(Env* env, char* format, ...) {
     va_list args;
     va_start(args, format);
     char* msg = NULL;
@@ -24,30 +69,58 @@ Object new_error(char* format, ...) {
     return OBJ(o_Error, .error_msg = msg);
 }
 
-bool is_truthy(Object o) {
-    switch (o.typ) {
+bool is_truthy(Object* o) {
+    switch (o->typ) {
         case o_Null: return false;
-        case o_Boolean: return o.data.boolean;
+        case o_Boolean: return o->data.boolean;
         default: return true; // TODO? c-like?
     }
 }
 
-static Object
-eval_integer_literal(IntegerLiteral* il) {
+static Object*
+eval_integer_literal(Env* env, IntegerLiteral* il) {
     return OBJ(o_Integer, il->value);
 }
 
-static Object
-eval_float_literal(FloatLiteral* fl) {
+static Object*
+eval_float_literal(Env* env, FloatLiteral* fl) {
     return OBJ(o_Float, fl->value);
 }
 
-static Object
-eval_block_statement(NodeBuffer stmts, Env* env) {
-    Object result = {};
+static Object*
+eval_string_literal(Env* env, StringLiteral* sl) {
+    size_t len = strlen(sl->tok.literal);
+    CharBuffer* str = allocate(sizeof(CharBuffer));
+    CharBufferInit(str);
+    if (len > 0) {
+        str->capacity = power_of_2_ceil(len + 1);
+        str->data = allocate(str->capacity * sizeof(char));
+        memcpy(str->data, sl->tok.literal,
+                str->capacity * sizeof(char));
+        str->data[len] = '\0';
+    } else CharBufferInit(str);
+    str->length = len;
+    return OBJ(o_String, .string = str);
+}
+
+static Object*
+eval_array_literal(Env* env, ArrayLiteral* al) {
+    ObjectBuffer* arr = allocate(sizeof(ObjectBuffer));
+    *arr = eval_expressions(env, al->elements);
+    if (arr->length == 1 && IS_ERROR(arr->data[0])) {
+        Object* err = arr->data[0];
+        free(arr->data);
+        return err;
+    }
+    return OBJ(o_Array, .array = arr);
+}
+
+static Object*
+eval_block_statement(Env* env, NodeBuffer stmts) {
+    Object* result = NULL_OBJ();
     for (int i = 0; i < stmts.length; i++) {
-        result = eval(stmts.data[i], env);
-        switch (result.typ) {
+        result = eval(env, stmts.data[i]);
+        switch (result->typ) {
             case o_ReturnValue: return result;
             case o_Error: return result;
             default: break;
@@ -56,34 +129,40 @@ eval_block_statement(NodeBuffer stmts, Env* env) {
     return result;
 }
 
-static Object
-eval_minus_prefix_operator_expression(Object right) {
-    switch (right.typ) {
+static Object*
+eval_minus_prefix_operator_expression(Env* env, Object* right) {
+    switch (right->typ) {
         case o_Integer:
-            return OBJ(o_Integer, -right.data.integer);
+            return OBJ(o_Integer, -right->data.integer);
         case o_Float:
-            return OBJ(o_Float, -right.data.floating);
+            return OBJ(o_Float, -right->data.floating);
         default:
-            return new_error("unknown operator: -%s",
-                    show_object_type(right.typ));
+            return new_error(env, "unknown operator: -%s",
+                    show_object_type(right->typ));
     }
 }
 
-static Object
-eval_bang_operator_expression(Object right) {
-    switch (right.typ) {
+static Object*
+bool_to_object(bool value) {
+    if (value) return TRUE;
+    return FALSE;
+}
+
+static Object*
+eval_bang_operator_expression(Object* right) {
+    switch (right->typ) {
         case o_Boolean:
-            return BOOL(!right.data.boolean);
+            return bool_to_object(!right->data.boolean);
         case o_Null:
-            return BOOL(true);
+            return TRUE;
         default:
-            return BOOL(false);
+            return FALSE;
     }
 }
 
-static Object
-eval_prefix_expression(PrefixExpression* pe, Env* env) {
-    Object right = eval(pe->right, env);
+static Object*
+eval_prefix_expression(Env* env, PrefixExpression* pe) {
+    Object* right = eval(env, pe->right);
     if (IS_ERROR(right))
         return right;
 
@@ -91,30 +170,32 @@ eval_prefix_expression(PrefixExpression* pe, Env* env) {
         return eval_bang_operator_expression(right);
 
     } else if (STR_EQ("-", pe->op)) {
-        return eval_minus_prefix_operator_expression(right);
+        return eval_minus_prefix_operator_expression(env, right);
 
     } else {
-        return new_error("unknown operator: %s%s",
-                pe->op, show_object_type(right.typ));
+        return new_error(env, "unknown operator: %s%s",
+                pe->op, show_object_type(right->typ));
     }
 }
 
 static double
-conv_int_to_float(Object obj) {
-    if (obj.typ == o_Integer)
-        return (double)obj.data.integer;
+conv_int_to_float(Object* obj) {
+    if (obj->typ == o_Integer)
+        return (double)obj->data.integer;
 
-    else if (obj.typ == o_Float)
-        return obj.data.floating;
+    else if (obj->typ == o_Float)
+        return obj->data.floating;
 
     else {
-        printf("cannot convert type %s to float\n", show_object_type(obj.typ));
+        fprintf(stderr,
+                "cannot convert type %s to float\n",
+                show_object_type(obj->typ));
         exit(1);
     }
 }
 
-static Object
-eval_float_infix_expression(char* op, Object left, Object right) {
+static Object*
+eval_float_infix_expression(Env* env, char* op, Object* left, Object* right) {
     double left_val = conv_int_to_float(left);
     double right_val = conv_int_to_float(right);
 
@@ -131,30 +212,52 @@ eval_float_infix_expression(char* op, Object left, Object right) {
         left_val /= right_val;
 
     } else if (STR_EQ("<", op)) {
-        return BOOL(left_val < right_val);
+        return bool_to_object(left_val < right_val);
 
     } else if (STR_EQ(">", op)) {
-        return BOOL(left_val > right_val);
+        return bool_to_object(left_val > right_val);
 
     } else if (STR_EQ("==", op)) {
-        return BOOL(left_val == right_val);
+        return bool_to_object(left_val == right_val);
 
     } else if (STR_EQ("!=", op)) {
-        return BOOL(left_val != right_val);
+        return bool_to_object(left_val != right_val);
 
     } else {
-        return new_error("unknown operator: %s %s %s",
-                show_object_type(left.typ), op,
-                show_object_type(right.typ));
+        return new_error(env, "unknown operator: %s %s %s",
+                show_object_type(left->typ), op,
+                show_object_type(right->typ));
     }
 
     return OBJ(o_Float, left_val);
 }
 
-static Object
-eval_integer_infix_expression(char* op, Object left, Object right) {
-    long left_val = left.data.integer;
-    long right_val = right.data.integer;
+static Object*
+eval_string_infix_expression(Env* env, char* op, Object* left, Object* right) {
+    if (!STR_EQ("+", op))
+        return new_error(env, "unknown operator: %s %s %s",
+                show_object_type(left->typ), op,
+                show_object_type(right->typ));
+
+    // this should go into a Buffer* fn ..
+    CharBuffer* left_val = left->data.string;
+    CharBuffer* right_val = right->data.string;
+    CharBuffer* result = allocate(sizeof(CharBuffer));
+    result->length = left_val->length + right_val->length;
+    result->capacity = power_of_2_ceil(result->length + 1);
+    result->data = allocate(result->capacity * sizeof(char));
+    memcpy(result->data, left_val->data,
+            left_val->length * sizeof(char));
+    memcpy(result->data + left_val->length, right_val->data,
+            right_val->length * sizeof(char));
+
+    return OBJ(o_String, .string = result);
+}
+
+static Object*
+eval_integer_infix_expression(Env* env, char* op, Object* left, Object* right) {
+    long left_val = left->data.integer;
+    long right_val = right->data.integer;
 
     if (STR_EQ("+", op)) {
         left_val += right_val;
@@ -169,98 +272,118 @@ eval_integer_infix_expression(char* op, Object left, Object right) {
         left_val /= right_val;
 
     } else if (STR_EQ("<", op)) {
-        return BOOL(left_val < right_val);
+        return bool_to_object(left_val < right_val);
 
     } else if (STR_EQ(">", op)) {
-        return BOOL(left_val > right_val);
+        return bool_to_object(left_val > right_val);
 
     } else if (STR_EQ("==", op)) {
-        return BOOL(left_val == right_val);
+        return bool_to_object(left_val == right_val);
 
     } else if (STR_EQ("!=", op)) {
-        return BOOL(left_val != right_val);
+        return bool_to_object(left_val != right_val);
 
     } else {
-        return new_error("unknown operator: %s %s %s",
-                show_object_type(left.typ), op,
-                show_object_type(right.typ));
+        return new_error(env, "unknown operator: %s %s %s",
+                show_object_type(left->typ), op,
+                show_object_type(right->typ));
     }
 
     return OBJ(o_Integer, left_val);
 }
 
-static Object
-eval_infix_expression(InfixExpression* ie, Env* env) {
-    Object left = eval(ie->left, env);
+static Object*
+eval_infix_expression(Env* env, InfixExpression* ie) {
+    Object* left = eval(env, ie->left);
     if (IS_ERROR(left))
         return left;
 
-    Object right = eval(ie->right, env);
+    Object* right = eval(env, ie->right);
     if (IS_ERROR(right))
         return right;
 
-    if (left.typ == o_Integer && right.typ == o_Integer) {
-        return eval_integer_infix_expression(ie->op, left, right);
+    if (left->typ == o_Integer && right->typ == o_Integer) {
+        return eval_integer_infix_expression(env, ie->op, left, right);
 
-    } else if (left.typ == o_Float || right.typ == o_Float) {
-        return eval_float_infix_expression(ie->op, left, right);
+    } else if (left->typ == o_Float || right->typ == o_Float) {
+        return eval_float_infix_expression(env, ie->op, left, right);
+
+    } else if (left->typ == o_String && right->typ == o_String) {
+        return eval_string_infix_expression(env, ie->op, left, right);
 
     } else if (STR_EQ("==", ie->op)) {
-        return BOOL(object_cmp(left, right));
+        return bool_to_object(object_cmp(left, right));
 
     } else if (STR_EQ("!=", ie->op)) {
-        return BOOL(!object_cmp(left, right));
+        return bool_to_object(!object_cmp(left, right));
 
-    } else if (left.typ != right.typ) {
-        return new_error("type mismatch: %s %s %s",
-                show_object_type(left.typ), ie->op,
-                show_object_type(right.typ));
+    } else if (left->typ != right->typ) {
+        return new_error(env, "type mismatch: %s %s %s",
+                show_object_type(left->typ), ie->op,
+                show_object_type(right->typ));
 
     } else {
-        return new_error("unknown operator: %s %s %s",
-                show_object_type(left.typ), ie->op,
-                show_object_type(right.typ));
+        return new_error(env, "unknown operator: %s %s %s",
+                show_object_type(left->typ), ie->op,
+                show_object_type(right->typ));
     }
 }
 
-static Object
-eval_if_expression(IfExpression* ie, Env* env) {
-    Object condition = eval(ie->condition, env);
+static Object*
+eval_if_expression(Env* env, IfExpression* ie) {
+    Object* condition = eval(env, ie->condition);
     if (is_truthy(condition)) {
-        return eval_block_statement(ie->consequence->stmts, env);
+        return eval_block_statement(env, ie->consequence->stmts);
 
     } else if (ie->alternative != NULL) {
-        return eval_block_statement(ie->alternative->stmts, env);
+        return eval_block_statement(env, ie->alternative->stmts);
     }
 
     return NULL_OBJ();
 }
 
-static Object
-eval_identifier(Identifier* i, Env* env) {
-    Object* val = env_get(env, i->value);
-    if (val == NULL) {
-        return new_error("identifier not found: %s", i->value);
-    }
-    return *val;
+static Object*
+eval_identifier(Env* env, Identifier* i) {
+    Object* val = env_get(env, i->tok.literal);
+    if (val != NULL)
+        return val;
+
+    Object* builtin = builtin_get(env, i->tok.literal);
+    if (builtin != NULL)
+        return builtin;
+
+    return new_error(env, "identifier not found: %s", i->tok.literal);
 }
 
 static ObjectBuffer
-eval_argument_expressions(NodeBuffer args, Env* env) {
+eval_expressions(Env* env, NodeBuffer args) {
     ObjectBuffer results;
     ObjectBufferInit(&results);
     for (int i = 0; i < args.length; i++) {
-        Object result = eval(args.data[i], env);
+        Object* result = eval(env, args.data[i]);
         if (IS_ERROR(result)) {
-            for (int j = 0; j < i; i++)
-                object_destroy(&results.data[j]);
-
-            results.length = 1;
-            results.data[0] = result;
+            env->tracking.length -= i; // untrack previous results
+            if (results.length == 0)
+                ObjectBufferPush(&results, result);
+            else {
+                results.length = 1;
+                results.data[0] = result;
+            }
             return results;
         }
         ObjectBufferPush(&results, result);
+        track(env, result);
     }
+
+    env->tracking.length -= args.length; // untrack results
+
+    // for (int i = 0; i < results.length; i++) {
+    //     node_fprint(args.data[i], stdout);
+    //     printf(" -> ");
+    //     object_fprint(results.data[i], stdout);
+    //     puts("");
+    // }
+
     return results;
 }
 
@@ -339,151 +462,194 @@ captures_in(Node n, ParamBuffer* buf) {
 
 // load args into new frame, run function,
 // remove new frame and return result
-static Object
-apply_function(Object fn, ObjectBuffer args, Env* env) {
+static Object*
+apply_function(Env* env, Object* fn, ObjectBuffer* args, char* fn_name) {
     FunctionLiteral* func;
-    Object result;
+    Object* result;
     Frame *previous,
           *new_frame = frame_new(env);
 
-    if (fn.typ == o_Function) {
-        func = fn.data.func;
+    if (fn->typ == o_Function) {
+        func = fn->data.func;
         new_frame->parent = env->current;
         previous = env->current;
         env->current = new_frame;
 
-    } else if (fn.typ == o_Closure) {
-        func = fn.data.closure->func;
+    } else if (fn->typ == o_Closure) {
+        func = fn->data.closure->func;
         previous = env->current;
-        // can only [env_set()] on [env->current]
+        // can only perform [env_set()] on [env->current]
         env->current = new_frame;
-        new_frame->parent = fn.data.closure->frame;
+        new_frame->parent = fn->data.closure->frame;
+
+    } else {
+        fprintf(stderr,
+                "apply_function: function type %s not handled\n",
+                show_object_type(fn->typ));
+        exit(1);
     }
 
-    for (int i = 0; i < func->params.length; i++) {
-        env_set(env, func->params.data[i]->value, args.data[i]);
+    if (func->params.length != args->length)
+        return new_error(env,
+                "function %s() takes %d argument%s got %d",
+                fn_name, func->params.length,
+                func->params.length != 1 ? "s" : "", args->length);
+
+    for (int i = 0; i < args->length; i++) {
+        env_set(env, func->params.data[i]->tok.literal, args->data[i]);
     }
 
-    result = from_return_value(eval_block_statement(func->body->stmts, env));
+    result = from_return_value(eval_block_statement(env, func->body->stmts));
 
-    if (result.typ == o_Function) {
-        // [result] is a Closure
+    // [result] is a Closure
+    if (result->typ == o_Function) {
         ParamBuffer captured_variables;
         ParamBufferInit(&captured_variables);
-        captures_in(NODE(n_BlockStatement, result.data.func->body),
+        captures_in(
+                NODE(n_BlockStatement, result->data.func->body),
                 &captured_variables);
 
         // copy [captured_variables] into new [Frame] for Closure
         Frame* closure_frame = frame_new(env);
         for (int i = 0; i < captured_variables.length; i++) {
-            char* name = captured_variables.data[i]->value;
+            char* name = captured_variables.data[i]->tok.literal;
+
+            // get from evaluated function Frame.
             Object* value = env_get(env, name);
             if (value == NULL) continue;
+
+            // insert in closure frame.
             if (ht_set(closure_frame->table, name, value) == NULL)
                 ALLOC_FAIL();
         }
         free(captured_variables.data);
 
-        // TODO FIX memory leak
-        Closure* closure = malloc(sizeof(Closure));
+        Closure* closure = allocate(sizeof(Closure));
         closure->frame = closure_frame;
-        closure->func = result.data.func;
+        closure->func = result->data.func;
         result = OBJ(o_Closure, .closure = closure );
-        result.is_marked = true; // keep for next round of garbage collection
-        env_track(env, result);
     }
 
     env->current = previous;
     frame_destroy(new_frame, env);
+    trace_mark_object(result);
     mark_and_sweep(env);
 
     return result;
 }
 
-Object eval_call_expression(CallExpression* ce, Env* env) {
-    Object function = eval(ce->function, env);
-    int args_len;
-    switch (function.typ) {
-        case o_Error: return function;
-        case o_Function:
-            args_len = function.data.func->params.length;
-            break;
-        case o_Closure:
-            args_len = function.data.closure->func->params.length;
-            break;
-        default:
-            fprintf(stderr,
-                    "eval(n_CallExpression): function type %s not handled\n",
-                    show_object_type(function.typ));
-            exit(1);
-    }
-
+static Object*
+eval_call_expression(Env* env, CallExpression* ce) {
     char* fn_name = ce->function.typ == n_Identifier
-        ? ((Identifier*)ce->function.obj)->value
-        : "<anonymous function>";
-    if (args_len != ce->args.length)
-        return new_error(
-                "function %s() takes %d arguments got %d",
-                fn_name, args_len, ce->args.length);
-
-    // necessary?
-    ObjectBuffer args = eval_argument_expressions(ce->args, env);
+        ? ((Identifier*)ce->function.obj)->tok.literal
+        : "<anonymous>";
+    Object *result, *function = eval(env, ce->function);
+    ObjectBuffer args = eval_expressions(env, ce->args);
     if (args.length == 1 && IS_ERROR(args.data[0])) {
-        Object err = args.data[0];
+        Object* err = args.data[0];
         free(args.data);
         return err;
     }
-
-    Object result = apply_function(function, args, env);
-
-    for (int i = 0; i < args.length; i++)
-        object_destroy(&args.data[i]);
+    switch (function->typ) {
+        case o_Error:
+            result = function;
+            break;
+        case o_Function:
+        case o_Closure:
+            result = apply_function(env, function, &args, fn_name);
+            break;
+        case o_BuiltinFunction:
+            {
+                result = function->data.builtin(env, &args);
+                if (result == NULL) result = NULL_OBJ();
+                break;
+            }
+        default:
+            result = new_error(env, "not a function: %s",
+                    show_object_type(function->typ));
+    }
     free(args.data);
     return result;
 }
 
-Object eval(Node n, Env* env) {
+static Object*
+eval_array_index_expression(Object* left, Object* index) {
+    ObjectBuffer* arr = left->data.array;
+    long idx = index->data.integer;
+    long max = arr->length - 1;
+    if (idx < 0 || idx > max) return NULL_OBJ();
+    return arr->data[idx];
+}
+
+static Object*
+eval_index_expression(Env* env, Object* left, Object* index) {
+    if (left->typ == o_Array && index->typ == o_Integer) {
+        return eval_array_index_expression(left, index);
+    } else {
+        return new_error(env, "index operator not supported: %s",
+                show_object_type(left->typ));
+    }
+}
+
+Object* eval(Env* env, Node n) {
     switch (n.typ) {
         case n_Identifier:
-            return eval_identifier(n.obj, env);
+            return eval_identifier(env, n.obj);
         case n_IfExpression:
-            return eval_if_expression(n.obj, env);
+            return eval_if_expression(env, n.obj);
         case n_IntegerLiteral:
-            return eval_integer_literal(n.obj);
+            return eval_integer_literal(env, n.obj);
         case n_FloatLiteral:
-            return eval_float_literal(n.obj);
+            return eval_float_literal(env, n.obj);
         case n_BooleanLiteral:
             {
                 BooleanLiteral* b = n.obj;
-                return BOOL(b->value);
+                return bool_to_object(b->value);
+            }
+        case n_StringLiteral:
+            return eval_string_literal(env, n.obj);
+        case n_ArrayLiteral:
+            return eval_array_literal(env, n.obj);
+        case n_IndexExpression:
+            {
+                IndexExpression* ie = n.obj;
+                Object* left = eval(env, ie->left);
+                if (IS_ERROR(left)) {
+                    return left;
+                }
+                Object* index = eval(env, ie->index);
+                if (IS_ERROR(index)) {
+                    return index;
+                }
+                return eval_index_expression(env, left, index);
             }
         case n_FunctionLiteral:
             return OBJ(o_Function, .func = n.obj);
         case n_PrefixExpression:
-            return eval_prefix_expression(n.obj, env);
+            return eval_prefix_expression(env, n.obj);
         case n_InfixExpression:
-            return eval_infix_expression(n.obj, env);
+            return eval_infix_expression(env, n.obj);
         case n_CallExpression:
-            return eval_call_expression(n.obj, env);
+            return eval_call_expression(env, n.obj);
         case n_LetStatement:
             {
                 LetStatement* ls = n.obj;
-                Object val = eval(ls->value, env);
+                Object* val = eval(env, ls->value);
                 if (IS_ERROR(val)) {
                     return val;
                 }
-                env_set(env, ls->name->value, val);
+                env_set(env, ls->name->tok.literal, val);
                 return NULL_OBJ();
             }
         case n_BlockStatement:
             {
                 BlockStatement* b = n.obj;
-                return eval_block_statement(b->stmts, env);
+                return eval_block_statement(env, b->stmts);
             }
         case n_ReturnStatement:
             {
                 ReturnStatement* ns = n.obj;
-                Object res = eval(ns->return_value, env);
+                Object* res = eval(env, ns->return_value);
                 if (IS_ERROR(res)) {
                     return res;
                 }
@@ -492,26 +658,22 @@ Object eval(Node n, Env* env) {
         case n_ExpressionStatement:
             {
                 ExpressionStatement* es = n.obj;
-                return eval(es->expression, env);
+                return eval(env, es->expression);
             }
         default:
             return NULL_OBJ();
     }
 }
 
-
-Object eval_program(Program* p, Env* env) {
-    Object result = {};
+Object* eval_program(Program* p, Env* env) {
+    Object* result = NULL_OBJ();
     for (int i = 0; i < p->stmts.length; i++) {
-        result = eval(p->stmts.data[i], env);
-        switch (result.typ) {
+        result = eval(env, p->stmts.data[i]);
+        switch (result->typ) {
             case o_ReturnValue:
                 return from_return_value(result);
             case o_Error:
                 return result;
-            case o_Closure:
-                result.data.closure = NULL;
-                break;
             default: break;
         }
     }

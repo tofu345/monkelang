@@ -8,7 +8,7 @@
 struct Keyword {
     char* name;
     TokenType tok_typ;
-} keywords[] = {
+} const keywords[] = {
     {"fn", t_Function},
     {"let", t_Let},
     {"true", t_True},
@@ -33,6 +33,7 @@ const char* token_types[] = {
     "Illegal",
     "Eof",
     "Identifier",
+    "String",
 	"Int",
 	"Float",
 	"=",
@@ -51,6 +52,8 @@ const char* token_types[] = {
 	")",
 	"{",
 	"}",
+    "[",
+    "]",
 	"fn",
 	"let",
 	"true",

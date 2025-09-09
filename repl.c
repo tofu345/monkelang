@@ -20,7 +20,7 @@ void print_parser_errors(FILE* out, Parser* p) {
 BUFFER(Program, Program);
 DEFINE_BUFFER(Program, Program);
 
-void start(FILE* in, FILE* out) {
+void repl(FILE* in, FILE* out) {
     ProgramBuffer progs;
     ProgramBufferInit(&progs);
     Env* env = env_new();
@@ -40,18 +40,17 @@ void start(FILE* in, FILE* out) {
         Program prog = parse_program(&p);
         ProgramBufferPush(&progs, prog);
 
-        if (p.errors.length != 0) {
+        if (p.errors.length > 0) {
             print_parser_errors(out, &p);
             free(input);
             parser_destroy(&p);
             continue;
         }
 
-        Object evaluated = eval_program(&prog, env);
-        if (evaluated.typ != o_Null) {
+        Object* evaluated = eval_program(&prog, env);
+        if (evaluated->typ != o_Null) {
             object_fprint(evaluated, out);
             fprintf(out, "\n");
-            object_destroy(&evaluated);
         }
 
         free(input);
@@ -62,4 +61,27 @@ void start(FILE* in, FILE* out) {
     for (int i = 0; i < progs.length; i++)
         program_destroy(&progs.data[i]);
     free(progs.data);
+}
+
+void run(char* program) {
+    Lexer l = lexer_new(program);
+    Parser p;
+    parser_init(&p, &l);
+    Program prog = parse_program(&p);
+    if (p.errors.length > 0) {
+        print_parser_errors(stdout, &p);
+        parser_destroy(&p);
+        return;
+    }
+
+    Env* env = env_new();
+    Object* evaluated = eval_program(&prog, env);
+    if (evaluated->typ != o_Null) {
+        object_fprint(evaluated, stdout);
+        puts("");
+    }
+
+    parser_destroy(&p);
+    program_destroy(&prog);
+    env_destroy(env);
 }

@@ -1,3 +1,4 @@
 #include <stdio.h>
 
-void start(FILE* in, FILE* out);
+void run(char* program);
+void repl(FILE* in, FILE* out);

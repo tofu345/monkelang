@@ -3,8 +3,9 @@
 typedef enum __attribute__ ((__packed__)) {
     t_Illegal,
     t_Eof,
-    // identifiers + literals
-    t_Ident,
+    // literals
+    t_Ident, // variable names
+    t_String,
 	t_Int, // stored as `long`
 	t_Float, // stored as `double`
     // Operators
@@ -25,6 +26,8 @@ typedef enum __attribute__ ((__packed__)) {
 	t_Rparen,
 	t_Lbrace,
 	t_Rbrace,
+	t_Lbracket,
+	t_Rbracket,
     // Keywords
 	t_Function,
 	t_Let,

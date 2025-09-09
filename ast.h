@@ -15,13 +15,16 @@ enum NodeType {
     // Expressions
     n_Identifier = 1,
     n_IntegerLiteral,
+    n_BooleanLiteral,
     n_FloatLiteral,
+    n_FunctionLiteral,
+    n_StringLiteral,
+    n_ArrayLiteral,
     n_PrefixExpression,
     n_InfixExpression,
-    n_BooleanLiteral,
     n_IfExpression,
-    n_FunctionLiteral,
     n_CallExpression,
+    n_IndexExpression,
 
     // Statements
     n_LetStatement,
@@ -62,7 +65,6 @@ int program_fprint(Program* p, FILE* fp);
 // TODO? remove tok or value?
 typedef struct {
     Token tok; // the 't_Ident' token
-    char* value; // same as tok.literal
 } Identifier;
 
 typedef struct {
@@ -139,3 +141,18 @@ typedef struct {
     Node function; // Identifier or FunctionLiteral
     NodeBuffer args;
 } CallExpression;
+
+typedef struct {
+    Token tok; // the 't_String' token
+} StringLiteral;
+
+typedef struct {
+    Token tok; // the '[' token
+    NodeBuffer elements;
+} ArrayLiteral;
+
+typedef struct {
+    Token tok; // the '[' token
+    Node left;
+    Node index;
+} IndexExpression;

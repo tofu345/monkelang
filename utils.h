@@ -6,16 +6,22 @@
 #include <stdlib.h>
 #include <string.h>
 
-
-#define DEFAULT_CAPACITY 8
+#define DEFAULT_CAPACITY 4
 
 #define FPRINTF(fp, ...) \
     if (fprintf(fp, __VA_ARGS__) <= 0) \
         return -1;
 
-// TODO? gc?
 #define ALLOC_FAIL() \
     do { \
-        fprintf(stderr, "allocation failed: %s\n", strerror(errno)); \
+        fprintf(stderr, "%s:%d:%s() allocation failed: %s\n", \
+                __FILE__, __LINE__, __func__, \
+                strerror(errno)); \
         exit(1); \
     } while(0);
+
+void* allocate(size_t size);
+void* reallocate(void* ptr, size_t size);
+
+// From: wrenPowerOf2Ceil: http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2Float
+int power_of_2_ceil(int n);

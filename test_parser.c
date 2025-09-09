@@ -1,3 +1,4 @@
+#include "tests.h"
 #include "unity/unity.h"
 #include "ast.h"
 #include "parser.h"
@@ -31,10 +32,8 @@ static void test_let_statement(Node stmt, const char* exp_name) {
     TEST_ASSERT_MESSAGE(n_LetStatement == stmt.typ, "type not LetStatement");
 
     LetStatement* let_stmt = (LetStatement*)stmt.obj;
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(exp_name, let_stmt->name->value,
-            "wrong LetStatement.Identifier.Value");
     TEST_ASSERT_EQUAL_STRING_MESSAGE(exp_name, let_stmt->name->tok.literal,
-            "wrong LetStatement.Identifier.Token.literal");
+            "wrong LetStatement.Identifier.Value");
 }
 
 void test_return_statements(void) {
@@ -90,7 +89,7 @@ void test_identifier_expression(void) {
 
     Identifier* ident = es->expression.obj;
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            "foobar", ident->tok.literal, "wrong Identifier.Token.literal");
+            "foobar", ident->tok.literal, "wrong Identifier.Token.value");
 
     program_destroy(&prog);
     parser_destroy(&p);
@@ -199,9 +198,7 @@ test_identifier(Node n, const char* value) {
     TEST_ASSERT_MESSAGE(n_Identifier == n.typ, "type not type Identifier");
     Identifier* id = n.obj;
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            value, id->value, "wrong Identifier.Value");
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            value, id->tok.literal, "wrong Identifier.Token.literal");
+            value, id->tok.literal, "wrong Identifier.Value");
 }
 
 static void
@@ -214,20 +211,6 @@ test_boolean_literal(Node n, bool exp) {
             exp ? "true" : "false",
             b->tok.literal, "wrong BooleanLiteral.Token.literal");
 }
-
-typedef enum {
-    l_Integer,
-    l_Float,
-    l_String,
-    l_BooleanLiteral,
-} L_Type;
-
-typedef union {
-    long integer;
-    double floating;
-    const char* string;
-    bool boolean;
-} L_Test;
 
 static void
 test_literal_expression(Node n, L_Test exp, L_Type typ) {
@@ -395,111 +378,119 @@ void test_operator_precedence_parsing(void) {
     } tests[] = {
         {
             "-1 * 2 + 3",
-            "(((-1) * 2) + 3)",
+            "(((-1) * 2) + 3);",
         },
         {
             "-a * b",
-            "((-a) * b)",
+            "((-a) * b);",
         },
         {
             "!-a",
-            "(!(-a))",
+            "(!(-a));",
         },
         {
             "a + b + c",
-            "((a + b) + c)",
+            "((a + b) + c);",
         },
         {
             "a + b - c",
-            "((a + b) - c)",
+            "((a + b) - c);",
         },
         {
             "a * b * c",
-            "((a * b) * c)",
+            "((a * b) * c);",
         },
         {
             "a * b / c",
-            "((a * b) / c)",
+            "((a * b) / c);",
         },
         {
             "a + b / c",
-            "(a + (b / c))",
+            "(a + (b / c));",
         },
         {
             "a + b * c + d / e - f",
-            "(((a + (b * c)) + (d / e)) - f)",
+            "(((a + (b * c)) + (d / e)) - f);",
         },
         {
             "3 + 4; -5 * 5",
-            "(3 + 4)((-5) * 5)",
+            "(3 + 4);((-5) * 5);",
         },
         {
             "5 > 4 == 3 < 4",
-            "((5 > 4) == (3 < 4))",
+            "((5 > 4) == (3 < 4));",
         },
         {
             "5 < 4 != 3 > 4",
-            "((5 < 4) != (3 > 4))",
+            "((5 < 4) != (3 > 4));",
         },
         {
             "3 + 4 * 5 == 3 * 1 + 4 * 5",
-            "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+            "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)));",
         },
         {
             "true",
-            "true",
+            "true;",
         },
         {
             "false",
-            "false",
+            "false;",
         },
         {
             "3 > 5 == false",
-            "((3 > 5) == false)",
+            "((3 > 5) == false);",
         },
         {
             "3 < 5 == true",
-            "((3 < 5) == true)",
+            "((3 < 5) == true);",
         },
         {
             "1 + (2 + 3) + 4",
-            "((1 + (2 + 3)) + 4)",
+            "((1 + (2 + 3)) + 4);",
         },
         {
             "(5 + 5) * 2",
-            "((5 + 5) * 2)",
+            "((5 + 5) * 2);",
         },
         {
-            "2 / (5 + 5)",
-            "(2 / (5 + 5))",
+            "2 / (5 + 5);",
+            "(2 / (5 + 5));",
         },
         {
-            "-(5 + 5)",
-            "(-(5 + 5))",
+            "-(5 + 5);",
+            "(-(5 + 5));",
         },
         {
-            "-(1.1 + 5)",
-            "(-(1.100 + 5))",
+            "-(1.1 + 5);",
+            "(-(1.100 + 5));",
         },
         {
-            "-(2. * 5)",
-            "(-(2.000 * 5))",
+            "-(2. * 5);",
+            "(-(2.000 * 5));",
         },
         {
-            "!(true == true)",
-            "(!(true == true))",
+            "!(true == true);",
+            "(!(true == true));",
         },
         {
             "a + add(b * c) + d",
-            "((a + add((b * c))) + d)",
+            "((a + add((b * c))) + d);",
         },
         {
-            "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
-            "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+            "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8));",
+            "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)));",
         },
         {
-            "add(a + b + c * d / f + g)",
-            "add((((a + b) + ((c * d) / f)) + g))",
+            "add(a + b + c * d / f + g);",
+            "add((((a + b) + ((c * d) / f)) + g));",
+        },
+        {
+            "a * [1, 2, 3, 4][b * c] * d",
+            "((a * [1, 2, 3, 4][(b * c)]) * d);",
+        },
+        {
+            "add(a * b[2], b[1], 2 * [1, 2][1])",
+            "add((a * b[2]), b[1], (2 * [1, 2][1]));",
         },
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
@@ -815,6 +806,84 @@ void test_call_expression_parsing(void) {
     parser_destroy(&p);
 }
 
+void test_string_literal_expression(void) {
+    char* input = "\"hello world\";";
+
+    Lexer l = lexer_new(input);
+    Parser p;
+    parser_init(&p, &l);
+    Program prog = parse_program(&p);
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
+    check_parser_errors(&p);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            1, prog.stmts.length, "wrong prog.statements length");
+
+    ExpressionStatement* es = prog.stmts.data[0].obj;
+    TEST_ASSERT_MESSAGE(
+            n_StringLiteral == es->expression.typ, "type not StringLiteral");
+    StringLiteral* sl = es->expression.obj;
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            "hello world", sl->tok.literal, "wrong StringLiteral.Value");
+
+    program_destroy(&prog);
+    parser_destroy(&p);
+}
+
+void test_parsing_array_literals(void) {
+    char* input = "[1, 2 * 2, 3 + 3]";
+
+    Lexer l = lexer_new(input);
+    Parser p;
+    parser_init(&p, &l);
+    Program prog = parse_program(&p);
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
+    check_parser_errors(&p);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            1, prog.stmts.length, "wrong prog.statements length");
+
+    ExpressionStatement* es = prog.stmts.data[0].obj;
+    TEST_ASSERT_MESSAGE(
+            n_ArrayLiteral == es->expression.typ, "type not ArrayLiteral");
+    ArrayLiteral* al = es->expression.obj;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            3, al->elements.length, "wrong length of ArrayLiteral.elements");
+
+    test_integer_literal(al->elements.data[0], 1);
+    test_infix_expression(al->elements.data[1],
+            L_TEST(2), "*", L_TEST(2), l_Integer);
+    test_infix_expression(al->elements.data[2],
+            L_TEST(3), "+", L_TEST(3), l_Integer);
+
+    program_destroy(&prog);
+    parser_destroy(&p);
+}
+
+void test_parsing_index_expressions(void) {
+    char* input = "myArray[1 + 1]";
+
+    Lexer l = lexer_new(input);
+    Parser p;
+    parser_init(&p, &l);
+    Program prog = parse_program(&p);
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
+    check_parser_errors(&p);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            1, prog.stmts.length, "wrong prog.statements length");
+
+    ExpressionStatement* es = prog.stmts.data[0].obj;
+    TEST_ASSERT_MESSAGE(
+            n_IndexExpression == es->expression.typ,
+            "type not IndexExpression");
+    IndexExpression* ie = es->expression.obj;
+
+    test_identifier(ie->left, "myArray");
+    test_infix_expression(ie->index,
+            L_TEST(1), "+", L_TEST(1), l_Integer);
+
+    program_destroy(&prog);
+    parser_destroy(&p);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_let_statements);
@@ -831,5 +900,8 @@ int main(void) {
     RUN_TEST(test_function_literal_parsing);
     RUN_TEST(test_function_parameter_parsing);
     RUN_TEST(test_call_expression_parsing);
+    RUN_TEST(test_string_literal_expression);
+    RUN_TEST(test_parsing_array_literals);
+    RUN_TEST(test_parsing_index_expressions);
     return UNITY_END();
 }

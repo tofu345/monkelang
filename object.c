@@ -6,7 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-DEFINE_BUFFER(Object, Object);
+DEFINE_BUFFER(Object, Object*);
+DEFINE_BUFFER(Char, char);
 
 void object_destroy(Object* o) {
     switch (o->typ) {
@@ -16,6 +17,15 @@ void object_destroy(Object* o) {
         case o_Boolean:
         case o_ReturnValue:
         case o_Function:
+        case o_BuiltinFunction:
+            break;
+        case o_String:
+            free(o->data.string->data);
+            free(o->data.string);
+            break;
+        case o_Array:
+            free(o->data.array->data);
+            free(o->data.array);
             break;
         case o_Closure:
             free(o->data.closure);
@@ -69,84 +79,108 @@ fprint_function(FILE* fp) {
     return 0;
 }
 
-int object_fprint(Object o, FILE* fp) {
-    switch (o.typ) {
+static int
+fprintf_string(ObjectData sl, FILE* fp) {
+    if (sl.string->length == 0) {
+        FPRINTF(fp, "\"\"");
+    } else {
+        FPRINTF(fp, "\"%.*s\"", sl.string->length, sl.string->data);
+    }
+    return 0;
+}
+
+static int
+fprint_array(ObjectData o, FILE* fp) {
+    ObjectBuffer* array = o.array;
+    FPRINTF(fp, "[");
+    for (int i = 0; i < array->length - 1; i++) {
+        object_fprint(array->data[i], fp);
+        FPRINTF(fp, ", ");
+    }
+    if (array->length >= 1)
+        object_fprint(array->data[array->length - 1], fp);
+    FPRINTF(fp, "]");
+    return 0;
+}
+
+int object_fprint(Object* o, FILE* fp) {
+    switch (o->typ) {
         case o_Integer:
-            return fprintf_integer(o.data, fp);
+            return fprintf_integer(o->data, fp);
         case o_Float:
-            return fprintf_float(o.data, fp);
+            return fprintf_float(o->data, fp);
         case o_Boolean:
-            return fprintf_boolean(o.data, fp);
+            return fprintf_boolean(o->data, fp);
         case o_Null:
             return fprintf_null(fp);
         case o_Error:
-            return fprintf_error(o.data, fp);
+            return fprintf_error(o->data, fp);
+        case o_BuiltinFunction:
+            FPRINTF(fp, "<builtin function>");
+            return 0;
         case o_Function:
         case o_Closure:
             return fprint_function(fp);
+        case o_String:
+            return fprintf_string(o->data, fp);
+        case o_Array:
+            return fprint_array(o->data, fp);
         default:
             fprintf(stderr, "object_fprint: object type not handled %d\n",
-                    o.typ);
+                    o->typ);
             exit(1);
     }
 }
 
-bool object_cmp(Object left, Object right) {
-    if (left.typ != right.typ) return false;
+bool object_cmp(Object* left, Object* right) {
+    if (left->typ != right->typ) return false;
 
-    switch (left.typ) {
+    switch (left->typ) {
         case o_Float:
-            return left.data.floating == right.data.floating;
+            return left->data.floating == right->data.floating;
         case o_Integer:
-            return left.data.integer == right.data.integer;
+            return left->data.integer == right->data.integer;
         case o_Boolean:
-            return left.data.boolean == right.data.boolean;
+            return left->data.boolean == right->data.boolean;
         case o_Null:
             return true;
         case o_Error:
-            return !strcmp(left.data.error_msg, right.data.error_msg);
+            return !strcmp(left->data.error_msg, right->data.error_msg);
         case o_ReturnValue:
             return object_cmp(
                     from_return_value(left),
                     from_return_value(right));
+        case o_String:
+            return !strcmp(left->data.string->data, right->data.string->data);
+        case o_Array:
+            {
+                ObjectBuffer* l_arr = left->data.array;
+                ObjectBuffer* r_arr = right->data.array;
+                if (l_arr->length != r_arr->length) return false;
+                for (int i = 0; i < l_arr->length; i++)
+                    if (!object_cmp(l_arr->data[i], r_arr->data[i]))
+                        return false;
+                return true;
+            }
         // TODO: cmp function error
         default:
             fprintf(stderr, "object_cmp: object type not handled %s\n",
-                    show_object_type(left.typ));
+                    show_object_type(left->typ));
             exit(1);
             break;
     }
 }
 
-Object object_copy(Object obj) {
-    switch (obj.typ) {
-        case o_Null:
-        case o_Integer:
-        case o_Float:
-        case o_Boolean:
-        case o_Error:
-        case o_Function:
-        case o_Closure:
-            return obj;
-        case o_ReturnValue:
-            return to_return_value(object_copy(from_return_value(obj)));
-        default:
-            fprintf(stderr, "object_copy: object type not handled %d\n",
-                    obj.typ);
-            exit(1);
-    }
-}
-
-inline Object to_return_value(Object obj) {
-    struct ReturnValue* return_val = (void*)&obj;
+inline Object* to_return_value(Object* obj) {
+    struct ReturnValue* return_val = (void*)obj;
     return_val->value_typ = return_val->typ;
     return_val->typ = o_ReturnValue;
     return obj;
 }
 
-inline Object from_return_value(Object obj) {
-    if (obj.typ != o_ReturnValue) return obj;
-    struct ReturnValue* return_val = (void*)&obj;
+inline Object* from_return_value(Object* obj) {
+    if (obj->typ != o_ReturnValue) return obj;
+    struct ReturnValue* return_val = (void*)obj;
     return_val->typ = return_val->value_typ;
     return obj;
 }
@@ -157,9 +191,12 @@ const char* object_types[] = {
     "Float",
     "Boolean",
     "ReturnValue",
+    "Builtin",
     "Error",
     "Function",
     "Closure",
+    "String",
+    "Array",
 };
 
 const char* show_object_type(ObjectType t) {

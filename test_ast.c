@@ -19,14 +19,12 @@ void test_print(void) {
                 .name =
                     &(Identifier){
                         .tok = { t_Ident, 0, 0, "myVar" },
-                        .value = "myVar",
                     },
                 .value =
                     {
                         n_Identifier,
                         &(Identifier){
                             .tok = { t_Ident, 0, 0, "anotherVar" },
-                            .value = "anotherVar",
                         },
                     }
             }

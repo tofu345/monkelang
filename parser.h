@@ -39,4 +39,5 @@ enum Precedence {
     p_Product,
     p_Prefix,
     p_Call,
+    p_Index,
 };

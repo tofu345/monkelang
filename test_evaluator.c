@@ -1,5 +1,6 @@
 #include "ast.h"
 #include "environment.h"
+#include "tests.h"
 #include "unity/unity.h"
 #include "object.h"
 #include "evaluator.h"
@@ -27,29 +28,27 @@ check_parser_errors(Parser* p) {
     TEST_FAIL();
 }
 
-static Object
-test_eval(char* input) {
+static Object*
+test_eval(char* input, Env* env) {
     Lexer l = lexer_new(input);
     Parser p;
     parser_init(&p, &l);
     Program prog = parse_program(&p);
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
     check_parser_errors(&p);
-    Env* env = env_new();
-    Object result = eval_program(&prog, env);
-    env_destroy(env);
+    Object* result = eval_program(&prog, env);
     program_destroy(&prog);
     parser_destroy(&p);
     return result;
 }
 
 static void
-test_integer_object(Object o, long expected) {
+test_integer_object(Object* o, long expected) {
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
-		show_object_type(o_Integer), show_object_type(o.typ),
+		show_object_type(o_Integer), show_object_type(o->typ),
         "incorrect type");
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            expected, o.data.integer, "integer has wrong value");
+            expected, o->data.integer, "integer has wrong value");
 }
 
 void test_eval_integer_expression(void) {
@@ -76,19 +75,20 @@ void test_eval_integer_expression(void) {
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
     for (size_t i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        Object evaluated = test_eval(test.input);
+        Env* env = env_new();
+        Object* evaluated = test_eval(test.input, env);
         test_integer_object(evaluated, test.expected);
-        object_destroy(&evaluated);
+        env_destroy(env);
     }
 }
 
 static void
-test_boolean_object(Object o, bool expected) {
+test_boolean_object(Object* o, bool expected) {
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
-		show_object_type(o_Boolean), show_object_type(o.typ),
+		show_object_type(o_Boolean), show_object_type(o->typ),
         "incorrect type");
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            expected, o.data.boolean, "boolean has wrong value");
+            expected, o->data.boolean, "boolean has wrong value");
 }
 
 void test_eval_boolean_expression(void) {
@@ -119,9 +119,10 @@ void test_eval_boolean_expression(void) {
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
     for (size_t i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        Object evaluated = test_eval(test.input);
+        Env* env = env_new();
+        Object* evaluated = test_eval(test.input, env);
         test_boolean_object(evaluated, test.expected);
-        object_destroy(&evaluated);
+        env_destroy(env);
     }
 }
 
@@ -140,15 +141,16 @@ void test_bang_operator(void) {
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
     for (size_t i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        Object evaluated = test_eval(test.input);
+        Env* env = env_new();
+        Object* evaluated = test_eval(test.input, env);
         test_boolean_object(evaluated, test.expected);
-        object_destroy(&evaluated);
+        env_destroy(env);
     }
 }
 
-void test_null_object(Object o) {
+void test_null_object(Object* o) {
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            "Null", show_object_type(o.typ),
+            "Null", show_object_type(o->typ),
             "object is not null");
 }
 
@@ -168,13 +170,14 @@ void test_if_else_expression(void) {
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
     for (size_t i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        Object evaluated = test_eval(test.input);
+        Env* env = env_new();
+        Object* evaluated = test_eval(test.input, env);
         if (test.expected == 0) {
             test_null_object(evaluated);
         } else {
             test_integer_object(evaluated, test.expected);
         }
-        object_destroy(&evaluated);
+        env_destroy(env);
     }
 }
 
@@ -200,9 +203,10 @@ void test_return_statements(void) {
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
     for (size_t i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        Object evaluated = test_eval(test.input);
+        Env* env = env_new();
+        Object* evaluated = test_eval(test.input, env);
         test_integer_object(evaluated, test.expected);
-        object_destroy(&evaluated);
+        env_destroy(env);
     }
 }
 
@@ -249,18 +253,23 @@ void test_error_handling(void) {
             "foobar",
             "identifier not found: foobar",
         },
+        {
+            "\"Hello\" - \"World\"",
+            "unknown operator: String - String",
+        },
     };
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
     for (size_t i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        Object error = test_eval(test.input);
+        Env* env = env_new();
+        Object* error = test_eval(test.input, env);
         TEST_ASSERT_EQUAL_STRING_MESSAGE(
                 show_object_type(o_Error),
-                show_object_type(error.typ), "wrong object type");
+                show_object_type(error->typ), "wrong object type");
         TEST_ASSERT_EQUAL_STRING_MESSAGE(
-                test.error_msg, error.data.error_msg,
+                test.error_msg, error->data.error_msg,
                 "error has wrong message");
-        object_destroy(&error);
+        env_destroy(env);
     }
 }
 
@@ -277,9 +286,10 @@ void test_let_statements(void) {
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
     for (size_t i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        Object evaluated = test_eval(test.input);
+        Env* env = env_new();
+        Object* evaluated = test_eval(test.input, env);
         test_integer_object(evaluated, test.expected);
-        object_destroy(&evaluated);
+        env_destroy(env);
     }
 }
 
@@ -292,19 +302,19 @@ void test_function_object(void) {
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
     check_parser_errors(&p);
     Env* env = env_new();
-    Object evaluated = eval_program(&prog, env);
+    Object* evaluated = eval_program(&prog, env);
 
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            show_object_type(o_Function), show_object_type(evaluated.typ),
+            show_object_type(o_Function), show_object_type(evaluated->typ),
             "wrong object type");
 
-    FunctionLiteral* fn = evaluated.data.func;
+    FunctionLiteral* fn = evaluated->data.func;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             1, fn->params.length, "wrong number of parameters");
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            "x", fn->params.data[0]->value, "wrong paramater");
+            "x", fn->params.data[0]->tok.literal, "wrong paramater");
 
-    char* expected_body = "(x + 2)";
+    char* expected_body = "(x + 2);";
 
     char* buf = NULL;
     size_t len;
@@ -317,7 +327,6 @@ void test_function_object(void) {
             expected_body, buf, "wrong function body");
 
     free(buf);
-    object_destroy(&evaluated);
     env_destroy(env);
     program_destroy(&prog);
     parser_destroy(&p);
@@ -338,9 +347,10 @@ void test_function_application(void) {
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
     for (size_t i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        Object evaluated = test_eval(test.input);
+        Env* env = env_new();
+        Object* evaluated = test_eval(test.input, env);
         test_integer_object(evaluated, test.expected);
-        object_destroy(&evaluated);
+        env_destroy(env);
     }
 }
 
@@ -350,10 +360,161 @@ let newAdder = fn(x) { \
     fn(y) { x + y }; \
 }; \
 let addTwo = newAdder(2); \
-addTwo(2);";
-    Object evaluated = test_eval(input);
+addTwo(2);\
+addTwo(2);\
+    ";
+    Env* env = env_new();
+    Object* evaluated = test_eval(input, env);
     test_integer_object(evaluated, 4);
-    object_destroy(&evaluated);
+    env_destroy(env);
+}
+
+void test_string_literal(void) {
+    char* input = "\"Hello World!\"";
+    Env* env = env_new();
+    Object* evaluated = test_eval(input, env);
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            show_object_type(o_String), show_object_type(evaluated->typ),
+            "type not String");
+    char* data = evaluated->data.string->data;
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            "Hello World!", data,
+            "String has wrong value");
+    env_destroy(env);
+}
+
+void test_string_concatenation(void) {
+    char* input = "\"Hello\" + \" \" + \"World!\"";
+    Env* env = env_new();
+    Object* evaluated = test_eval(input, env);
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            show_object_type(o_String),
+            show_object_type(evaluated->typ), "type not String");
+    char* data = evaluated->data.string->data;
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            "Hello World!", data,
+            "String has wrong value");
+    env_destroy(env);
+}
+
+void test_builtin_function(void) {
+    struct Test {
+        char* input;
+        L_Test expected;
+        L_Type t;
+    } tests[] = {
+        {"len(\"\")", {0}, l_Integer},
+        {"len(\"four\")", {4}, l_Integer},
+        {"len(\"hello world\")", {11}, l_Integer},
+        {
+            "len(1)",
+            L_TEST( .string = "builtin len(): argument of 'Integer' not supported"),
+            l_String
+        },
+        {
+            "len(\"one\", \"two\")",
+            L_TEST( .string = "builtin len() takes 1 argument got 2"),
+            l_String
+        },
+    };
+    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
+    for (size_t i = 0; i < tests_len; i++) {
+        struct Test test = tests[i];
+        Env* env = env_new();
+        Object* evaluated = test_eval(test.input, env);
+        switch (test.t) {
+            case l_Integer:
+                test_integer_object(evaluated, test.expected.integer);
+                break;
+            case l_String:
+                TEST_ASSERT_EQUAL_STRING_MESSAGE(
+                        show_object_type(o_Error),
+                        show_object_type(evaluated->typ),
+                        "type not Error");
+                TEST_ASSERT_EQUAL_STRING_MESSAGE(
+                        test.expected.string, evaluated->data.error_msg,
+                        "integer has wrong value");
+                break;
+            default: TEST_FAIL_MESSAGE("unhandled type");
+        }
+        env_destroy(env);
+    }
+}
+
+void test_array_literals(void) {
+    char* input = "[1, 2 * 2, 3 + 3]";
+    Env* env = env_new();
+    Object* evaluated = test_eval(input, env);
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            show_object_type(o_Array), show_object_type(evaluated->typ),
+            "type not Array");
+    ObjectBuffer* arr = evaluated->data.array;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            3, arr->length, "wrong number of elements");
+    test_integer_object(arr->data[0], 1);
+    test_integer_object(arr->data[1], 4);
+    test_integer_object(arr->data[2], 6);
+    env_destroy(env);
+}
+
+void test_array_index_expressions(void) {
+    struct Test {
+        char* input;
+        long expected;
+    } tests[] = {
+        		{
+			"[1, 2, 3][0]",
+			1,
+		},
+		{
+			"[1, 2, 3][1]",
+			2,
+		},
+		{
+			"[1, 2, 3][2]",
+			3,
+		},
+		{
+			"let i = 0; [1][i];",
+			1,
+		},
+		{
+			"[1, 2, 3][1 + 1];",
+			3,
+		},
+		{
+			"let myArray = [1, 2, 3]; myArray[2];",
+			3,
+		},
+		{
+			"let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+			6,
+		},
+		{
+			"let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+			2,
+		},
+		{
+			"[1, 2, 3][3]",
+			0, // NULL
+		},
+		{
+			"[1, 2, 3][-1]",
+			0, // NULL
+		},
+    };
+    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
+    for (size_t i = 0; i < tests_len; i++) {
+        struct Test test = tests[i];
+        Env* env = env_new();
+        Object* evaluated = test_eval(test.input, env);
+        if (test.expected == 0) {
+            test_null_object(evaluated);
+        } else {
+            test_integer_object(evaluated, test.expected);
+        }
+        env_destroy(env);
+    }
 }
 
 int main(void) {
@@ -367,5 +528,10 @@ int main(void) {
     RUN_TEST(test_function_object);
     RUN_TEST(test_function_application);
     RUN_TEST(test_closures);
+    RUN_TEST(test_string_literal);
+    RUN_TEST(test_string_concatenation);
+    RUN_TEST(test_builtin_function);
+    RUN_TEST(test_array_literals);
+    RUN_TEST(test_array_index_expressions);
     return UNITY_END();
 }

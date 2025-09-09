@@ -32,6 +32,9 @@ if (5 < 10) {\
 \
 10 == 10;\
 10 != 9;\
+\"foobar\"\
+\"foo bar\"\
+[1, 2];\
 ";
 
     struct Test {
@@ -111,6 +114,14 @@ if (5 < 10) {\
 		{t_Not_eq, "!="},
 		{t_Int, "9"},
 		{t_Semicolon, ";"},
+        {t_String, "foobar"},
+        {t_String, "foo bar"},
+        {t_Lbracket, "["},
+        {t_Int, "1"},
+        {t_Comma, ","},
+        {t_Int, "2"},
+        {t_Rbracket, "]"},
+        {t_Semicolon, ";"},
 		{t_Eof, ""},
     };
 

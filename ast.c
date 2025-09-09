@@ -1,6 +1,7 @@
 #include "ast.h"
 #include "buffer.h"
 #include "token.h"
+#include "utils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,7 +22,7 @@ char* token_literal(const Node n) {
 
 static int
 fprint_identifier(Identifier* i, FILE* fp) {
-    FPRINTF(fp, "%s", i->value);
+    FPRINTF(fp, "%s", i->tok.literal);
     return 0;
 }
 
@@ -106,7 +107,7 @@ fprint_call_expression(CallExpression* ce, FILE* fp) {
 static int
 fprint_let_statement(LetStatement* ls, FILE* fp) {
     FPRINTF(fp, "%s %s = ",
-            ls->tok.literal, ls->name->value);
+            ls->tok.literal, ls->name->tok.literal);
     if (ls->value.obj != NULL) {
         NODE_FPRINT(fp, ls->value);
     }
@@ -133,6 +134,29 @@ fprint_return_statement(ReturnStatement* rs, FILE* fp) {
 static int
 fprint_expression_statement(ExpressionStatement* es, FILE* fp) {
     NODE_FPRINT(fp, es->expression);
+    FPRINTF(fp, ";");
+    return 0;
+}
+
+static int
+fprint_array_literal(ArrayLiteral* al, FILE* fp) {
+    FPRINTF(fp, "[");
+    for (int i = 0; i < al->elements.length - 1; i++) {
+        NODE_FPRINT(fp, al->elements.data[i]);
+        FPRINTF(fp, ", ");
+    }
+    if (al->elements.length > 0)
+        NODE_FPRINT(fp, al->elements.data[al->elements.length - 1]);
+    FPRINTF(fp, "]");
+    return 0;
+}
+
+static int
+fprint_index_expression(IndexExpression* ie, FILE* fp) {
+    NODE_FPRINT(fp, ie->left);
+    FPRINTF(fp, "[");
+    NODE_FPRINT(fp, ie->index);
+    FPRINTF(fp, "]");
     return 0;
 }
 
@@ -179,6 +203,12 @@ int node_fprint(const Node n, FILE* fp) {
         case n_BlockStatement:
             return fprint_block_statement(n.obj, fp);
 
+        case n_ArrayLiteral:
+            return fprint_array_literal(n.obj, fp);
+
+        case n_IndexExpression:
+            return fprint_index_expression(n.obj, fp);
+
         default:
             fprintf(stderr, "node_fprint: node type not handled %d\n", n.typ);
             exit(1);
@@ -224,7 +254,7 @@ void destroy_function_literal(FunctionLiteral* fl) {
     free(fl->tok.literal);
     if (fl->params.data != NULL) {
         for (int i = 0; i < fl->params.length; i++) {
-            free(fl->params.data[i]->value);
+            free(fl->params.data[i]->tok.literal);
             free(fl->params.data[i]);
         }
         free(fl->params.data);
@@ -238,10 +268,12 @@ static void
 destroy_call_expression(CallExpression* ce) {
     free(ce->tok.literal);
     node_destroy(ce->function);
-    for (int i = 0; i < ce->args.length; i++) {
-        node_destroy(ce->args.data[i]);
+    if (ce->args.data != NULL) {
+        for (int i = 0; i < ce->args.length; i++) {
+            node_destroy(ce->args.data[i]);
+        }
+        free(ce->args.data);
     }
-    free(ce->args.data);
     free(ce);
 }
 
@@ -267,6 +299,25 @@ static void
 destroy_expression_statement(ExpressionStatement* es) {
     node_destroy(es->expression);
     free(es);
+}
+
+static void
+destroy_array_literal(ArrayLiteral* al) {
+    free(al->tok.literal);
+    if (al->elements.data != NULL) {
+        for (int i = 0; i < al->elements.length; i++)
+            node_destroy(al->elements.data[i]);
+        free(al->elements.data);
+    }
+    free(al);
+}
+
+static void
+destroy_index_expression(IndexExpression* ie) {
+    free(ie->tok.literal);
+    node_destroy(ie->left);
+    node_destroy(ie->index);
+    free(ie);
 }
 
 void node_destroy(Node n) {
@@ -299,6 +350,12 @@ void node_destroy(Node n) {
 
         case n_BlockStatement:
             return destroy_block_statement(n.obj);
+
+        case n_ArrayLiteral:
+            return destroy_array_literal(n.obj);
+
+        case n_IndexExpression:
+            return destroy_index_expression(n.obj);
 
         default:
             // since first field of `n.obj` is `Token`
