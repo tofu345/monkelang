@@ -97,6 +97,8 @@ peek_token_is(const Parser* p, TokenType t) {
     return p->peek_token.type == t;
 }
 
+// if peek_token.typ is not [t] return false, else return true and call
+// [next_token].
 static bool
 expect_peek(Parser* p, TokenType t) {
     if (peek_token_is(p, t)) {
@@ -169,7 +171,10 @@ parse_integer_literal(Parser* p) {
 
     if (*endptr != '\0' || errno == ERANGE || errno == EINVAL) {
         char* msg = NULL;
-        int err = asprintf(&msg, "could not parse '%s' as integer", lit);
+        int err = asprintf(&msg, 
+                ":%d,%d: could not parse '%s' as integer", 
+                int_lit->tok.line, int_lit->tok.col,
+                lit);
         if (err == -1) ALLOC_FAIL();
         parser_error(p, msg);
         free(int_lit->tok.literal);
@@ -190,7 +195,9 @@ parse_float_literal(Parser* p) {
     double value = strtod(fl_lit->tok.literal, &endptr);
     if (*endptr != '\0' || errno == ERANGE || errno == EINVAL) {
         char* msg = NULL;
-        int err = asprintf(&msg, "could not parse '%s' as float",
+        int err = asprintf(&msg, 
+                ":%d,%d: could not parse '%s' as float",
+                fl_lit->tok.line, fl_lit->tok.col,
                 fl_lit->tok.literal);
         if (err == -1) ALLOC_FAIL();
         parser_error(p, msg);
@@ -343,8 +350,8 @@ parse_function_literal(Parser* p) {
         free(fl);
         return (Node){};
     }
-
     fl->body = NULL;
+
     int err = parse_function_parameters(p, fl);
     if (err == -1 || !expect_peek(p, t_Lbrace)) {
         node_destroy(NODE(n_FunctionLiteral, fl));
@@ -653,6 +660,10 @@ Program parse_program(Parser* p) {
         Node stmt = parse_statement(p);
         if (stmt.obj != NULL)
             NodeBufferPush(&prog.stmts, stmt);
+        else if (p->errors.length >= MAX_ERRORS) {
+            break;
+        }
+
         next_token(p);
     }
     return prog;

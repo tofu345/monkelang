@@ -4,6 +4,8 @@
 #include "lexer.h"
 #include "token.h"
 
+#define MAX_ERRORS 16
+
 typedef struct Parser Parser;
 
 typedef Node (*PrefixParseFn) (Parser* p);

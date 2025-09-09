@@ -1,7 +1,6 @@
 #include "object.h"
 #include "utils.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -132,7 +131,7 @@ int object_fprint(Object* o, FILE* fp) {
     }
 }
 
-bool object_cmp(Object* left, Object* right) {
+bool object_eq(Object* left, Object* right) {
     if (left->typ != right->typ) return false;
 
     switch (left->typ) {
@@ -147,9 +146,8 @@ bool object_cmp(Object* left, Object* right) {
         case o_Error:
             return !strcmp(left->data.error_msg, right->data.error_msg);
         case o_ReturnValue:
-            return object_cmp(
-                    from_return_value(left),
-                    from_return_value(right));
+            return object_eq(from_return_value(left),
+                    from_return_value(right)); 
         case o_String:
             return !strcmp(left->data.string->data, right->data.string->data);
         case o_Array:
@@ -158,13 +156,13 @@ bool object_cmp(Object* left, Object* right) {
                 ObjectBuffer* r_arr = right->data.array;
                 if (l_arr->length != r_arr->length) return false;
                 for (int i = 0; i < l_arr->length; i++)
-                    if (!object_cmp(l_arr->data[i], r_arr->data[i]))
+                    if (!object_eq(l_arr->data[i], r_arr->data[i]))
                         return false;
                 return true;
             }
         // TODO: cmp function error
         default:
-            fprintf(stderr, "object_cmp: object type not handled %s\n",
+            fprintf(stderr, "object_eq: object type not handled %s\n",
                     show_object_type(left->typ));
             exit(1);
             break;

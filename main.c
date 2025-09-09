@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
         return EXIT_SUCCESS;
 
     } else if (argc > 2) {
-        fprintf(stderr, "error: expect optional path to program\n");
+        fprintf(stderr, "error: expect only optional path to program\n");
         return EXIT_FAILURE;
     }
     return run_program(argv[1]);

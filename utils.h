@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define DEFAULT_CAPACITY 4
+#define DEFAULT_CAPACITY 8
 
 #define FPRINTF(fp, ...) \
     if (fprintf(fp, __VA_ARGS__) <= 0) \

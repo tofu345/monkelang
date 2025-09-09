@@ -23,7 +23,6 @@ void trace_mark_object(Object* obj) {
     if (obj == NULL || obj->is_marked) return;
     obj->is_marked = true;
 
-    // mark Objects [obj] contains references to.
     switch (obj->typ) {
         case o_Null:
         case o_Integer:
@@ -72,11 +71,12 @@ sweep(Env* env) {
             continue;
         }
 
-        if (obj->typ == o_Closure) {
-            frame_destroy(obj->data.closure->frame, env);
-
-        } else if (obj->typ == o_Error) {
-            continue; // ignore errors
+        switch (obj->typ) {
+            case o_Closure:
+                frame_destroy(obj->data.closure->frame, env);
+                break;
+            case o_Error: continue; // ignore errors
+            default: break;
         }
 
         object_destroy(obj);

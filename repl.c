@@ -15,6 +15,8 @@ void print_parser_errors(FILE* out, Parser* p) {
     for (int i = 0; i < p->errors.length; i++) {
         fprintf(out, "%s\n", p->errors.data[i]);
     }
+    if (p->errors.length >= MAX_ERRORS)
+        fprintf(out, "too many errors, stopping now\n");
 }
 
 BUFFER(Program, Program);
@@ -26,6 +28,7 @@ void repl(FILE* in, FILE* out) {
     Env* env = env_new();
 
     Parser p;
+    p.l = NULL;
     while (1) {
         fprintf(out, ">> ");
         char* input = NULL;
@@ -36,7 +39,15 @@ void repl(FILE* in, FILE* out) {
         }
 
         Lexer l = lexer_new(input);
-        parser_init(&p, &l);
+        if (p.l == NULL)
+            parser_init(&p, &l);
+        else {
+            p.l = &l;
+            StringBufferInit(&p.errors);
+            p.cur_token = lexer_next_token(&l);
+            p.peek_token = lexer_next_token(&l);
+        }
+
         Program prog = parse_program(&p);
         ProgramBufferPush(&progs, prog);
 
@@ -44,6 +55,7 @@ void repl(FILE* in, FILE* out) {
             print_parser_errors(out, &p);
             free(input);
             parser_destroy(&p);
+            p.errors.data = NULL;
             continue;
         }
 
@@ -75,11 +87,7 @@ void run(char* program) {
     }
 
     Env* env = env_new();
-    Object* evaluated = eval_program(&prog, env);
-    if (evaluated->typ != o_Null) {
-        object_fprint(evaluated, stdout);
-        puts("");
-    }
+    eval_program(&prog, env);
 
     parser_destroy(&p);
     program_destroy(&prog);

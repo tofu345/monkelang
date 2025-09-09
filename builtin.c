@@ -3,6 +3,14 @@
 #include "utils.h"
 #include "evaluator.h"
 
+Object* builtin_exit(Env* env, ObjectBuffer* args) {
+    if (args->length > 0)
+        return new_error(env, "builtin exit() takes 0 arguments got %d",
+                args->length);
+
+    exit(0);
+}
+
 Object* builtin_copy(Env* env, ObjectBuffer* args) {
     if (args->length != 1)
         return new_error(env, "builtin copy() takes 1 argument got %d",
@@ -128,6 +136,7 @@ struct {
     const char* name;
     Object obj;
 } builtins[] = {
+    BUILTIN(exit),
     BUILTIN(copy),
     BUILTIN(len),
     BUILTIN(first),

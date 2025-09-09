@@ -1,3 +1,4 @@
+#include "object.h"
 #include "tests.h"
 #include "unity/unity.h"
 #include "ast.h"
@@ -96,19 +97,24 @@ void test_identifier_expression(void) {
 }
 
 static void
-test_integer_literal(Node n, long value) {
+_test_integer_literal(Node n, long value, char* expected) {
     TEST_ASSERT_MESSAGE(n_IntegerLiteral == n.typ, "type not IntegerLiteral");
 
     IntegerLiteral* il = n.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             value, il->value, "wrong IntegerLiteral.value");
 
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            expected, il->tok.literal, "wrong IntegerLiteral.tok.literal");
+}
+
+static void
+test_integer_literal(Node n, long value) {
     char* expected = NULL;
     if (asprintf(&expected, "%ld", value) == -1)
         TEST_FAIL_MESSAGE("no memory");
 
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            expected, il->tok.literal, "wrong IntegerLiteral.tok.literal");
+    _test_integer_literal(n, value, expected);
     free(expected);
 }
 
@@ -224,7 +230,7 @@ test_literal_expression(Node n, L_Test exp, L_Type typ) {
         case l_String:
             test_identifier(n, exp.string);
             break;
-        case l_BooleanLiteral:
+        case l_Boolean:
             test_boolean_literal(n, exp.boolean);
             break;
         default:
@@ -242,7 +248,7 @@ void test_let_statements(void) {
     } tests[] = {
         {"let x = 5;", "x", {5}, l_Integer},
         {"let x = 5.000;", "x", {5.0}, l_Float},
-        {"let y = true;", "y", {true}, l_BooleanLiteral},
+        {"let y = true;", "y", {true}, l_Boolean},
         {"let foobar = y;", "foobar", (L_Test){ .string = "y" }, l_String},
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
@@ -329,9 +335,9 @@ void test_parsing_infix_expressions(void) {
         {"5 < 5;", {5}, "<", {5}, l_Integer},
         {"5 == 5;", {5}, "==", {5}, l_Integer},
         {"5 != 5;", {5}, "!=", {5}, l_Integer},
-        {"true == true", {true}, "==", {true}, l_BooleanLiteral},
-        {"true != false", {true}, "!=", {false}, l_BooleanLiteral},
-        {"false == false", {false}, "==", {false}, l_BooleanLiteral},
+        {"true == true", {true}, "==", {true}, l_Boolean},
+        {"true != false", {true}, "!=", {false}, l_Boolean},
+        {"false == false", {false}, "==", {false}, l_Boolean},
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
     for (int i = 0; i < tests_len; i++) {
@@ -830,7 +836,7 @@ void test_string_literal_expression(void) {
 }
 
 void test_parsing_array_literals(void) {
-    char* input = "[1, 2 * 2, 3 + 3]";
+    char* input = "[1, 2 * 2, 3 + 3, 0xdeadbeef, 0b11011]";
 
     Lexer l = lexer_new(input);
     Parser p;
@@ -846,13 +852,15 @@ void test_parsing_array_literals(void) {
             n_ArrayLiteral == es->expression.typ, "type not ArrayLiteral");
     ArrayLiteral* al = es->expression.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            3, al->elements.length, "wrong length of ArrayLiteral.elements");
+            5, al->elements.length, "wrong length of ArrayLiteral.elements");
 
     test_integer_literal(al->elements.data[0], 1);
     test_infix_expression(al->elements.data[1],
             L_TEST(2), "*", L_TEST(2), l_Integer);
     test_infix_expression(al->elements.data[2],
             L_TEST(3), "+", L_TEST(3), l_Integer);
+    _test_integer_literal(al->elements.data[3], 0xdeadbeef, "0xdeadbeef");
+    _test_integer_literal(al->elements.data[4], 0b11011, "0b11011");
 
     program_destroy(&prog);
     parser_destroy(&p);
@@ -884,6 +892,51 @@ void test_parsing_index_expressions(void) {
     parser_destroy(&p);
 }
 
+// void test_parsing_hash_literals_string_keys(void) {
+//     char* input = "{\"one\": 1, \"two\": 2, \"three\": 3}";
+//
+//     Lexer l = lexer_new(input);
+//     Parser p;
+//     parser_init(&p, &l);
+//     Program prog = parse_program(&p);
+//     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
+//     check_parser_errors(&p);
+//     TEST_ASSERT_EQUAL_INT_MESSAGE(
+//             1, prog.stmts.length, "wrong prog.statements length");
+//
+//     ExpressionStatement* es = prog.stmts.data[0].obj;
+//     TEST_ASSERT_MESSAGE(
+//             n_HashLiteral == es->expression.typ,
+//             "type not HashLiteral");
+//     HashLiteral* hl = es->expression.obj;
+//
+//     TEST_ASSERT_EQUAL_INT_MESSAGE(
+//             3, hl->pairs->length, "wrong HashLiteral.pairs length");
+//
+//     struct {
+//         char* key;
+//         long value;
+//     } expected[] = {
+//         {"one", 1},
+//         {"two", 2},
+//         {"three", 3},
+//     };
+//     int expected_len = sizeof(expected) / sizeof(expected[0]);
+//     for (int i = 0; i < hl->pairs->capacity; i++) {
+//         if (hl->pairs->entries->value == NULL) continue;
+//         // Object* key = hl->pairs->entries[i].key;
+//         Object* val = hl->pairs->entries[i].value;
+//
+//         // TEST_ASSERT_MESSAGE(
+//         //         n_StringLiteral == pairs->entries[i].key,
+//         //         "type not StringLiteral");
+//
+//     }
+//
+//     program_destroy(&prog);
+//     parser_destroy(&p);
+// }
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_let_statements);
@@ -903,5 +956,6 @@ int main(void) {
     RUN_TEST(test_string_literal_expression);
     RUN_TEST(test_parsing_array_literals);
     RUN_TEST(test_parsing_index_expressions);
+    // RUN_TEST(test_parsing_hash_literals_string_keys);
     return UNITY_END();
 }

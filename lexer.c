@@ -57,11 +57,11 @@ static bool is_digit(char ch) {
 
 static bool is_hex_digit(char ch) {
     return ('0' <= ch && ch <= '9') || ('a' <= ch && ch <= 'f')
-        || ('A' <= ch && ch <= 'F') || ch == 'x';
+        || ('A' <= ch && ch <= 'F');
 }
 
 static bool is_binary_digit(char ch) {
-    return ch == '0' || ch == '1' || ch == 'b';
+    return ch == '0' || ch == '1';
 }
 
 static void skip_whitespace(Lexer* l) {
@@ -78,16 +78,17 @@ static char peek_char(Lexer *l) {
     }
 }
 
-static char* copy_string(const char* str, int from, int len) {
+static char* copy_string(Lexer* l, int from, int len) {
     char* ident = malloc((len + 1) * sizeof(char));
     if (ident == NULL) ALLOC_FAIL();
     for (int i = 0; i < len; i++) {
-        ident[i] = str[from + i];
+        ident[i] = l->input[from + i];
     }
     ident[len] = '\0';
     return ident;
 }
 
+// read_string till closing quote, if not present return NULL.
 static char* read_string(Lexer* l) {
     read_char(l);
     int position = l->position;
@@ -97,7 +98,7 @@ static char* read_string(Lexer* l) {
         len++;
     }
     if (l->ch != '"') return NULL;
-    return copy_string(l->input, position, len);
+    return copy_string(l, position, len);
 }
 
 static char* read_identifier(Lexer* l) {
@@ -107,28 +108,37 @@ static char* read_identifier(Lexer* l) {
         read_char(l);
         len++;
     }
-    return copy_string(l->input, position, len);
+    return copy_string(l, position, len);
 }
 
 static char* read_digit(Lexer* l, TokenType* t) {
-    *t = t_Int;
-
-    char peek = peek_char(l);
-    bool (*check_fn) (char) = &is_digit;
-    if (peek == 'x') check_fn = &is_hex_digit;
-    else if (peek == 'b') check_fn = &is_binary_digit;
-
-    bool is_float = false;
     int position = l->position;
     int len = 0;
-    while (check_fn(l->ch)) {
+
+    char peek = peek_char(l);
+    bool (*valid) (char) = &is_digit;
+    if (l->ch == '0') {
+        if (peek == 'x' || peek == 'X')
+            valid = &is_hex_digit;
+        else if (peek == 'b' || peek == 'B')
+            valid = &is_binary_digit;
+    }
+    // skip 0x | 0b
+    if (valid != &is_digit) {
+        read_char(l);
+        read_char(l);
+        len = 2;
+    }
+
+    bool is_float = false;
+    while (valid(l->ch)) {
         is_float = is_float || l->ch == '.';
         read_char(l);
         len++;
     }
-    if (is_float) *t = t_Float;
+    *t = is_float ? t_Float : t_Int;
 
-    return copy_string(l->input, position, len);
+    return copy_string(l, position, len);
 }
 
 Token lexer_next_token(Lexer* l) {
@@ -186,6 +196,9 @@ Token lexer_next_token(Lexer* l) {
         break;
     case ';':
         new_token(&tok, t_Semicolon, l->ch);
+        break;
+    case ':':
+        new_token(&tok, t_Colon, l->ch);
         break;
     case ',':
         new_token(&tok, t_Comma, l->ch);

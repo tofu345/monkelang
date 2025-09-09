@@ -6,7 +6,7 @@ typedef enum {
     l_Integer,
     l_Float,
     l_String,
-    l_BooleanLiteral,
+    l_Boolean,
 } L_Type;
 
 typedef union {

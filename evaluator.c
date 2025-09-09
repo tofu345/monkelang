@@ -10,8 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-const Object o_true = (Object){ o_Boolean, false, {.boolean = true}};
-const Object o_false = (Object){ o_Boolean, false, {.boolean = false}};
+const Object o_true = (Object){ o_Boolean, .data = {.boolean = true}};
+const Object o_false = (Object){ o_Boolean, .data = {.boolean = false}};
 const Object o_null = (Object){ o_Null };
 
 #define TRUE (Object*)&o_true
@@ -60,7 +60,6 @@ Object* object_copy(Env* env, Object* obj) {
     }
 }
 
-
 Object* new_error(Env* env, char* format, ...) {
     va_list args;
     va_start(args, format);
@@ -87,7 +86,7 @@ eval_integer_literal(Env* env, IntegerLiteral* il) {
 
 static Object*
 eval_float_literal(Env* env, FloatLiteral* fl) {
-    return OBJ(o_Float, fl->value);
+    return OBJ(o_Float, .floating = fl->value);
 }
 
 static Object*
@@ -98,10 +97,10 @@ eval_string_literal(Env* env, StringLiteral* sl) {
     if (len > 0) {
         str->capacity = power_of_2_ceil(len + 1);
         str->data = allocate(str->capacity * sizeof(char));
-        memcpy(str->data, sl->tok.literal,
-                str->capacity * sizeof(char));
+        memcpy(str->data, sl->tok.literal, len * sizeof(char));
         str->data[len] = '\0';
-    } else CharBufferInit(str);
+    } else
+        CharBufferInit(str);
     str->length = len;
     return OBJ(o_String, .string = str);
 }
@@ -232,7 +231,7 @@ eval_float_infix_expression(Env* env, char* op, Object* left, Object* right) {
                 show_object_type(right->typ));
     }
 
-    return OBJ(o_Float, left_val);
+    return OBJ(o_Float, .floating = left_val);
 }
 
 static Object*
@@ -253,6 +252,7 @@ eval_string_infix_expression(Env* env, char* op, Object* left, Object* right) {
             left_val->length * sizeof(char));
     memcpy(result->data + left_val->length, right_val->data,
             right_val->length * sizeof(char));
+    result->data[result->length] = '\0';
 
     return OBJ(o_String, .string = result);
 }
@@ -315,10 +315,10 @@ eval_infix_expression(Env* env, InfixExpression* ie) {
         return eval_string_infix_expression(env, ie->op, left, right);
 
     } else if (STR_EQ("==", ie->op)) {
-        return bool_to_object(object_cmp(left, right));
+        return bool_to_object(object_eq(left, right));
 
     } else if (STR_EQ("!=", ie->op)) {
-        return bool_to_object(!object_cmp(left, right));
+        return bool_to_object(!object_eq(left, right));
 
     } else if (left->typ != right->typ) {
         return new_error(env, "type mismatch: %s %s %s",
@@ -365,7 +365,8 @@ eval_expressions(Env* env, NodeBuffer args) {
     for (int i = 0; i < args.length; i++) {
         Object* result = eval(env, args.data[i]);
         if (IS_ERROR(result)) {
-            env->tracking.length -= i; // untrack previous results
+            // untrack previous results
+            env->tracking.length -= i;
             if (results.length == 0)
                 ObjectBufferPush(&results, result);
             else {
@@ -375,10 +376,12 @@ eval_expressions(Env* env, NodeBuffer args) {
             return results;
         }
         ObjectBufferPush(&results, result);
+        // keep in scope
         track(env, result);
     }
 
-    env->tracking.length -= args.length; // untrack results
+    // untrack results
+    env->tracking.length -= args.length;
 
     // for (int i = 0; i < results.length; i++) {
     //     node_fprint(args.data[i], stdout);
@@ -386,6 +389,7 @@ eval_expressions(Env* env, NodeBuffer args) {
     //     object_fprint(results.data[i], stdout);
     //     puts("");
     // }
+    // puts("");
 
     return results;
 }
@@ -467,21 +471,18 @@ captures_in(Node n, ParamBuffer* buf) {
 // remove new frame and return result
 static Object*
 apply_function(Env* env, Object* fn, ObjectBuffer* args, char* fn_name) {
-    FunctionLiteral* func;
+    FunctionLiteral* func; // which fn to run
     Object* result;
-    Frame *previous,
+    Frame *previous = env->current,
           *new_frame = frame_new(env);
 
     if (fn->typ == o_Function) {
         func = fn->data.func;
         new_frame->parent = env->current;
-        previous = env->current;
         env->current = new_frame;
 
     } else if (fn->typ == o_Closure) {
         func = fn->data.closure->func;
-        previous = env->current;
-        // can only perform [env_set()] on [env->current]
         env->current = new_frame;
         new_frame->parent = fn->data.closure->frame;
 
@@ -535,7 +536,8 @@ apply_function(Env* env, Object* fn, ObjectBuffer* args, char* fn_name) {
 
     env->current = previous;
     frame_destroy(new_frame, env);
-    trace_mark_object(result);
+    if (!IS_NULL(result))
+        trace_mark_object(result);
     mark_and_sweep(env);
 
     return result;
@@ -546,7 +548,8 @@ eval_call_expression(Env* env, CallExpression* ce) {
     char* fn_name = ce->function.typ == n_Identifier
         ? ((Identifier*)ce->function.obj)->tok.literal
         : "<anonymous>";
-    Object *result, *function = eval(env, ce->function);
+    Object *result,
+           *function = eval(env, ce->function);
     ObjectBuffer args = eval_expressions(env, ce->args);
     if (args.length == 1 && IS_ERROR(args.data[0])) {
         Object* err = args.data[0];
@@ -589,8 +592,8 @@ eval_index_expression(Env* env, Object* left, Object* index) {
     if (left->typ == o_Array && index->typ == o_Integer) {
         return eval_array_index_expression(left, index);
     } else {
-        return new_error(env, "index operator not supported: %s",
-                show_object_type(left->typ));
+        return new_error(env, "index operator not supported for '%s[%s]'",
+                show_object_type(left->typ), show_object_type(index->typ));
     }
 }
 

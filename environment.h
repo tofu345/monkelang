@@ -40,14 +40,15 @@ Frame* frame_new(Env* env);
 void frame_destroy(Frame* frame, Env* env);
 
 // based on boot.dev: c memory mgmt course - https://www.youtube.com/watch?v=rJrd2QMVbGM
-//
-// To run when: an allocation fails, or a function returns
 void mark_and_sweep(Env* env);
+
+// mark [obj] and Objects it contains references to.
 void trace_mark_object(Object* obj);
 
+// search for [name] in [env->current] and its [parents]
 Object* env_get(Env* env, char* name);
 
-// add to [env->current] table, and append to [env->objects].
+// add to [env->current] table with [name] and append to [env->objects].
 void env_set(Env* env, char* name, Object* obj);
 
 // add to [env->tracking]

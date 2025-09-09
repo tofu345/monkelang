@@ -20,16 +20,12 @@
     void name##Buffer##Init(name##Buffer* buf) {                              \
         buf->length = 0;                                                      \
         buf->data = NULL;                                                     \
-        buf->capacity = 0;                                                    \
+        buf->capacity = 4;                                                    \
     }                                                                         \
                                                                               \
     void name##BufferPush(name##Buffer* buf, typ val) {                       \
-        if (buf->length >= buf->capacity) {                                   \
-            int capacity;                                                     \
-            if (buf->data == NULL)                                            \
-                capacity = DEFAULT_CAPACITY;                                  \
-            else                                                              \
-                capacity = power_of_2_ceil(buf->capacity * 2);                \
+        if (buf->data == NULL || buf->length >= buf->capacity) {              \
+            int capacity = power_of_2_ceil(buf->capacity * 2);                \
             buf->data = reallocate(buf->data, capacity * sizeof(typ));        \
             buf->capacity = capacity;                                         \
         }                                                                     \

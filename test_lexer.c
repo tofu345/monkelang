@@ -35,6 +35,9 @@ if (5 < 10) {\
 \"foobar\"\
 \"foo bar\"\
 [1, 2];\
+0xdeadbeef;\
+0b11011;\
+{\"foo\": \"bar\"};\
 ";
 
     struct Test {
@@ -121,6 +124,16 @@ if (5 < 10) {\
         {t_Comma, ","},
         {t_Int, "2"},
         {t_Rbracket, "]"},
+        {t_Semicolon, ";"},
+        {t_Int, "0xdeadbeef"},
+        {t_Semicolon, ";"},
+        {t_Int, "0b11011"},
+        {t_Semicolon, ";"},
+        {t_Lbrace, "{"},
+        {t_String, "foo"},
+        {t_Colon, ":"},
+        {t_String, "bar"},
+        {t_Rbrace, "}"},
         {t_Semicolon, ";"},
 		{t_Eof, ""},
     };
