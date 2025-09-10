@@ -171,8 +171,8 @@ parse_integer_literal(Parser* p) {
 
     if (*endptr != '\0' || errno == ERANGE || errno == EINVAL) {
         char* msg = NULL;
-        int err = asprintf(&msg, 
-                ":%d,%d: could not parse '%s' as integer", 
+        int err = asprintf(&msg,
+                ":%d,%d: could not parse '%s' as integer",
                 int_lit->tok.line, int_lit->tok.col,
                 lit);
         if (err == -1) ALLOC_FAIL();
@@ -195,7 +195,7 @@ parse_float_literal(Parser* p) {
     double value = strtod(fl_lit->tok.literal, &endptr);
     if (*endptr != '\0' || errno == ERANGE || errno == EINVAL) {
         char* msg = NULL;
-        int err = asprintf(&msg, 
+        int err = asprintf(&msg,
                 ":%d,%d: could not parse '%s' as float",
                 fl_lit->tok.line, fl_lit->tok.col,
                 fl_lit->tok.literal);
@@ -385,6 +385,60 @@ parse_array_literal(Parser* p) {
         return (Node){};
     }
     return NODE(n_ArrayLiteral, al);
+}
+
+static Node
+parse_hash_literal(Parser* p) {
+    HashLiteral* hl = allocate(sizeof(HashLiteral));
+    hl->tok = p->cur_token;
+    PairBufferInit(&hl->pairs);
+
+    while (!peek_token_is(p, t_Rbrace)) {
+        next_token(p);
+
+        Node key = parse_expression(p, p_Lowest);
+        if (key.obj == NULL) {
+            node_destroy(NODE(n_HashLiteral, hl));
+            return (Node){};
+        }
+
+        if (!expect_peek(p, t_Colon)) {
+            node_destroy(key);
+            node_destroy(NODE(n_HashLiteral, hl));
+            return (Node){};
+        }
+
+        free(p->cur_token.literal); // ':' tok
+        next_token(p);
+
+        Node value = parse_expression(p, p_Lowest);
+        if (value.obj == NULL) {
+            free(p->cur_token.literal);
+            node_destroy(key);
+            node_destroy(NODE(n_HashLiteral, hl));
+            return (Node){};
+        }
+
+        Pair pair = { key, value };
+        PairBufferPush(&hl->pairs, pair);
+
+        if (peek_token_is(p, t_Rbrace))
+            break;
+
+        if (!expect_peek(p, t_Comma)) {
+            node_destroy(NODE(n_HashLiteral, hl));
+            return (Node){};
+        }
+        free(p->cur_token.literal);
+    }
+
+    if (!expect_peek(p, t_Rbrace)) {
+        node_destroy(NODE(n_HashLiteral, hl));
+        return (Node){};
+    }
+    free(p->cur_token.literal);
+
+    return NODE(n_HashLiteral, hl);
 }
 
 static Node
@@ -627,6 +681,7 @@ void parser_init(Parser* p, Lexer* l) {
     p->prefix_parse_fns[t_Function] = parse_function_literal;
     p->prefix_parse_fns[t_String] = parse_string;
     p->prefix_parse_fns[t_Lbracket] = parse_array_literal;
+    p->prefix_parse_fns[t_Lbrace] = parse_hash_literal;
 
     memset(p->infix_parse_fns, 0, t_Return * sizeof(InfixParseFn));
     p->infix_parse_fns[t_Plus] = parse_infix_expression;

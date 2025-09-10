@@ -3,6 +3,7 @@
 #include "buffer.h"
 #include "utils.h"
 #include "token.h"
+#include "hash-table/ht.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -20,6 +21,7 @@ enum NodeType {
     n_FunctionLiteral,
     n_StringLiteral,
     n_ArrayLiteral,
+    n_HashLiteral,
     n_PrefixExpression,
     n_InfixExpression,
     n_IfExpression,
@@ -156,3 +158,15 @@ typedef struct {
     Node left;
     Node index;
 } IndexExpression;
+
+typedef struct {
+    Node key;
+    Node val;
+} Pair;
+
+BUFFER(Pair, Pair);
+
+typedef struct {
+    Token tok; // the '{' token
+    PairBuffer pairs;
+} HashLiteral;

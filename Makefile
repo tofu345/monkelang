@@ -13,11 +13,11 @@ test_lexer: .FORCE
 test_parser: .FORCE
 	@ gcc ${CFLAGS} -o build/test_parser.out \
 		unity/* test_parser.c parser.c parser_tracing.c ast.c lexer.c \
-		token.c utils.c
+		token.c utils.c object.c hash-table/ht.c
 
 test_ast: .FORCE
 	@ gcc ${CFLAGS} -o build/test_ast.out \
-		unity/* test_ast.c ast.c token.c utils.c
+		unity/* test_ast.c ast.c token.c utils.c object.c hash-table/ht.c
 
 test_evaluator: .FORCE
 	@ gcc ${CFLAGS} -o build/test_evaluator.out \

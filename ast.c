@@ -13,6 +13,7 @@
 
 DEFINE_BUFFER(Param, Identifier*);
 DEFINE_BUFFER(Node, Node);
+DEFINE_BUFFER(Pair, Pair);
 
 char* token_literal(const Node n) {
     // since the first element of every `node.obj` is a token.
@@ -160,6 +161,30 @@ fprint_index_expression(IndexExpression* ie, FILE* fp) {
     return 0;
 }
 
+static int
+fprint_hash_literal_entry(Node key, Node value, FILE* fp) {
+    NODE_FPRINT(fp, key);
+    FPRINTF(fp, ": ");
+    NODE_FPRINT(fp, value);
+    return 0;
+}
+
+static int
+fprint_hash_literal(HashLiteral* hl, FILE* fp) {
+    FPRINTF(fp, "{");
+    for (int i = 0; i < hl->pairs.length - 1; i++) {
+        Pair* pair = &hl->pairs.data[i];
+        fprint_hash_literal_entry(pair->key, pair->val, fp);
+        FPRINTF(fp, ", ");
+    }
+    if (hl->pairs.length > 1) {
+        Pair* pair = &hl->pairs.data[hl->pairs.length - 1];
+        fprint_hash_literal_entry(pair->key, pair->val, fp);
+    }
+    FPRINTF(fp, "}");
+    return 0;
+}
+
 int node_fprint(const Node n, FILE* fp) {
     if (n.obj == NULL) return 0;
 
@@ -208,6 +233,9 @@ int node_fprint(const Node n, FILE* fp) {
 
         case n_IndexExpression:
             return fprint_index_expression(n.obj, fp);
+
+        case n_HashLiteral:
+            return fprint_hash_literal(n.obj, fp);
 
         default:
             fprintf(stderr, "node_fprint: node type not handled %d\n", n.typ);
@@ -320,6 +348,18 @@ destroy_index_expression(IndexExpression* ie) {
     free(ie);
 }
 
+static void
+destroy_hash_literal(HashLiteral* hl) {
+    free(hl->tok.literal);
+    for (int i = 0; i < hl->pairs.length - 1; i++) {
+        Pair* pair = &hl->pairs.data[i];
+        node_destroy(pair->key);
+        node_destroy(pair->val);
+    }
+    free(hl->pairs.data);
+    free(hl);
+}
+
 void node_destroy(Node n) {
     if (n.obj == NULL) return;
 
@@ -356,6 +396,9 @@ void node_destroy(Node n) {
 
         case n_IndexExpression:
             return destroy_index_expression(n.obj);
+
+        case n_HashLiteral:
+            return destroy_hash_literal(n.obj);
 
         default:
             // since first field of `n.obj` is `Token`

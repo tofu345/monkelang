@@ -20,6 +20,7 @@ typedef enum __attribute__ ((__packed__)) {
 	t_Eq,
 	t_Not_eq,
     // Delimeters
+    t_Colon,
 	t_Comma,
 	t_Semicolon,
 	t_Lparen,

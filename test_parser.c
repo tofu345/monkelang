@@ -1,4 +1,3 @@
-#include "object.h"
 #include "tests.h"
 #include "unity/unity.h"
 #include "ast.h"
@@ -22,7 +21,7 @@ static void check_parser_errors(Parser* p) {
 
     printf("parser had %d errors\n", p->errors.length);
     for (int i = 0; i < p->errors.length; i++) {
-        printf("parser error: %s\n", p->errors.data[i]);
+        printf("parser error%s\n", p->errors.data[i]);
     }
     TEST_FAIL();
 }
@@ -892,50 +891,115 @@ void test_parsing_index_expressions(void) {
     parser_destroy(&p);
 }
 
-// void test_parsing_hash_literals_string_keys(void) {
-//     char* input = "{\"one\": 1, \"two\": 2, \"three\": 3}";
-//
-//     Lexer l = lexer_new(input);
-//     Parser p;
-//     parser_init(&p, &l);
-//     Program prog = parse_program(&p);
-//     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
-//     check_parser_errors(&p);
-//     TEST_ASSERT_EQUAL_INT_MESSAGE(
-//             1, prog.stmts.length, "wrong prog.statements length");
-//
-//     ExpressionStatement* es = prog.stmts.data[0].obj;
-//     TEST_ASSERT_MESSAGE(
-//             n_HashLiteral == es->expression.typ,
-//             "type not HashLiteral");
-//     HashLiteral* hl = es->expression.obj;
-//
-//     TEST_ASSERT_EQUAL_INT_MESSAGE(
-//             3, hl->pairs->length, "wrong HashLiteral.pairs length");
-//
-//     struct {
-//         char* key;
-//         long value;
-//     } expected[] = {
-//         {"one", 1},
-//         {"two", 2},
-//         {"three", 3},
-//     };
-//     int expected_len = sizeof(expected) / sizeof(expected[0]);
-//     for (int i = 0; i < hl->pairs->capacity; i++) {
-//         if (hl->pairs->entries->value == NULL) continue;
-//         // Object* key = hl->pairs->entries[i].key;
-//         Object* val = hl->pairs->entries[i].value;
-//
-//         // TEST_ASSERT_MESSAGE(
-//         //         n_StringLiteral == pairs->entries[i].key,
-//         //         "type not StringLiteral");
-//
-//     }
-//
-//     program_destroy(&prog);
-//     parser_destroy(&p);
-// }
+void test_parsing_hash_literals_string_keys(void) {
+    char* input = "{\"one\": 1, \"two\": 2, \"three\": 3}";
+
+    Lexer l = lexer_new(input);
+    Parser p;
+    parser_init(&p, &l);
+    Program prog = parse_program(&p);
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
+    check_parser_errors(&p);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            1, prog.stmts.length, "wrong prog.statements length");
+
+    ExpressionStatement* es = prog.stmts.data[0].obj;
+    TEST_ASSERT_MESSAGE(
+            n_HashLiteral == es->expression.typ,
+            "type not HashLiteral");
+    HashLiteral* hl = es->expression.obj;
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            3, hl->pairs.length, "wrong HashLiteral.pairs length");
+
+    struct {
+        char* key;
+        long value;
+    } expected[] = {
+        {"one", 1},
+        {"two", 2},
+        {"three", 3},
+    };
+    int expected_len = sizeof(expected) / sizeof(expected[0]);
+    for (int i = 0; i < expected_len; i++) {
+        Pair* pair = &hl->pairs.data[i];
+        TEST_ASSERT_NOT_NULL_MESSAGE(pair->val.obj, "value not found");
+        test_integer_literal(pair->val, expected[i].value);
+    }
+
+    program_destroy(&prog);
+    parser_destroy(&p);
+}
+
+void test_parsing_empty_hash_literal(void) {
+    char* input = "{}";
+
+    Lexer l = lexer_new(input);
+    Parser p;
+    parser_init(&p, &l);
+    Program prog = parse_program(&p);
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
+    check_parser_errors(&p);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            1, prog.stmts.length, "wrong prog.statements length");
+
+    ExpressionStatement* es = prog.stmts.data[0].obj;
+    TEST_ASSERT_MESSAGE(
+            n_HashLiteral == es->expression.typ,
+            "type not HashLiteral");
+    HashLiteral* hl = es->expression.obj;
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            0, hl->pairs.length, "wrong HashLiteral.pairs length");
+
+    program_destroy(&prog);
+    parser_destroy(&p);
+}
+
+void test_parsing_hash_literals_with_expressions(void) {
+    char* input = "{\"one\": 0 + 1, \"two\": 10 - 8, \"three\": 15 / 5}";
+
+    Lexer l = lexer_new(input);
+    Parser p;
+    parser_init(&p, &l);
+    Program prog = parse_program(&p);
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
+    check_parser_errors(&p);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            1, prog.stmts.length, "wrong prog.statements length");
+
+    ExpressionStatement* es = prog.stmts.data[0].obj;
+    TEST_ASSERT_MESSAGE(
+            n_HashLiteral == es->expression.typ,
+            "type not HashLiteral");
+    HashLiteral* hl = es->expression.obj;
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            3, hl->pairs.length, "wrong HashLiteral.pairs length");
+
+    struct Test {
+        char* key;
+        long left;
+        char* op;
+        long right;
+    } expected[] = {
+        {"one", 0, "+", 1},
+        {"two", 10, "-", 8},
+        {"three", 15, "/", 5},
+    };
+    int expected_len = sizeof(expected) / sizeof(expected[0]);
+    for (int i = 0; i < expected_len; i++) {
+        struct Test test = expected[i];
+        Pair* pair = &hl->pairs.data[i];
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(test.key,
+                ((StringLiteral*)pair->key.obj)->tok.literal, "value not found");
+        test_infix_expression(pair->val,
+                L_TEST(test.left), test.op, L_TEST(test.right), l_Integer);
+    }
+
+    program_destroy(&prog);
+    parser_destroy(&p);
+}
 
 int main(void) {
     UNITY_BEGIN();
@@ -956,6 +1020,8 @@ int main(void) {
     RUN_TEST(test_string_literal_expression);
     RUN_TEST(test_parsing_array_literals);
     RUN_TEST(test_parsing_index_expressions);
-    // RUN_TEST(test_parsing_hash_literals_string_keys);
+    RUN_TEST(test_parsing_hash_literals_string_keys);
+    RUN_TEST(test_parsing_empty_hash_literal);
+    RUN_TEST(test_parsing_hash_literals_with_expressions);
     return UNITY_END();
 }

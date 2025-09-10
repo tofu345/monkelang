@@ -26,6 +26,7 @@
     void name##BufferPush(name##Buffer* buf, typ val) {                       \
         if (buf->data == NULL || buf->length >= buf->capacity) {              \
             int capacity = power_of_2_ceil(buf->capacity * 2);                \
+            if (capacity < buf->capacity) ALLOC_FAIL(); /* overflow */        \
             buf->data = reallocate(buf->data, capacity * sizeof(typ));        \
             buf->capacity = capacity;                                         \
         }                                                                     \
