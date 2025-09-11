@@ -368,7 +368,7 @@ parse_function_literal(Parser* p) {
 }
 
 static Node
-parse_string(Parser* p) {
+parse_string_literal(Parser* p) {
     StringLiteral* sl = allocate(sizeof(StringLiteral));
     sl->tok = p->cur_token;
     return NODE(n_StringLiteral, sl);
@@ -679,7 +679,7 @@ void parser_init(Parser* p, Lexer* l) {
     p->prefix_parse_fns[t_Lparen] = parse_grouped_expression;
     p->prefix_parse_fns[t_If] = parse_if_expression;
     p->prefix_parse_fns[t_Function] = parse_function_literal;
-    p->prefix_parse_fns[t_String] = parse_string;
+    p->prefix_parse_fns[t_String] = parse_string_literal;
     p->prefix_parse_fns[t_Lbracket] = parse_array_literal;
     p->prefix_parse_fns[t_Lbrace] = parse_hash_literal;
 

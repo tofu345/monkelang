@@ -587,14 +587,71 @@ eval_array_index_expression(Object* left, Object* index) {
     return arr->data[idx];
 }
 
+static char*
+hash_key(Object* key) {
+    switch (key->typ) {
+        case o_String: return key->data.string->data;
+        default: return NULL;
+    }
+}
+
+static Object*
+eval_hash_index_expression(Env* env, Object* left, Object* index) {
+    ht* pairs = left->data.hash;
+
+    char* key = hash_key(index);
+    if (key == NULL) {
+        return new_error(env, "unusable as hash key: %s",
+                show_object_type(index->typ));
+    }
+
+    Object* val = ht_get(pairs, key);
+    if (val == NULL) {
+        return NULL_OBJ();
+    }
+
+    return val;
+}
+
 static Object*
 eval_index_expression(Env* env, Object* left, Object* index) {
     if (left->typ == o_Array && index->typ == o_Integer) {
         return eval_array_index_expression(left, index);
+    } else if (left->typ == o_Hash) {
+        return eval_hash_index_expression(env, left, index);
     } else {
         return new_error(env, "index operator not supported for '%s[%s]'",
                 show_object_type(left->typ), show_object_type(index->typ));
     }
+}
+
+static Object*
+eval_hash_literal(Env* env, HashLiteral* hl) {
+    ht* pairs = ht_create();
+    for (int i = 0; i < hl->pairs.length; i++) {
+        Object* key_obj = eval(env, hl->pairs.data[i].key);
+        if (IS_NULL(key_obj)) {
+            ht_destroy(pairs);
+            return key_obj;
+        }
+
+        char* key = hash_key(key_obj);
+        if (key == NULL) {
+            ht_destroy(pairs);
+            return new_error(env, "unusable as hash key: %s",
+                    show_object_type(key_obj->typ));
+        }
+
+        Object* value = eval(env, hl->pairs.data[i].val);
+        if (IS_NULL(value)) {
+            ht_destroy(pairs);
+            return value;
+        }
+
+        if (ht_set(pairs, key, value) == NULL) ALLOC_FAIL();
+    }
+
+    return OBJ(o_Hash, .hash = pairs);
 }
 
 Object* eval(Env* env, Node n) {
@@ -631,6 +688,8 @@ Object* eval(Env* env, Node n) {
             }
         case n_FunctionLiteral:
             return OBJ(o_Function, .func = n.obj);
+        case n_HashLiteral:
+            return eval_hash_literal(env, n.obj);
         case n_PrefixExpression:
             return eval_prefix_expression(env, n.obj);
         case n_InfixExpression:

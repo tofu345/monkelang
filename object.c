@@ -32,6 +32,9 @@ void object_destroy(Object* o) {
         case o_Error:
             free(o->data.error_msg);
             return;
+        case o_Hash:
+            ht_destroy(o->data.hash);
+            return;
         default:
             printf("object_destroy: %d typ not handled\n", o->typ);
             exit(1);
@@ -102,6 +105,29 @@ fprint_array(ObjectData o, FILE* fp) {
     return 0;
 }
 
+static int
+fprint_hash_literal_entry(const char* key, Object* value, FILE* fp) {
+    FPRINTF(fp, "%s: ", key);
+    object_fprint(value, fp);
+    return 0;
+}
+
+static int
+fprint_hash(ObjectData o, FILE* fp) {
+    FPRINTF(fp, "{");
+    ht* tbl = o.hash;
+    hti it = ht_iterator(tbl);
+    for (size_t i = 0; i < tbl->length - 1; i++) {
+        if (!ht_next(&it)) break;
+        fprint_hash_literal_entry(it.key, it.value, fp);
+        FPRINTF(fp, ", ");
+    }
+    if (tbl->length > 1 && ht_next(&it))
+        fprint_hash_literal_entry(it.key, it.value, fp);
+    FPRINTF(fp, "}");
+    return 0;
+}
+
 int object_fprint(Object* o, FILE* fp) {
     switch (o->typ) {
         case o_Integer:
@@ -120,10 +146,17 @@ int object_fprint(Object* o, FILE* fp) {
         case o_Function:
         case o_Closure:
             return fprint_function(fp);
+        case o_ReturnValue:
+            FPRINTF(fp, "return ");
+            object_fprint(to_return_value(o), fp);
+            from_return_value(o);
+            return 0;
         case o_String:
             return fprintf_string(o->data, fp);
         case o_Array:
             return fprint_array(o->data, fp);
+        case o_Hash:
+            return fprint_hash(o->data, fp);
         default:
             fprintf(stderr, "object_fprint: object type not handled %d\n",
                     o->typ);
@@ -147,7 +180,7 @@ bool object_eq(Object* left, Object* right) {
             return !strcmp(left->data.error_msg, right->data.error_msg);
         case o_ReturnValue:
             return object_eq(from_return_value(left),
-                    from_return_value(right)); 
+                    from_return_value(right));
         case o_String:
             return !strcmp(left->data.string->data, right->data.string->data);
         case o_Array:
@@ -195,6 +228,7 @@ const char* object_types[] = {
     "Closure",
     "String",
     "Array",
+    "Hash",
 };
 
 const char* show_object_type(ObjectType t) {

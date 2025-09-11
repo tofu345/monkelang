@@ -23,7 +23,7 @@ check_parser_errors(Parser* p) {
 
     printf("parser had %d errors\n", p->errors.length);
     for (int i = 0; i < p->errors.length; i++) {
-        printf("parser error: %s\n", p->errors.data[i]);
+        printf("%s\n", p->errors.data[i]);
     }
     TEST_FAIL();
 }
@@ -256,6 +256,10 @@ void test_error_handling(void) {
         {
             "\"Hello\" - \"World\"",
             "unknown operator: String - String",
+        },
+        {
+            "{\"name\": \"Monkey\"}[fn(x) { x }];",
+            "unusable as hash key: Function",
         },
     };
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
@@ -517,6 +521,100 @@ void test_array_index_expressions(void) {
     }
 }
 
+void test_hash_literals(void) {
+    char* input = "let two = \"two\";\n\
+    {\n\
+        \"one\": 10 - 9,\n\
+        two: 1 + 1,\n\
+        \"thr\" + \"ee\": 6 / 2,\n\
+        \"4\": 4,\n\
+        \"true\": 5,\n\
+        \"false\": 6\n\
+    }";
+    Env* env = env_new();
+    Object* evaluated = test_eval(input, env);
+
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            show_object_type(o_Hash), show_object_type(evaluated->typ),
+            "type not Hash");
+
+    ht* pairs = evaluated->data.hash;
+
+    struct Test {
+        char* key;
+        long value;
+    } expected[] = {
+        {"one", 1},
+        {"two", 2},
+        {"three", 3},
+        {"4", 4},
+        {"true", 5},
+        {"false", 6},
+    };
+    int expected_len = sizeof(expected) / sizeof(expected[0]);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            expected_len, pairs->length, "wrong number of elements");
+
+    for (int i = 0; i < expected_len; i++) {
+        Object* val = ht_get(pairs, expected[i].key);
+        if (val == NULL)
+            TEST_FAIL_MESSAGE("no pair for given key in Pairs");
+
+        test_integer_object(val, expected[i].value);
+    }
+
+    env_destroy(env);
+}
+
+void test_hash_index_expressions(void) {
+    struct Test {
+        char* input;
+        long expected;
+    } tests[] = {
+        {
+            "{\"foo\": 5}[\"foo\"]",
+            5,
+        },
+        {
+            "{\"foo\": 5}[\"bar\"]",
+            0, // NULL
+        },
+        {
+            "let key = \"foo\"; {\"foo\": 5}[key]",
+            5,
+        },
+        {
+            "{}[\"foo\"]",
+            0, // NULL
+        },
+        {
+            "{\"5\": 5}[\"5\"]",
+            5,
+        },
+        {
+            "{\"true\": 5}[\"true\"]",
+            5,
+        },
+        {
+            "{\"false\": 5}[\"false\"]",
+            5,
+        },
+    };
+    size_t tests_len = sizeof(tests) / sizeof(tests[0]);
+    for (size_t i = 0; i < tests_len; i++) {
+        struct Test test = tests[i];
+        Env* env = env_new();
+        Object* evaluated = test_eval(test.input, env);
+        if (test.expected == 0) {
+            test_null_object(evaluated);
+        } else {
+            test_integer_object(evaluated, test.expected);
+        }
+        env_destroy(env);
+    }
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_eval_integer_expression);
@@ -533,5 +631,7 @@ int main(void) {
     RUN_TEST(test_builtin_function);
     RUN_TEST(test_array_literals);
     RUN_TEST(test_array_index_expressions);
+    RUN_TEST(test_hash_literals);
+    RUN_TEST(test_hash_index_expressions);
     return UNITY_END();
 }

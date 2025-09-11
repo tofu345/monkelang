@@ -121,9 +121,10 @@ Object* builtin_push(Env* env, ObjectBuffer* args) {
 }
 
 Object* builtin_puts([[maybe_unused]] Env* env, ObjectBuffer* args) {
-    for (int i = 0; i < args->length; i++)
+    for (int i = 0; i < args->length; i++) {
         object_fprint(args->data[i], stdout);
-    puts("");
+        puts("");
+    }
     return NULL;
 }
 

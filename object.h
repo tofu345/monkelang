@@ -19,6 +19,7 @@ typedef enum __attribute__ ((__packed__)) {
                // in scope.
     o_String,
     o_Array,
+    o_Hash,
 } ObjectType;
 
 typedef struct Object Object;
@@ -40,6 +41,7 @@ typedef union {
     Builtin* builtin;
     CharBuffer* string;
     ObjectBuffer* array;
+    ht* hash;
 } ObjectData;
 
 struct Object {

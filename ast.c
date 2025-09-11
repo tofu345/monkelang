@@ -185,6 +185,12 @@ fprint_hash_literal(HashLiteral* hl, FILE* fp) {
     return 0;
 }
 
+static int
+fprint_string_literal(StringLiteral* sl, FILE* fp) {
+    FPRINTF(fp, "\"%s\"", sl->tok.literal);
+    return 0;
+}
+
 int node_fprint(const Node n, FILE* fp) {
     if (n.obj == NULL) return 0;
 
@@ -236,6 +242,9 @@ int node_fprint(const Node n, FILE* fp) {
 
         case n_HashLiteral:
             return fprint_hash_literal(n.obj, fp);
+
+        case n_StringLiteral:
+            return fprint_string_literal(n.obj, fp);
 
         default:
             fprintf(stderr, "node_fprint: node type not handled %d\n", n.typ);
@@ -351,7 +360,7 @@ destroy_index_expression(IndexExpression* ie) {
 static void
 destroy_hash_literal(HashLiteral* hl) {
     free(hl->tok.literal);
-    for (int i = 0; i < hl->pairs.length - 1; i++) {
+    for (int i = 0; i < hl->pairs.length; i++) {
         Pair* pair = &hl->pairs.data[i];
         node_destroy(pair->key);
         node_destroy(pair->val);

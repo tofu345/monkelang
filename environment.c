@@ -32,6 +32,7 @@ void trace_mark_object(Object* obj) {
         case o_Error:
         case o_Function:
         case o_Closure:
+        case o_String:
             return;
         case o_Array:
             {
@@ -40,9 +41,18 @@ void trace_mark_object(Object* obj) {
                     trace_mark_object(arr->data[i]);
                 return;
             }
+        case o_Hash:
+            {
+                hti it = ht_iterator(obj->data.hash);
+                while (ht_next(&it)) {
+                    trace_mark_object(it.value);
+                }
+                return;
+            }
         default:
             fprintf(stderr, "trace_mark_object: type %d not handled",
                     obj->typ);
+            exit(1);
     }
 }
 
@@ -52,11 +62,9 @@ mark(Env* env) {
         trace_mark_object(env->tracking.data[i]);
     }
     for (int i = 0; i < env->frames.length; i++) {
-        // check if NULL?
-        ht* table = env->frames.data[i]->table;
-        for (size_t i = 0; i < table->capacity; i++) {
-            if (table->entries[i].value == NULL) continue;
-            trace_mark_object(table->entries[i].value);
+        hti it = ht_iterator(env->frames.data[i]->table);
+        while (ht_next(&it)) {
+            trace_mark_object(it.value);
         }
     }
 }
