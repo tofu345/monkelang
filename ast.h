@@ -170,3 +170,5 @@ typedef struct {
     Token tok; // the '{' token
     PairBuffer pairs;
 } HashLiteral;
+
+void destroy_hash_literal(HashLiteral* hl);

@@ -62,8 +62,10 @@ void repl(FILE* in, FILE* out) {
         // program_fprint(&prog, stdout);
 
         Object* evaluated = eval_program(&prog, env);
-        object_fprint(evaluated, out);
-        fprintf(out, "\n");
+        if (evaluated->typ != o_Null) {
+            object_fprint(evaluated, out);
+            fprintf(out, "\n");
+        }
 
         free(input);
         parser_destroy(&p);

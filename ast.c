@@ -289,13 +289,11 @@ destroy_if_expression(IfExpression* ie) {
 
 void destroy_function_literal(FunctionLiteral* fl) {
     free(fl->tok.literal);
-    if (fl->params.data != NULL) {
-        for (int i = 0; i < fl->params.length; i++) {
-            free(fl->params.data[i]->tok.literal);
-            free(fl->params.data[i]);
-        }
-        free(fl->params.data);
+    for (int i = 0; i < fl->params.length; i++) {
+        free(fl->params.data[i]->tok.literal);
+        free(fl->params.data[i]);
     }
+    free(fl->params.data);
     if (fl->body != NULL)
         destroy_block_statement(fl->body);
     free(fl);
@@ -357,8 +355,7 @@ destroy_index_expression(IndexExpression* ie) {
     free(ie);
 }
 
-static void
-destroy_hash_literal(HashLiteral* hl) {
+void destroy_hash_literal(HashLiteral* hl) {
     free(hl->tok.literal);
     for (int i = 0; i < hl->pairs.length; i++) {
         Pair* pair = &hl->pairs.data[i];

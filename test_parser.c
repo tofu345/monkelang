@@ -21,7 +21,7 @@ static void check_parser_errors(Parser* p) {
 
     printf("parser had %d errors\n", p->errors.length);
     for (int i = 0; i < p->errors.length; i++) {
-        printf("parser error%s\n", p->errors.data[i]);
+        printf("%s\n", p->errors.data[i]);
     }
     TEST_FAIL();
 }

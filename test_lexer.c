@@ -38,6 +38,7 @@ if (5 < 10) {\
 0xdeadbeef;\
 0b11011;\
 {\"foo\": \"bar\"};\
+// this should be ignored\
 ";
 
     struct Test {
@@ -169,6 +170,7 @@ let add = fn(x, y) {\n\
     x + y;\n\
 };\n\
 \n\
+// ignore\n\
 10 == 10;\n\
 ";
 
@@ -203,11 +205,11 @@ let add = fn(x, y) {\n\
 		{t_Semicolon, ";", "5,10"},
 		{t_Rbrace, "}", "6,1"},
 		{t_Semicolon, ";", "6,2"},
-		{t_Int, "10", "8,1"},
-		{t_Eq, "==", "8,4"},
-		{t_Int, "10", "8,7"},
-		{t_Semicolon, ";", "8,9"},
-		{t_Eof, "", "9,1"},
+		{t_Int, "10", "9,1"},
+		{t_Eq, "==", "9,4"},
+		{t_Int, "10", "9,7"},
+		{t_Semicolon, ";", "9,9"},
+		{t_Eof, "", "10,1"},
     };
 
     size_t len_tests = sizeof(tests) / sizeof(tests[0]);

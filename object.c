@@ -106,9 +106,9 @@ fprint_array(ObjectData o, FILE* fp) {
 }
 
 static int
-fprint_hash_literal_entry(const char* key, Object* value, FILE* fp) {
-    FPRINTF(fp, "%s: ", key);
-    object_fprint(value, fp);
+fprint_hash_literal_entry(ht_entry* entry, FILE* fp) {
+    FPRINTF(fp, "%s: ", entry->key);
+    object_fprint(entry->value, fp);
     return 0;
 }
 
@@ -117,13 +117,12 @@ fprint_hash(ObjectData o, FILE* fp) {
     FPRINTF(fp, "{");
     ht* tbl = o.hash;
     hti it = ht_iterator(tbl);
-    for (size_t i = 0; i < tbl->length - 1; i++) {
-        if (!ht_next(&it)) break;
-        fprint_hash_literal_entry(it.key, it.value, fp);
+    for (size_t i = 0; i < tbl->length - 1 && ht_next(&it); i++) {
+        fprint_hash_literal_entry(it.current, fp);
         FPRINTF(fp, ", ");
     }
-    if (tbl->length > 1 && ht_next(&it))
-        fprint_hash_literal_entry(it.key, it.value, fp);
+    if (tbl->length >= 1 && ht_next(&it))
+        fprint_hash_literal_entry(it.current, fp);
     FPRINTF(fp, "}");
     return 0;
 }
@@ -146,17 +145,16 @@ int object_fprint(Object* o, FILE* fp) {
         case o_Function:
         case o_Closure:
             return fprint_function(fp);
-        case o_ReturnValue:
-            FPRINTF(fp, "return ");
-            object_fprint(to_return_value(o), fp);
-            from_return_value(o);
-            return 0;
         case o_String:
             return fprintf_string(o->data, fp);
         case o_Array:
             return fprint_array(o->data, fp);
         case o_Hash:
             return fprint_hash(o->data, fp);
+        case o_ReturnValue:
+            fprintf(stderr, "object_fprint: cannot print ReturnValue\n");
+            exit(1);
+            return 0;
         default:
             fprintf(stderr, "object_fprint: object type not handled %d\n",
                     o->typ);
@@ -202,14 +200,14 @@ bool object_eq(Object* left, Object* right) {
     }
 }
 
-inline Object* to_return_value(Object* obj) {
+Object* to_return_value(Object* obj) {
     struct ReturnValue* return_val = (void*)obj;
     return_val->value_typ = return_val->typ;
     return_val->typ = o_ReturnValue;
     return obj;
 }
 
-inline Object* from_return_value(Object* obj) {
+Object* from_return_value(Object* obj) {
     if (obj->typ != o_ReturnValue) return obj;
     struct ReturnValue* return_val = (void*)obj;
     return_val->typ = return_val->value_typ;

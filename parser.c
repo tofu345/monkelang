@@ -4,6 +4,7 @@
 #include "parser.h"
 #include "token.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -55,8 +56,13 @@ cur_precedence(Parser* p) {
 }
 
 static void
-parser_error(Parser* p, char* msg) {
+parser_error(Parser* p, char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    char* msg = NULL;
+    if (vasprintf(&msg, format, args) == -1) ALLOC_FAIL();
     StringBufferPush(&p->errors, msg);
+    va_end(args);
 }
 
 static void
@@ -67,24 +73,18 @@ next_token(Parser* p) {
 
 static void
 cur_tok_error(Parser* p, TokenType t) {
-    char* msg = NULL;
-    int len = asprintf(&msg,
+    parser_error(p,
             ":%d,%d: expected token to be '%s', got '%s' instead",
             p->cur_token.line, p->cur_token.col,
             show_token_type(t), show_token_type(p->peek_token.type));
-    if (len == -1) ALLOC_FAIL();
-    parser_error(p, msg);
 }
 
 static void
 peek_error(Parser* p, TokenType t) {
-    char* msg = NULL;
-    int len = asprintf(&msg,
+    parser_error(p,
             ":%d,%d: expected next token to be '%s', got '%s' instead",
             p->cur_token.line, p->cur_token.col,
             show_token_type(t), show_token_type(p->peek_token.type));
-    if (len == -1) ALLOC_FAIL();
-    parser_error(p, msg);
 }
 
 static bool
@@ -92,7 +92,7 @@ cur_token_is(const Parser* p, TokenType t) {
     return p->cur_token.type == t;
 }
 
-static bool
+inline static bool
 peek_token_is(const Parser* p, TokenType t) {
     return p->peek_token.type == t;
 }
@@ -112,12 +112,9 @@ expect_peek(Parser* p, TokenType t) {
 
 static void
 no_prefix_parse_error(Parser* p, TokenType t) {
-    char* msg = NULL;
-    int err = asprintf(&msg,
-            ":%d,%d: no prefix parse function for token '%s' found",
+    parser_error(p,
+            ":%d,%d: unexpected token '%s'",
             p->cur_token.line, p->cur_token.col, show_token_type(t));
-    if (err == -1) ALLOC_FAIL();
-    parser_error(p, msg);
 }
 
 static Node
@@ -158,56 +155,56 @@ parse_identifier(Parser* p) {
 
 static Node
 parse_integer_literal(Parser* p) {
-    IntegerLiteral* int_lit = allocate(sizeof(IntegerLiteral));
-    int_lit->tok = p->cur_token;
+    IntegerLiteral* il = allocate(sizeof(IntegerLiteral));
+    il->tok = p->cur_token;
 
+    char* literal = p->cur_token.literal;
     char* endptr;
-    char* lit = int_lit->tok.literal;
-    long value;
-    if (strlen(lit) > 1 && lit[1] == 'b')
-        value = strtol(lit + 2, &endptr, 2); // skip '0b'
-    else
-        value = strtol(lit, &endptr, 0); // parse dec, hex
+    int base = 0;
 
-    if (*endptr != '\0' || errno == ERANGE || errno == EINVAL) {
-        char* msg = NULL;
-        int err = asprintf(&msg,
+    if (strlen(literal) == 1) {
+        il->value = literal[0] - '0';
+        return NODE(n_IntegerLiteral, il);
+    }
+
+    if ('b' == literal[1]) {
+        base = 2; // skip '0b',
+                  // [strtol] infers base 16 or 8 not base 2.
+    }
+
+    long value = strtol(p->cur_token.literal + base, &endptr, base);
+    if (*endptr != '\0' || errno == ERANGE) {
+        parser_error(p,
                 ":%d,%d: could not parse '%s' as integer",
-                int_lit->tok.line, int_lit->tok.col,
-                lit);
-        if (err == -1) ALLOC_FAIL();
-        parser_error(p, msg);
-        free(int_lit->tok.literal);
-        free(int_lit);
+                p->cur_token.line, p->cur_token.col, literal);
+        free(p->cur_token.literal);
+        free(il);
         return (Node){};
     }
 
-    int_lit->value = value;
-    return NODE(n_IntegerLiteral, int_lit);
+    il->value = value;
+    return NODE(n_IntegerLiteral, il);
 }
 
 static Node
 parse_float_literal(Parser* p) {
-    FloatLiteral* fl_lit = allocate(sizeof(FloatLiteral));
-    fl_lit->tok = p->cur_token;
+    FloatLiteral* fl = allocate(sizeof(FloatLiteral));
+    fl->tok = p->cur_token;
 
     char* endptr;
-    double value = strtod(fl_lit->tok.literal, &endptr);
-    if (*endptr != '\0' || errno == ERANGE || errno == EINVAL) {
-        char* msg = NULL;
-        int err = asprintf(&msg,
+    double value = strtod(fl->tok.literal, &endptr);
+    if (*endptr != '\0' || errno == ERANGE) {
+        parser_error(p,
                 ":%d,%d: could not parse '%s' as float",
-                fl_lit->tok.line, fl_lit->tok.col,
-                fl_lit->tok.literal);
-        if (err == -1) ALLOC_FAIL();
-        parser_error(p, msg);
-        free(fl_lit->tok.literal);
-        free(fl_lit);
+                fl->tok.line, fl->tok.col,
+                fl->tok.literal);
+        free(fl->tok.literal);
+        free(fl);
         return (Node){};
     }
 
-    fl_lit->value = value;
-    return NODE(n_FloatLiteral, fl_lit);
+    fl->value = value;
+    return NODE(n_FloatLiteral, fl);
 }
 
 static Node
@@ -252,7 +249,7 @@ static Node
 parse_boolean(Parser* p) {
     BooleanLiteral* b = allocate(sizeof(BooleanLiteral));
     b->tok = p->cur_token;
-    b->value = cur_token_is(p, t_True);
+    b->value = p->cur_token.type == t_True;
     return NODE(n_BooleanLiteral, b);
 }
 
@@ -279,19 +276,19 @@ parse_block_statement(Parser* p) {
 
     while (!cur_token_is(p, t_Rbrace) && !cur_token_is(p, t_Eof)) {
         Node stmt = parse_statement(p);
-        if (stmt.obj != NULL)
+        if (stmt.obj != NULL) {
             NodeBufferPush(&bs->stmts, stmt);
+        }
         next_token(p);
     }
 
-    if (cur_token_is(p, t_Rbrace)) {
-        free(p->cur_token.literal); // '}' token
-    } else {
+    if (!cur_token_is(p, t_Rbrace)) {
         cur_tok_error(p, t_Rbrace);
-        node_destroy(NODE(n_BlockStatement, bs));
+        destroy_block_statement(bs);
         return NULL;
     }
 
+    free(p->cur_token.literal); // '}' tok
     return bs;
 }
 
@@ -300,15 +297,13 @@ static int
 parse_function_parameters(Parser* p, FunctionLiteral* fl) {
     ParamBufferInit(&fl->params);
 
-    if (peek_token_is(p, t_Rparen)) {
-        free(p->cur_token.literal); // '(' tok
-        next_token(p);
+    free(p->cur_token.literal); // '(' tok
+    next_token(p);
+
+    if (cur_token_is(p, t_Rparen)) {
         free(p->cur_token.literal); // ')' tok
         return 0;
     }
-
-    free(p->cur_token.literal); // '(' tok
-    next_token(p);
 
     if (p->cur_token.type != t_Ident) {
         cur_tok_error(p, t_Ident);
@@ -324,6 +319,7 @@ parse_function_parameters(Parser* p, FunctionLiteral* fl) {
     while (peek_token_is(p, t_Comma)) {
         next_token(p);
         free(p->cur_token.literal); // ',' tok
+
         if (!expect_peek(p, t_Ident))
             return -1;
 
@@ -350,17 +346,17 @@ parse_function_literal(Parser* p) {
         free(fl);
         return (Node){};
     }
-    fl->body = NULL;
 
     int err = parse_function_parameters(p, fl);
     if (err == -1 || !expect_peek(p, t_Lbrace)) {
-        node_destroy(NODE(n_FunctionLiteral, fl));
+        fl->body = NULL;
+        destroy_function_literal(fl);
         return (Node){};
     }
 
     fl->body = parse_block_statement(p);
     if (fl->body == NULL) {
-        node_destroy(NODE(n_FunctionLiteral, fl));
+        destroy_function_literal(fl);
         return (Node){};
     }
 
@@ -398,13 +394,13 @@ parse_hash_literal(Parser* p) {
 
         Node key = parse_expression(p, p_Lowest);
         if (key.obj == NULL) {
-            node_destroy(NODE(n_HashLiteral, hl));
+            destroy_hash_literal(hl);
             return (Node){};
         }
 
         if (!expect_peek(p, t_Colon)) {
             node_destroy(key);
-            node_destroy(NODE(n_HashLiteral, hl));
+            destroy_hash_literal(hl);
             return (Node){};
         }
 
@@ -415,25 +411,23 @@ parse_hash_literal(Parser* p) {
         if (value.obj == NULL) {
             free(p->cur_token.literal);
             node_destroy(key);
-            node_destroy(NODE(n_HashLiteral, hl));
+            destroy_hash_literal(hl);
             return (Node){};
         }
 
-        Pair pair = { key, value };
-        PairBufferPush(&hl->pairs, pair);
+        PairBufferPush(&hl->pairs, (Pair){ key, value });
 
-        if (peek_token_is(p, t_Rbrace))
-            break;
+        if (peek_token_is(p, t_Rbrace)) break;
 
         if (!expect_peek(p, t_Comma)) {
-            node_destroy(NODE(n_HashLiteral, hl));
+            destroy_hash_literal(hl);
             return (Node){};
         }
         free(p->cur_token.literal);
     }
 
     if (!expect_peek(p, t_Rbrace)) {
-        node_destroy(NODE(n_HashLiteral, hl));
+        destroy_hash_literal(hl);
         return (Node){};
     }
     free(p->cur_token.literal);
@@ -469,7 +463,7 @@ parse_index_expression(Parser* p, Node left) {
         free(ie);
         return (Node){};
     }
-    free(p->cur_token.literal);
+    free(p->cur_token.literal); // '}' tok
     return NODE(n_IndexExpression, ie);
 }
 
@@ -518,7 +512,7 @@ parse_expression_list(Parser* p, TokenType end) {
     if (!expect_peek(p, end))
         return __parse_expression_list_err(list);
 
-    free(p->cur_token.literal);
+    free(p->cur_token.literal); // 'end' tok
     return list;
 }
 
@@ -538,7 +532,8 @@ parse_if_expression(Parser* p) {
     next_token(p);
     ie->condition = parse_expression(p, p_Lowest);
     if (ie->condition.obj == NULL || !expect_peek(p, t_Rparen)) {
-        node_destroy(NODE(n_IfExpression, ie));
+        free(ie->tok.literal);
+        free(ie);
         return (Node){};
     }
     free(p->cur_token.literal); // ')' tok
@@ -557,6 +552,7 @@ parse_if_expression(Parser* p) {
     if (peek_token_is(p, t_Else)) {
         next_token(p);
         free(p->cur_token.literal); // 'else' tok
+
         if (!expect_peek(p, t_Lbrace)) {
             node_destroy(NODE(n_IfExpression, ie));
             return (Node){};
@@ -634,11 +630,10 @@ parse_return_statement(Parser* p) {
 static Node
 parse_expression_statement(Parser* p) {
     ExpressionStatement* stmt = allocate(sizeof(ExpressionStatement));
-    stmt->tok = p->cur_token;
+    stmt->tok = p->cur_token; // will be the same as stmt.expression.tok
 
     stmt->expression = parse_expression(p, p_Lowest);
     if (stmt->expression.obj == NULL) {
-        // stmt.tok points to stmt.expression.tok
         free(stmt);
         return (Node){};
     }
@@ -647,7 +642,6 @@ parse_expression_statement(Parser* p) {
         next_token(p);
         free(p->cur_token.literal);
     }
-
     return NODE(n_ExpressionStatement, stmt);
 }
 
@@ -659,6 +653,11 @@ parse_statement(Parser* p) {
         return parse_let_statement(p);
     case t_Return:
         return parse_return_statement(p);
+    case t_Illegal:
+        parser_error(p,
+                ":%d,%d: illegal character found",
+                p->cur_token.line, p->cur_token.col);
+        return (Node){};
     default:
         return parse_expression_statement(p);
     }

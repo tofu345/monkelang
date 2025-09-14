@@ -36,7 +36,7 @@ Lexer lexer_new(const char* input) {
     return l;
 }
 
-inline static void
+static void
 new_token(Token* t, TokenType type, char ch) {
     // must malloc here
     char* lit = malloc(2 * sizeof(char));
@@ -183,7 +183,18 @@ Token lexer_next_token(Lexer* l) {
         new_token(&tok, t_Minus, l->ch);
         break;
     case '/':
-        new_token(&tok, t_Slash, l->ch);
+        if (peek_char(l) == '/') {
+            size_t position = l->read_position + 1;
+            char ch;
+            do {
+                ch = l->input[++position];
+            } while (position < l->input_len && ch != '\n');
+            l->read_position = position;
+            read_char(l);
+            return lexer_next_token(l);
+        } else {
+            new_token(&tok, t_Slash, l->ch);
+        }
         break;
     case '*':
         new_token(&tok, t_Asterisk, l->ch);
@@ -230,7 +241,7 @@ Token lexer_next_token(Lexer* l) {
     case 0:
         tok.literal = NULL;
         tok.type = t_Eof;
-        break;
+        return tok;
     default:
         if (is_letter(l->ch)) {
             tok.literal = read_identifier(l);
