@@ -8,7 +8,6 @@
 #include "object.h"
 
 #define OBJ(t, d) object_new(env, t, (ObjectData){d})
-
 Object* object_new(Env* env, ObjectType typ, ObjectData data);
 
 typedef struct Frame {
@@ -27,8 +26,20 @@ BUFFER(Frame, Frame*);
 struct Env {
     FrameBuffer frames;
     Frame* current;
+
+    // List of all allocated [Objects].
+    // TODO: allocate only non-primitive types.
     ObjectBuffer objects;
-    ObjectBuffer tracking; // [Objects] that must stay in scope
+
+    // [Objects] that will always be marked during [mark_and_sweep].
+    //
+    // Needed because [mark_and_sweep] is called after a function (not
+    // [builtins]) finishes, not great, I know.
+	//
+	// In Infix Expressions, when evaluating right expression, left will be
+	// freed if [right] contains a call expression :|
+    ObjectBuffer tracking;
+
     ht* builtins;
 };
 
@@ -53,3 +64,4 @@ void env_set(Env* env, char* name, Object* obj);
 
 // add to [env->tracking]
 void track(Env* env, Object* obj);
+void untrack(Env* env, size_t num_objects);

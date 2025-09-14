@@ -35,7 +35,7 @@ Object* object_copy(Env* env, Object* obj) {
         case o_Function:
         case o_BuiltinFunction:
         case o_Closure:
-            return obj;
+            return object_new(env, obj->typ, obj->data);
         case o_String:
             {
                 CharBuffer* new_str = allocate(sizeof(CharBuffer));
@@ -52,7 +52,9 @@ Object* object_copy(Env* env, Object* obj) {
                 return OBJ(o_Array, .array = new_arr);
             }
         case o_ReturnValue:
-            return to_return_value(object_copy(env, from_return_value(obj)));
+            fprintf(stderr, "object_copy: cannot copy ReturnValue\n");
+            exit(1);
+            return obj;
         default:
             fprintf(stderr, "object_copy: object type not handled %d\n",
                     obj->typ);
@@ -99,8 +101,7 @@ eval_string_literal(Env* env, StringLiteral* sl) {
         str->data = allocate(str->capacity * sizeof(char));
         memcpy(str->data, sl->tok.literal, len * sizeof(char));
         str->data[len] = '\0';
-    } else
-        CharBufferInit(str);
+    }
     str->length = len;
     return OBJ(o_String, .string = str);
 }
@@ -301,7 +302,9 @@ eval_infix_expression(Env* env, InfixExpression* ie) {
     if (IS_ERROR(left))
         return left;
 
+    track(env, left);
     Object* right = eval(env, ie->right);
+    untrack(env, 1);
     if (IS_ERROR(right))
         return right;
 
@@ -362,11 +365,12 @@ static ObjectBuffer
 eval_expressions(Env* env, NodeBuffer args) {
     ObjectBuffer results;
     ObjectBufferInit(&results);
+
     for (int i = 0; i < args.length; i++) {
         Object* result = eval(env, args.data[i]);
         if (IS_ERROR(result)) {
-            // untrack previous results
-            env->tracking.length -= i;
+            untrack(env, i);
+
             if (results.length == 0)
                 ObjectBufferPush(&results, result);
             else {
@@ -376,20 +380,10 @@ eval_expressions(Env* env, NodeBuffer args) {
             return results;
         }
         ObjectBufferPush(&results, result);
-        // keep in scope
-        track(env, result);
+        track(env, result); // keep in scope
     }
 
-    // untrack results
-    env->tracking.length -= args.length;
-
-    // for (int i = 0; i < results.length; i++) {
-    //     node_fprint(args.data[i], stdout);
-    //     printf(" -> ");
-    //     object_fprint(results.data[i], stdout);
-    //     puts("");
-    // }
-    // puts("");
+    untrack(env, args.length);
 
     return results;
 }
@@ -500,7 +494,9 @@ apply_function(Env* env, Object* fn, ObjectBuffer* args, char* fn_name) {
                 func->params.length != 1 ? "s" : "", args->length);
 
     for (int i = 0; i < args->length; i++) {
-        env_set(env, func->params.data[i]->tok.literal, args->data[i]);
+        env_set(env,
+                func->params.data[i]->tok.literal,
+                object_copy(env, args->data[i]));
     }
 
     result = from_return_value(eval_block_statement(env, func->body->stmts));
@@ -629,26 +625,26 @@ static Object*
 eval_hash_literal(Env* env, HashLiteral* hl) {
     ht* pairs = ht_create();
     for (int i = 0; i < hl->pairs.length; i++) {
-        Object* key_obj = eval(env, hl->pairs.data[i].key);
-        if (IS_NULL(key_obj)) {
+        Object* key = eval(env, hl->pairs.data[i].key);
+        if (IS_ERROR(key) || IS_NULL(key)) {
             ht_destroy(pairs);
-            return key_obj;
+            return key;
         }
 
-        char* key = hash_key(key_obj);
-        if (key == NULL) {
+        char* h_key = hash_key(key);
+        if (h_key == NULL) {
             ht_destroy(pairs);
             return new_error(env, "unusable as hash key: %s",
-                    show_object_type(key_obj->typ));
+                    show_object_type(key->typ));
         }
 
         Object* value = eval(env, hl->pairs.data[i].val);
-        if (IS_NULL(value)) {
+        if (IS_ERROR(value) || IS_NULL(value)) {
             ht_destroy(pairs);
             return value;
         }
 
-        if (ht_set(pairs, key, value) == NULL) ALLOC_FAIL();
+        if (ht_set(pairs, h_key, value) == NULL) ALLOC_FAIL();
     }
 
     return OBJ(o_Hash, .hash = pairs);

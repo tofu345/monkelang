@@ -45,7 +45,7 @@ void trace_mark_object(Object* obj) {
             {
                 hti it = ht_iterator(obj->data.hash);
                 while (ht_next(&it)) {
-                    trace_mark_object(it.value);
+                    trace_mark_object(it.current->value);
                 }
                 return;
             }
@@ -64,7 +64,7 @@ mark(Env* env) {
     for (int i = 0; i < env->frames.length; i++) {
         hti it = ht_iterator(env->frames.data[i]->table);
         while (ht_next(&it)) {
-            trace_mark_object(it.value);
+            trace_mark_object(it.current->value);
         }
     }
 }
@@ -164,4 +164,8 @@ void env_set(Env* env, char* name, Object* obj) {
 
 void track(Env *env, Object *obj) {
     ObjectBufferPush(&env->tracking, obj);
+}
+
+void untrack(Env* env, size_t num_objects) {
+    env->tracking.length -= num_objects;
 }
