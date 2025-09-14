@@ -1,7 +1,7 @@
 #include "unity/unity.h"
-#include "lexer.h"
-#include "token.h"
-#include "unity/unity_internals.h"
+
+#include "../src/lexer.h"
+#include "../src/token.h"
 
 #include <stdio.h>
 #include <stdlib.h>

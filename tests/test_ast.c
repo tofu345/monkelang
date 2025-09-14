@@ -1,6 +1,7 @@
 #include "unity/unity.h"
-#include "token.h"
-#include "ast.h"
+
+#include "../src/token.h"
+#include "../src/ast.h"
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,11 +1,12 @@
-#include "ast.h"
-#include "environment.h"
-#include "tests.h"
 #include "unity/unity.h"
-#include "object.h"
-#include "evaluator.h"
-#include "lexer.h"
-#include "parser.h"
+
+#include "tests.h"
+#include "../src/ast.h"
+#include "../src/environment.h"
+#include "../src/object.h"
+#include "../src/evaluator.h"
+#include "../src/lexer.h"
+#include "../src/parser.h"
 
 #include <stdio.h>
 #include <stdlib.h>

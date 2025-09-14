@@ -1,9 +1,11 @@
-#include "tests.h"
 #include "unity/unity.h"
-#include "ast.h"
-#include "parser.h"
-#include "lexer.h"
-#include "token.h"
+
+#include "tests.h"
+
+#include "../src/ast.h"
+#include "../src/parser.h"
+#include "../src/lexer.h"
+#include "../src/token.h"
 
 #include <stddef.h>
 #include <stdio.h>
