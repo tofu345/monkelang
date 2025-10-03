@@ -152,7 +152,7 @@ ht* builtins_init() {
     if (tbl == NULL) ALLOC_FAIL();
     int len = sizeof(builtins) / sizeof(builtins[0]);
     for (int i = 0; i < len; i++) {
-        if (ht_set(tbl, builtins[i].name, &builtins[i].obj) == NULL)
+        if (ht_set(tbl, builtins[i].name, (void *)&builtins[i].obj) == NULL)
             ALLOC_FAIL();
     }
     return tbl;

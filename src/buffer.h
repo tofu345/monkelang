@@ -24,7 +24,7 @@
     }                                                                         \
                                                                               \
     void name##BufferFill(name##Buffer* buf, typ val, int length) {           \
-        if (buf->data == NULL || buf->length >= buf->capacity) {              \
+        if (buf->length + length >= buf->capacity) {                          \
             int capacity = power_of_2_ceil(buf->length + length);             \
             buf->data = reallocate(buf->data, capacity * sizeof(typ));        \
             buf->capacity = capacity;                                         \
