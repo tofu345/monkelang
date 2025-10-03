@@ -11,30 +11,31 @@
     } name##Buffer;                                                           \
                                                                               \
     void name##Buffer##Init(name##Buffer* buf);                               \
-    void name##BufferPush(name##Buffer* buf, typ data);                       \
-    typ name##BufferPop(name##Buffer* buf);                                   \
+    void name##BufferFill(name##Buffer* buf, typ val, int length);            \
+    void name##BufferPush(name##Buffer* buf, typ val);                        \
     name##Buffer name##BufferCopy(name##Buffer* buf);                         \
 
 // From: wren DEFINE_BUFFER
 #define DEFINE_BUFFER(name, typ)                                              \
     void name##Buffer##Init(name##Buffer* buf) {                              \
-        buf->length = 0;                                                      \
         buf->data = NULL;                                                     \
-        buf->capacity = 4;                                                    \
+        buf->length = 0;                                                      \
+        buf->capacity = 0;                                                    \
     }                                                                         \
                                                                               \
-    void name##BufferPush(name##Buffer* buf, typ val) {                       \
+    void name##BufferFill(name##Buffer* buf, typ val, int length) {           \
         if (buf->data == NULL || buf->length >= buf->capacity) {              \
-            int capacity = power_of_2_ceil(buf->capacity * 2);                \
-            if (capacity < buf->capacity) ALLOC_FAIL(); /* overflow */        \
+            int capacity = power_of_2_ceil(buf->length + length);             \
             buf->data = reallocate(buf->data, capacity * sizeof(typ));        \
             buf->capacity = capacity;                                         \
         }                                                                     \
-        buf->data[(buf->length)++] = val;                                     \
+        for (int i = 0; i < length; i++) {                                    \
+            buf->data[(buf->length)++] = val;                                 \
+        }                                                                     \
     }                                                                         \
                                                                               \
-    typ name##BufferPop(name##Buffer* buf) {                                  \
-        return buf->data[--(buf->length)];                                    \
+    void name##BufferPush(name##Buffer* buf, typ val) {                       \
+        name##BufferFill(buf, val, 1);                                        \
     }                                                                         \
                                                                               \
     name##Buffer name##BufferCopy(name##Buffer* buf) {                        \

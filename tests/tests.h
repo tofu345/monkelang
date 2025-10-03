@@ -2,18 +2,25 @@
 
 #include <stdbool.h>
 
+#include "../src/code.h"
+
 typedef enum {
-    l_Integer,
-    l_Float,
-    l_String,
-    l_Boolean,
-} L_Type;
+    test_int = 1,
+    test_float,
+    test_str,
+    test_bool,
+} Type;
 
 typedef union {
-    long integer;
-    double floating;
-    const char* string;
-    bool boolean;
-} L_Test;
+    long _int;
+    double _float;
+    const char* _str;
+    bool _bool;
+} Value;
 
-#define L_TEST(t) (L_Test){t}
+typedef struct {
+    Type typ;
+    Value val;
+} Test;
+
+#define TEST(t, v) (Test){ test_##t, { ._##t = v } }

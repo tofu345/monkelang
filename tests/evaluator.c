@@ -405,21 +405,18 @@ void test_string_concatenation(void) {
 void test_builtin_function(void) {
     struct Test {
         char* input;
-        L_Test expected;
-        L_Type t;
+        Test expected;
     } tests[] = {
-        {"len(\"\")", {0}, l_Integer},
-        {"len(\"four\")", {4}, l_Integer},
-        {"len(\"hello world\")", {11}, l_Integer},
+        {"len(\"\")", TEST(int, 0)},
+        {"len(\"four\")", TEST(int, 4)},
+        {"len(\"hello world\")", TEST(int, 11)},
         {
             "len(1)",
-            L_TEST( .string = "builtin len(): argument of 'Integer' not supported"),
-            l_String
+            TEST(str, "builtin len(): argument of 'Integer' not supported")
         },
         {
             "len(\"one\", \"two\")",
-            L_TEST( .string = "builtin len() takes 1 argument got 2"),
-            l_String
+            TEST(str, "builtin len() takes 1 argument got 2"),
         },
     };
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
@@ -427,17 +424,17 @@ void test_builtin_function(void) {
         struct Test test = tests[i];
         Env* env = env_new();
         Object* evaluated = test_eval(test.input, env);
-        switch (test.t) {
-            case l_Integer:
-                test_integer_object(evaluated, test.expected.integer);
+        switch (test.expected.typ) {
+            case test_int:
+                test_integer_object(evaluated, test.expected.val._int);
                 break;
-            case l_String:
+            case test_str:
                 TEST_ASSERT_EQUAL_STRING_MESSAGE(
                         show_object_type(o_Error),
                         show_object_type(evaluated->typ),
                         "type not Error");
                 TEST_ASSERT_EQUAL_STRING_MESSAGE(
-                        test.expected.string, evaluated->data.error_msg,
+                        test.expected.val._str, evaluated->data.error_msg,
                         "integer has wrong value");
                 break;
             default: TEST_FAIL_MESSAGE("unhandled type");
@@ -464,61 +461,61 @@ void test_array_literals(void) {
 
 void test_array_index_expressions(void) {
     struct Test {
-        char* input;
-        long expected;
+	char* input;
+	long expected;
     } tests[] = {
-        		{
-			"[1, 2, 3][0]",
-			1,
-		},
-		{
-			"[1, 2, 3][1]",
-			2,
-		},
-		{
-			"[1, 2, 3][2]",
-			3,
-		},
-		{
-			"let i = 0; [1][i];",
-			1,
-		},
-		{
-			"[1, 2, 3][1 + 1];",
-			3,
-		},
-		{
-			"let myArray = [1, 2, 3]; myArray[2];",
-			3,
-		},
-		{
-			"let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
-			6,
-		},
-		{
-			"let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
-			2,
-		},
-		{
-			"[1, 2, 3][3]",
-			0, // NULL
-		},
-		{
-			"[1, 2, 3][-1]",
-			0, // NULL
-		},
+	{
+	    "[1, 2, 3][0]",
+	    1,
+	},
+	{
+	    "[1, 2, 3][1]",
+	    2,
+	},
+	{
+	    "[1, 2, 3][2]",
+	    3,
+	},
+	{
+	    "let i = 0; [1][i];",
+	    1,
+	},
+	{
+	    "[1, 2, 3][1 + 1];",
+	    3,
+	},
+	{
+	    "let myArray = [1, 2, 3]; myArray[2];",
+	    3,
+	},
+	{
+	    "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+	    6,
+	},
+	{
+	    "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+	    2,
+	},
+	{
+	    "[1, 2, 3][3]",
+	    0, // NULL
+	},
+	{
+	    "[1, 2, 3][-1]",
+	    0, // NULL
+	},
     };
     size_t tests_len = sizeof(tests) / sizeof(tests[0]);
     for (size_t i = 0; i < tests_len; i++) {
-        struct Test test = tests[i];
-        Env* env = env_new();
-        Object* evaluated = test_eval(test.input, env);
-        if (test.expected == 0) {
-            test_null_object(evaluated);
-        } else {
-            test_integer_object(evaluated, test.expected);
-        }
-        env_destroy(env);
+	struct Test test = tests[i];
+	Env* env = env_new();
+	Object* evaluated = test_eval(test.input, env);
+	if (test.expected == 0) {
+	    test_null_object(evaluated);
+	} else {
+	    test_integer_object(evaluated, test.expected);
+	}
+	env_destroy(env);
     }
 }
 

@@ -136,7 +136,7 @@ Object* builtin_puts([[maybe_unused]] Env* env, ObjectBuffer* args) {
 struct {
     const char* name;
     Object obj;
-} builtins[] = {
+} const builtins[] = {
     BUILTIN(exit),
     BUILTIN(copy),
     BUILTIN(len),

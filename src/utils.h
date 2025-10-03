@@ -20,6 +20,9 @@
         exit(1); \
     } while(0);
 
+// from dwm :p
+void die(const char *fmt, ...);
+
 void* allocate(size_t size);
 void* reallocate(void* ptr, size_t size);
 

@@ -162,7 +162,7 @@ parse_integer_literal(Parser* p) {
     char* endptr;
     int base = 0;
 
-    if (strlen(literal) == 1) {
+    if (literal[1] == '\0') {
         il->value = literal[0] - '0';
         return NODE(n_IntegerLiteral, il);
     }

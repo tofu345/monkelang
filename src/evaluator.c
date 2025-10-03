@@ -532,9 +532,11 @@ apply_function(Env* env, Object* fn, ObjectBuffer* args, char* fn_name) {
 
     env->current = previous;
     frame_destroy(new_frame, env);
-    if (!IS_NULL(result))
-        trace_mark_object(result);
-    mark_and_sweep(env);
+
+    // v- this could use a rework -v
+    // if (!IS_NULL(result))
+    //     trace_mark_object(result);
+    // mark_and_sweep(env);
 
     return result;
 }

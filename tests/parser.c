@@ -220,22 +220,22 @@ test_boolean_literal(Node n, bool exp) {
 }
 
 static void
-test_literal_expression(Node n, L_Test exp, L_Type typ) {
-    switch (typ) {
-        case l_Integer:
-            test_integer_literal(n, exp.integer);
+test_literal_expression(Node n, Test test) {
+    switch (test.typ) {
+        case test_int:
+            test_integer_literal(n, test.val._int);
             break;
-        case l_Float:
-            test_float_literal(n, exp.integer);
+        case test_float:
+            test_float_literal(n, test.val._float);
             break;
-        case l_String:
-            test_identifier(n, exp.string);
+        case test_str:
+            test_identifier(n, test.val._str);
             break;
-        case l_Boolean:
-            test_boolean_literal(n, exp.boolean);
+        case test_bool:
+            test_boolean_literal(n, test.val._bool);
             break;
         default:
-            fprintf(stderr, "type of exp not handled. got %d", typ);
+            fprintf(stderr, "type of exp not handled. got %d", test.typ);
             exit(1);
     }
 }
@@ -244,13 +244,12 @@ void test_let_statements(void) {
     struct Test {
         const char* input;
         const char* expectedIdent;
-        L_Test expectedVal;
-        L_Type t;
+        Test expectedVal;
     } tests[] = {
-        {"let x = 5;", "x", {5}, l_Integer},
-        {"let x = 5.000;", "x", {5.0}, l_Float},
-        {"let y = true;", "y", {true}, l_Boolean},
-        {"let foobar = y;", "foobar", (L_Test){ .string = "y" }, l_String},
+        {"let x = 5;", "x", TEST(int, 5)},
+        {"let x = 5.000;", "x", TEST(float, 5.0)},
+        {"let y = true;", "y", TEST(bool, true)},
+        {"let foobar = y;", "foobar", TEST(str, "y")},
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
     for (int i = 0; i < tests_len; i++) {
@@ -268,7 +267,7 @@ void test_let_statements(void) {
         test_let_statement(stmt, test.expectedIdent);
 
         LetStatement* ls = stmt.obj;
-        test_literal_expression(ls->value, test.expectedVal, test.t);
+        test_literal_expression(ls->value, test.expectedVal);
 
         program_destroy(&prog);
         parser_destroy(&p);
@@ -279,11 +278,10 @@ void test_parsing_prefix_expressions(void) {
     struct Test {
         char* input;
         char* operator;
-        L_Test value;
-        L_Type t;
+        Test value;
     } tests[] = {
-        {"!5;", "!", {5}, l_Integer},
-        {"-15;", "-", {15}, l_Integer},
+        {"!5;", "!", TEST(int, 5)},
+        {"-15;", "-", TEST(int, 15)},
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
     for (int i = 0; i < tests_len; i++) {
@@ -313,7 +311,7 @@ void test_parsing_prefix_expressions(void) {
         TEST_ASSERT_EQUAL_STRING_MESSAGE(
                 test.operator, pe->op, "wrong PrefixExpression.op");
 
-        test_literal_expression(pe->right, test.value, test.t);
+        test_literal_expression(pe->right, test.value);
 
         program_destroy(&prog);
         parser_destroy(&p);
@@ -323,22 +321,21 @@ void test_parsing_prefix_expressions(void) {
 void test_parsing_infix_expressions(void) {
     struct Test {
         char* input;
-        L_Test left_value;
+        Test left_value;
         char* operator;
-        L_Test right_value;
-        L_Type t;
+        Test right_value;
     } tests[] = {
-        {"5 + 5;", {5}, "+", {5}, l_Integer},
-        {"5 - 5;", {5}, "-", {5}, l_Integer},
-        {"5 * 5;", {5}, "*", {5}, l_Integer},
-        {"5 / 5;", {5}, "/", {5}, l_Integer},
-        {"5 > 5;", {5}, ">", {5}, l_Integer},
-        {"5 < 5;", {5}, "<", {5}, l_Integer},
-        {"5 == 5;", {5}, "==", {5}, l_Integer},
-        {"5 != 5;", {5}, "!=", {5}, l_Integer},
-        {"true == true", {true}, "==", {true}, l_Boolean},
-        {"true != false", {true}, "!=", {false}, l_Boolean},
-        {"false == false", {false}, "==", {false}, l_Boolean},
+        {"5 + 5;", TEST(int, 5), "+", TEST(int, 5)},
+        {"5 - 5;", TEST(int, 5), "-", TEST(int, 5)},
+        {"5 * 5;", TEST(int, 5), "*", TEST(int, 5)},
+        {"5 / 5;", TEST(int, 5), "/", TEST(int, 5)},
+        {"5 > 5;", TEST(int, 5), ">", TEST(int, 5)},
+        {"5 < 5;", TEST(int, 5), "<", TEST(int, 5)},
+        {"5 == 5;", TEST(int, 5), "==", TEST(int, 5)},
+        {"5 != 5;", TEST(int, 5), "!=", TEST(int, 5)},
+        {"true == true", TEST(bool, true), "==", TEST(bool, true)},
+        {"true != false", TEST(bool, true), "!=", TEST(bool, false)},
+        {"false == false", TEST(bool, false), "==", TEST(bool, false)},
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
     for (int i = 0; i < tests_len; i++) {
@@ -366,12 +363,12 @@ void test_parsing_infix_expressions(void) {
 
         InfixExpression* ie = es->expression.obj;
 
-        test_literal_expression(ie->left, test.left_value, test.t);
+        test_literal_expression(ie->left, test.left_value);
 
         TEST_ASSERT_EQUAL_STRING_MESSAGE(
                 test.operator, ie->op, "wrong InfixExpression.op");
 
-        test_literal_expression(ie->right, test.right_value, test.t);
+        test_literal_expression(ie->right, test.right_value);
 
         program_destroy(&prog);
         parser_destroy(&p);
@@ -538,16 +535,15 @@ void test_operator_precedence_parsing(void) {
 }
 
 static void
-test_infix_expression(Node n, L_Test left, char* operator,
-        L_Test right, L_Type typ) {
+test_infix_expression(Node n, Test left, char* operator, Test right) {
     TEST_ASSERT_MESSAGE
         (n_InfixExpression == n.typ, "type not type InfixExpression");
 
     InfixExpression* ie = n.obj;
-    test_literal_expression(ie->left, left, typ);
+    test_literal_expression(ie->left, left);
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
             operator, ie->op, "wrong InfixExpression.op");
-    test_literal_expression(ie->right, right, typ);
+    test_literal_expression(ie->right, right);
 }
 
 void test_boolean_expression(void) {
@@ -613,8 +609,7 @@ void test_if_expression(void) {
             n_IfExpression, es->expression.typ, "wrong IfExpression");
 
     IfExpression* ie = es->expression.obj;
-    test_infix_expression(ie->condition, (L_Test){ .string = "x" }, "<",
-            (L_Test){ .string = "y" }, l_String);
+    test_infix_expression(ie->condition, TEST(str, "x"), "<", TEST(str, "y"));
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, ie->consequence->stmts.length,
             "wrong IfExpression.consequence length");
@@ -654,8 +649,7 @@ void test_if_else_expression(void) {
             n_IfExpression, es->expression.typ, "wrong IfExpression");
 
     IfExpression* ie = es->expression.obj;
-    test_infix_expression(ie->condition, (L_Test){ .string = "x" }, "<",
-            (L_Test){ .string = "y" }, l_String);
+    test_infix_expression(ie->condition, TEST(str, "x"), "<", TEST(str, "y"));
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, ie->consequence->stmts.length,
             "wrong IfExpression.consequence length");
@@ -704,10 +698,10 @@ void test_function_literal_parsing(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             2, fl->params.length, "wrong FunctionLiteral.parems.length");
 
-    test_literal_expression((Node){ n_Identifier, fl->params.data[0] },
-            (L_Test){ .string = "x" }, l_String);
-    test_literal_expression((Node){ n_Identifier, fl->params.data[1] },
-            (L_Test){ .string = "y" }, l_String);
+    test_literal_expression(
+	    (Node){ n_Identifier, fl->params.data[0] }, TEST(str, "x"));
+    test_literal_expression(
+	    (Node){ n_Identifier, fl->params.data[1] }, TEST(str, "y"));
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, fl->body->stmts.length,
             "wrong FunctionLiteral.body.len");
@@ -719,8 +713,7 @@ void test_function_literal_parsing(void) {
     ExpressionStatement* body_stmt = fl->body->stmts.data[0].obj;
 
     test_infix_expression(body_stmt->expression,
-            (L_Test){ .string = "x" }, "+", (L_Test){ .string = "y" },
-            l_String);
+            TEST(str, "x"), "+", TEST(str, "y"));
 
     program_destroy(&prog);
     parser_destroy(&p);
@@ -759,8 +752,9 @@ void test_function_parameter_parsing(void) {
                 "wrong FunctionLiteral.paremeters_len");
 
         for (int i = 0; i < test.len; i++) {
-            test_literal_expression((Node){ n_Identifier, fl->params.data[i] },
-                    (L_Test){ .string = test.expectedParams[i] }, l_String);
+            test_literal_expression(
+		    (Node){ n_Identifier, fl->params.data[i] },
+                    TEST(str, test.expectedParams[i]));
         }
 
         program_destroy(&prog);
@@ -797,17 +791,11 @@ void test_call_expression_parsing(void) {
             3, ce->args.length, "wrong CallExpression.args_len");
 
     test_literal_expression(
-            ce->args.data[0], (L_Test){ .integer = 1 }, l_Integer);
+            ce->args.data[0], TEST(int, 1));
 
-    test_infix_expression(
-            ce->args.data[1],
-            (L_Test){ .integer = 2 }, "*", (L_Test){ .integer = 3 },
-            l_Integer);
+    test_infix_expression(ce->args.data[1], TEST(int, 2), "*", TEST(int, 3));
 
-    test_infix_expression(
-            ce->args.data[2],
-            (L_Test){ .integer = 4 }, "+", (L_Test){ .integer = 5 },
-            l_Integer);
+    test_infix_expression(ce->args.data[2], TEST(int, 4), "+", TEST(int, 5));
 
     program_destroy(&prog);
     parser_destroy(&p);
@@ -857,9 +845,9 @@ void test_parsing_array_literals(void) {
 
     test_integer_literal(al->elements.data[0], 1);
     test_infix_expression(al->elements.data[1],
-            L_TEST(2), "*", L_TEST(2), l_Integer);
+            TEST(int, 2), "*", TEST(int, 2));
     test_infix_expression(al->elements.data[2],
-            L_TEST(3), "+", L_TEST(3), l_Integer);
+            TEST(int, 3), "+", TEST(int, 3));
     _test_integer_literal(al->elements.data[3], 0xdeadbeef, "0xdeadbeef");
     _test_integer_literal(al->elements.data[4], 0b11011, "0b11011");
 
@@ -886,8 +874,7 @@ void test_parsing_index_expressions(void) {
     IndexExpression* ie = es->expression.obj;
 
     test_identifier(ie->left, "myArray");
-    test_infix_expression(ie->index,
-            L_TEST(1), "+", L_TEST(1), l_Integer);
+    test_infix_expression(ie->index, TEST(int, 1), "+", TEST(int, 1));
 
     program_destroy(&prog);
     parser_destroy(&p);
@@ -996,7 +983,7 @@ void test_parsing_hash_literals_with_expressions(void) {
         TEST_ASSERT_EQUAL_STRING_MESSAGE(test.key,
                 ((StringLiteral*)pair->key.obj)->tok.literal, "value not found");
         test_infix_expression(pair->val,
-                L_TEST(test.left), test.op, L_TEST(test.right), l_Integer);
+                TEST(int, test.left), test.op, TEST(int, test.right));
     }
 
     program_destroy(&prog);

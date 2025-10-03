@@ -1,4 +1,5 @@
-CFLAGS := -g -Wall -Wextra
+CC = gcc
+CFLAGS = -g -Wall -Wextra
 
 OBJS := $(patsubst src/%.c,build/%.o,$(wildcard src/*.c))
 DEPS := src/buffer.h
@@ -7,8 +8,10 @@ main: $(OBJS)
 	@ $(CC) $(CFLAGS) -o build/$@ $^ main.c src/hash-table/ht.c
 
 build/%.o: src/%.c src/%.h $(DEPS)
-	$(CC) $(CFLAGS) -c -o $@ $< $(CFLAGS)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
-tests/$(wildcard tests/*.c): $(OBJS)
-	@ $(CC) $(CFLAGS) -o $(patsubst tests/%.c,build/%,$@) $@ $^ \
+$(wildcard tests/*.c): $(OBJS) tests/compiler.h .FORCE
+	@ $(CC) $(CFLAGS) -o $(patsubst tests/%.c,build/test_%,$@) $@ $(OBJS) \
 		tests/unity/unity.c src/hash-table/ht.c
+
+.FORCE:
