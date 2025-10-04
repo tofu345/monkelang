@@ -1,9 +1,12 @@
 #pragma once
 
 #include "../src/code.h"
+#include "../src/buffer.h"
+#include "../src/ast.h"
+#include "../src/parser.h"
+#include "../src/compiler.h"
 
 // The lengths one must go to, to achieve a measure of convenience in C.
-
 typedef struct {
     enum {
         c_int = 1,
@@ -20,18 +23,20 @@ typedef struct {
     int length;
 } Constants;
 
-Instructions concat(Instructions out, ...);
-Constants constants(Constant c, ...);
-
 #define INT(v) (Constant){ c_int, { ._int = v } }
 #define INS(...) (Constant){ c_ins, { ._ins = _I(__VA_ARGS__) } }
 
-// This is likely not the correct way.
+// This is likely not the best way.
 #define _C(...) constants(__VA_ARGS__, NULL)
 #define _I(...) concat(__VA_ARGS__, NULL)
 
-static void run_compiler_test(
-    char *input,
-    Instructions expectedInstructions,
-    Constants expectedConstants
-);
+// append all Instructions after [ins] into [ins]
+Instructions concat(Instructions out, ...);
+// return [Constants] of [Constant]'s of arbitrary length
+Constants constants(Constant c, ...);
+
+Program parse(char *input);
+void check_parser_errors(Parser* p);
+void check_compiler_errors(Compiler* c);
+
+int test_integer_object(long expected, Object *actual);

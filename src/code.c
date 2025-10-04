@@ -19,7 +19,7 @@ const Definition definitions[] = {
 const Definition *
 lookup(Opcode op) {
     static int len = sizeof(definitions) / sizeof(definitions[0]);
-    if ((int)op > len) {
+    if (op <= 0 || (int)op > len) {
         die("Definition for Opcode '%d' not found", op);
     }
     return definitions + op - 1;
@@ -48,10 +48,9 @@ put_big_endian_uint16(uint8_t *arr, uint16_t n) {
 
 Operands read_operands(int *n, const Definition *def, uint8_t* ins) {
     Operands operands = {
-        .data = malloc(def->widths.length * sizeof(int)),
+        .data = allocate(def->widths.length * sizeof(int)),
         .length = def->widths.length
     };
-    if (operands.data == NULL) die("malloc");
 
     int width, offset = 0;
     for (int i = 0; i < def->widths.length; i++) {
@@ -72,18 +71,17 @@ Operands read_operands(int *n, const Definition *def, uint8_t* ins) {
 }
 
 Instructions
-make(Opcode op, int operand, ...) {
+make_valist(Opcode op, va_list operands) {
     const Definition *def = lookup(op);
-
     Instructions ins = {};
-    instructions_fill(&ins, op, 1);
-    int width, offset = 1;
+    instructions_allocate(&ins, 1);
+    ins.data[0] = op;
+    int operand, width, offset = 1;
 
-    va_list ap;
-    va_start(ap, operand);
     for (int i = 0; i < def->widths.length; i++) {
+        operand = va_arg(operands, int);
         width = def->widths.data[i];
-        instructions_fill(&ins, 0, width);
+        instructions_allocate(&ins, width);
         switch (width) {
             case 2:
                 put_big_endian_uint16(ins.data + offset, operand);
@@ -91,24 +89,26 @@ make(Opcode op, int operand, ...) {
             default:
                 die("make: operand width %d not implemented", width);
         }
-
         offset += width;
-        operand = va_arg(ap, int);
     }
-
-    va_end(ap);
+    va_end(operands);
     return ins;
 }
 
-void instructions_fill(Instructions *buf, uint8_t val, int length) {
+Instructions
+make(Opcode op, ...) {
+    va_list ap;
+    va_start(ap, op);
+    return make_valist(op, ap);
+}
+
+void instructions_allocate(Instructions *buf, int length) {
     if (buf->length + length >= buf->capacity) {
         int capacity = power_of_2_ceil(buf->length + length);
         buf->data = reallocate(buf->data, capacity * sizeof(uint8_t));
         buf->capacity = capacity;
     }
-    for (int i = 0; i < length; i++) {
-        buf->data[(buf->length)++] = val;
-    }
+    buf->length += length;
 }
 
 static int
@@ -126,20 +126,21 @@ fprint_definition_operands(FILE *out, const Definition *def, Operands operands) 
             return 0;
     }
 
-    FPRINTF(out, "ERROR: unhandled operand_count for %s\n",
-        def->name);
+    FPRINTF(out, "ERROR: unhandled operand_count for %s\n", def->name);
     return 0;
 }
 
 int fprint_instruction(FILE *out, Instructions ins) {
-    int read, i = 0;
+    int err, read, i = 0;
     const Definition *def;
+    Operands operands;
     while (i < ins.length) {
         def = lookup(ins.data[i]);
-        Operands operands = read_operands(&read, def, ins.data + i);
+        operands = read_operands(&read, def, ins.data + i);
         FPRINTF(out, "%04d ", i);
-        if (fprint_definition_operands(out, def, operands) == -1)
-            return -1;
+        err = fprint_definition_operands(out, def, operands);
+        free(operands.data);
+        if (err == -1) return -1;
         i += 1 + read;
     }
     return 0;

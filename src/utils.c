@@ -6,13 +6,13 @@
 
 inline void* allocate(size_t size) {
     void* ptr = malloc(size);
-    if (ptr == NULL) ALLOC_FAIL();
+    if (ptr == NULL) die("allocate");
     return ptr;
 }
 
 inline void* reallocate(void* ptr, size_t size) {
     void* new_ptr = realloc(ptr, size);
-    if (new_ptr == NULL) ALLOC_FAIL();
+    if (new_ptr == NULL) die("reallocate");
     return new_ptr;
 }
 

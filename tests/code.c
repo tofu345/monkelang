@@ -2,7 +2,6 @@
 
 #include "../src/code.h"
 
-#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 
@@ -46,10 +45,11 @@ void test_instructions_string(void) {
     };
     int length = sizeof(tests) / sizeof(tests[0]);
 
+    // concat all tests into tests[0]
     int index = tests[0].length;
     for (int i = 1; i < length; i++) {
         int len = tests[i].length;
-        instructions_fill(tests, 0, len);
+        instructions_allocate(tests, len);
         memcpy(tests[0].data + index, tests[i].data, len * sizeof(uint8_t));
         index += len;
         free(tests[i].data);
@@ -114,6 +114,8 @@ void test_read_operands(void) {
                 fail = true;
             }
         }
+        free(operands.data);
+        free(tt.actual.data);
         if (fail) TEST_FAIL();
     }
 }

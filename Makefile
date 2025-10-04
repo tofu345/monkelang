@@ -10,8 +10,8 @@ main: $(OBJS)
 build/%.o: src/%.c src/%.h $(DEPS)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(wildcard tests/*.c): $(OBJS) tests/compiler.h .FORCE
-	@ $(CC) $(CFLAGS) -o $(patsubst tests/%.c,build/test_%,$@) $@ $(OBJS) \
-		tests/unity/unity.c src/hash-table/ht.c
+$(wildcard tests/*.c): $(OBJS) tests/*.h .FORCE
+	@ $(CC) $(CFLAGS) -o $(patsubst tests/%.c,build/test_%,$@) $@ \
+		$(OBJS) tests/helpers.c tests/unity/unity.c src/hash-table/ht.c
 
 .FORCE:
