@@ -71,16 +71,33 @@ constants(Constant c, ...) {
     return (Constants){constants, length};
 }
 
-int test_integer_object(long expected, Object *actual) {
-    if (o_Integer != actual->typ) {
-        printf("object is not Integer. got=%s\n", show_object_type(actual->typ));
+int test_integer_object(long expected, Object actual) {
+    if (o_Integer != actual.typ) {
+        printf("object is not Integer. got=%s\n",
+                show_object_type(actual.typ));
         return -1;
     }
 
-    if (expected != actual->data.integer) {
+    if (expected != actual.data.integer) {
         printf("object has wrong value. want=%ld got=%ld\n",
-                expected, actual->data.integer);
+                expected, actual.data.integer);
         return -1;
     }
+    return 0;
+}
+
+int test_boolean_object(bool expected, Object actual) {
+    if (actual.typ != o_Boolean) {
+        printf("object is not Boolean. got=%s\n",
+                show_object_type(actual.typ));
+        return -1;
+    }
+
+    if (actual.data.boolean != expected) {
+        printf("object has wrong value. got=%d, want=%d\n",
+                actual.data.boolean, expected);
+        return -1;
+    }
+
     return 0;
 }

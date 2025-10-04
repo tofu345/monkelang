@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 
+DEFINE_BUFFER(String, char*);
+
 inline void* allocate(size_t size) {
     void* ptr = malloc(size);
     if (ptr == NULL) die("allocate");
@@ -42,4 +44,13 @@ int power_of_2_ceil(int n) {
     n |= n >> 16;
     n++;
     return n;
+}
+
+void error(StringBuffer* buf, char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    char* msg = NULL;
+    if (vasprintf(&msg, format, args) == -1) die("new_error: vasprintf");
+    StringBufferPush(buf, msg);
+    va_end(args);
 }

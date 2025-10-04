@@ -11,8 +11,6 @@ typedef struct Parser Parser;
 typedef Node (*PrefixParseFn) (Parser* p);
 typedef Node (*InfixParseFn) (Parser* p, Node left);
 
-BUFFER(String, char*);
-
 // All `parse_*` functions must return with `p->cur_token`
 // in use or freed
 struct Parser {
@@ -22,7 +20,7 @@ struct Parser {
 
     StringBuffer errors;
 
-    // memory efficient, no, fast, yes
+    // TODO: change order of tokens and reduce array size.
     PrefixParseFn prefix_parse_fns[t_Return];
     InfixParseFn infix_parse_fns[t_Return];
 };

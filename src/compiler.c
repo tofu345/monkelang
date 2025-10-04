@@ -1,7 +1,6 @@
 #include "compiler.h"
 #include "ast.h"
 #include "code.h"
-#include "parser.h"
 #include "object.h"
 #include "utils.h"
 
@@ -14,9 +13,6 @@ static int emit(Compiler *c, Opcode op, ...);
 static int add_constant(Compiler *c, Object obj);
 // add [ins] to [Compiler.instructions] and free [ins].
 static int add_instruction(Compiler *c, uint8_t *ins, int length);
-
-// TODO: eventually replace [evaluator.c/OBJ]
-#define OBJ(t, d) (Object){ .typ = t, .is_marked = false, .data = { d } }
 
 DEFINE_BUFFER(Constant, Object);
 
@@ -33,16 +29,6 @@ void compiler_destroy(Compiler *c) {
     free(c->instructions.data);
 }
 
-static void
-compiler_error(Compiler* c, char* format, ...) {
-    va_list args;
-    va_start(args, format);
-    char* msg = NULL;
-    if (vasprintf(&msg, format, args) == -1) ALLOC_FAIL();
-    StringBufferPush(&c->errors, msg);
-    va_end(args);
-}
-
 static int
 _compile(Compiler *c, Node n) {
     int err;
@@ -50,12 +36,29 @@ _compile(Compiler *c, Node n) {
         case n_ExpressionStatement:
             {
                 ExpressionStatement *es = n.obj;
-                return _compile(c, es->expression);
+                if (_compile(c, es->expression) == -1) { return -1; }
+                emit(c, OpPop);
+                return 0;
             }
 
         case n_InfixExpression:
             {
                 InfixExpression *ie = n.obj;
+                if ('<' == ie->op[0]) {
+                    err = _compile(c, ie->right);
+                    if (err == -1) {
+                        return -1;
+                    }
+
+                    err = _compile(c, ie->left);
+                    if (err == -1) {
+                        return -1;
+                    }
+
+                    emit(c, OpGreaterThan);
+                    return 0;
+                }
+
                 err = _compile(c, ie->left);
                 if (err == -1) {
                     return -1;
@@ -63,6 +66,53 @@ _compile(Compiler *c, Node n) {
 
                 err = _compile(c, ie->right);
                 if (err == -1) {
+                    return -1;
+                }
+
+                if ('+' == ie->op[0]) {
+                    emit(c, OpAdd);
+
+                } else if ('-' == ie->op[0]) {
+                    emit(c, OpSub);
+
+                } else if ('*' == ie->op[0]) {
+                    emit(c, OpMul);
+
+                } else if ('/' == ie->op[0]) {
+                    emit(c, OpDiv);
+
+                } else if ('>' == ie->op[0]) {
+                    emit(c, OpGreaterThan);
+
+                } else if (!strcmp("==", ie->op)) {
+                    emit(c, OpEqual);
+
+                } else if (!strcmp("!=", ie->op)) {
+                    emit(c, OpNotEqual);
+
+                } else {
+                    error(&c->errors, "unknown operator %s", ie->op);
+                    return -1;
+                }
+                return 0;
+            }
+
+        case n_PrefixExpression:
+            {
+                PrefixExpression *pe = n.obj;
+                err = _compile(c, pe->right);
+                if (err == -1) {
+                    return -1;
+                }
+
+                if ('!' == pe->op[0]) {
+                    emit(c, OpBang);
+
+                } else if ('-' == pe->op[0]) {
+                    emit(c, OpMinus);
+
+                } else {
+                    error(&c->errors, "unknown operator %s", pe->op);
                     return -1;
                 }
                 return 0;
@@ -76,10 +126,20 @@ _compile(Compiler *c, Node n) {
                 return 0;
             }
 
+        case n_BooleanLiteral:
+            {
+                BooleanLiteral *bl = n.obj;
+                if (bl->value) {
+                    emit(c, OpTrue);
+                } else {
+                    emit(c, OpFalse);
+                }
+                return 0;
+            }
+
         default:
-            die("_compile: node type %d not implemented", n.typ);
+            return 0;
     }
-    return -1;
 }
 
 static int

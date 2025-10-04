@@ -9,11 +9,24 @@
 
 #define DEF(code) \
     { #code, { _##code, sizeof(_##code) / sizeof(_##code[0]) } }
+#define DEF_EMPTY(code) { #code, { NULL, 0 } }
 
 int _OpConstant[] = { 2 };
 
 const Definition definitions[] = {
     DEF(OpConstant),
+    DEF_EMPTY(OpPop),
+    DEF_EMPTY(OpAdd),
+    DEF_EMPTY(OpSub),
+    DEF_EMPTY(OpMul),
+    DEF_EMPTY(OpDiv),
+    DEF_EMPTY(OpTrue),
+    DEF_EMPTY(OpFalse),
+    DEF_EMPTY(OpEqual),
+    DEF_EMPTY(OpNotEqual),
+    DEF_EMPTY(OpGreaterThan),
+    DEF_EMPTY(OpMinus),
+    DEF_EMPTY(OpBang),
 };
 
 const Definition *
@@ -25,9 +38,7 @@ lookup(Opcode op) {
     return definitions + op - 1;
 }
 
-// read `arr[0:2]` big endian.
-static int
-read_big_endian_uint16(uint8_t *arr) {
+int read_big_endian_uint16(uint8_t *arr) {
     int out = (arr[0] << 8) | arr[1];
     return out;
 }
@@ -121,11 +132,13 @@ fprint_definition_operands(FILE *out, const Definition *def, Operands operands) 
     }
 
     switch (operand_count) {
+        case 0:
+            FPRINTF(out, "%s\n", def->name);
+            return 0;
         case 1:
             FPRINTF(out, "%s %d\n", def->name, operands.data[0]);
             return 0;
     }
-
     FPRINTF(out, "ERROR: unhandled operand_count for %s\n", def->name);
     return 0;
 }

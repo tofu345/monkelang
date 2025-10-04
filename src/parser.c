@@ -9,8 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-DEFINE_BUFFER(String, char*);
-
 static Node parse_statement(Parser* p);
 static Node parse_expression(Parser* p, enum Precedence precedence);
 static NodeBuffer parse_expression_list(Parser* p, TokenType end);

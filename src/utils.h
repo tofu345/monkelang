@@ -1,12 +1,12 @@
 #pragma once
 
+#include "buffer.h"
+
 #include <stddef.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define DEFAULT_CAPACITY 8
 
 #define FPRINTF(fp, ...) \
     if (fprintf(fp, __VA_ARGS__) <= 0) \
@@ -19,6 +19,10 @@
                 strerror(errno)); \
         exit(1); \
     } while(0);
+
+BUFFER(String, char*);
+
+void error(StringBuffer* buf, char* format, ...);
 
 // from dwm :p
 void die(const char *fmt, ...);

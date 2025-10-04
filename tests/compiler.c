@@ -3,27 +3,161 @@
 
 #include "../src/ast.h"
 #include "../src/parser.h"
-#include "../src/compiler.h"
+#include "unity/unity_internals.h"
 
 #include <stdio.h>
 
 void setUp(void) {}
 void tearDown(void) {}
 
-static void run_compiler_test(
+// compiler test
+static void c_test(
     char *input,
-    Instructions expectedInstructions,
-    Constants expectedConstants
+    Constants expectedConstants,
+    Instructions expectedInstructions
 );
 
 void test_integer_arithmetic(void) {
-    run_compiler_test(
+    c_test(
         "1 + 2",
+        _C( INT(1), INT(2) ),
         _I(
             make(OpConstant, 0),
-            make(OpConstant, 1)
-        ),
-        _C( INT(1), INT(2) )
+            make(OpConstant, 1),
+            make(OpAdd),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "1; 2;",
+        _C( INT(1), INT(2) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpPop),
+            make(OpConstant, 1),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "1 - 2",
+        _C( INT(1), INT(2) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 1),
+            make(OpSub),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "1 * 2",
+        _C( INT(1), INT(2) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 1),
+            make(OpMul),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "2 / 1",
+        _C( INT(2), INT(1) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 1),
+            make(OpDiv),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "-1",
+        _C( INT(1) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpMinus),
+            make(OpPop)
+        )
+    );
+}
+
+void test_boolean_expressions(void) {
+    c_test(
+        "true",
+        (Constants){},
+        _I( make(OpTrue), make(OpPop) )
+    );
+    c_test(
+        "false",
+        (Constants){},
+        _I( make(OpFalse), make(OpPop) )
+    );
+    c_test(
+        "1 > 2",
+        _C( INT(1), INT(2) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 1),
+            make(OpGreaterThan),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "1 < 2",
+        _C( INT(2), INT(1) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 1),
+            make(OpGreaterThan),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "1 == 2",
+        _C( INT(1), INT(2) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 1),
+            make(OpEqual),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "1 != 2",
+        _C( INT(1), INT(2) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 1),
+            make(OpNotEqual),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "true == false",
+        (Constants){},
+        _I(
+            make(OpTrue),
+            make(OpFalse),
+            make(OpEqual),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "true != false",
+        (Constants){},
+        _I(
+            make(OpTrue),
+            make(OpFalse),
+            make(OpNotEqual),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "!true",
+        (Constants){},
+        _I(
+            make(OpTrue),
+            make(OpBang),
+            make(OpPop)
+        )
     );
 }
 
@@ -31,10 +165,10 @@ static void test_instructions(Instructions expected, Instructions actual);
 static void test_constants(Constants expected, ConstantBuffer actual);
 
 static void
-run_compiler_test(
+c_test(
     char *input,
-    Instructions expectedInstructions,
-    Constants expectedConstants
+    Constants expectedConstants,
+    Instructions expectedInstructions
 ) {
     Program prog = parse(input);
     Compiler c = {};
@@ -86,7 +220,7 @@ test_constants(Constants expected, ConstantBuffer actual) {
     for (int i = 0; i < expected.length; i++) {
         switch (expected.data[i].type) {
             case c_int:
-                err = test_integer_object(expected.data[i].data._int, actual.data + i);
+                err = test_integer_object(expected.data[i].data._int, actual.data[i]);
                 if (err != 0) {
                     printf("constant %d - testIntegerObject failed\n", i);
                     TEST_FAIL();
@@ -102,5 +236,6 @@ test_constants(Constants expected, ConstantBuffer actual) {
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_integer_arithmetic);
+    RUN_TEST(test_boolean_expressions);
     return UNITY_END();
 }

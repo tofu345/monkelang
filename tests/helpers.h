@@ -36,7 +36,9 @@ Instructions concat(Instructions out, ...);
 Constants constants(Constant c, ...);
 
 Program parse(char *input);
+void print_errors(StringBuffer* errs);
 void check_parser_errors(Parser* p);
 void check_compiler_errors(Compiler* c);
 
-int test_integer_object(long expected, Object *actual);
+int test_integer_object(long expected, Object actual);
+int test_boolean_object(bool expected, Object actual);

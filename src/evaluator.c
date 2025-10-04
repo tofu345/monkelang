@@ -62,6 +62,7 @@ Object* object_copy(Env* env, Object* obj) {
     }
 }
 
+// TODO: delete or rename
 Object* new_error(Env* env, char* format, ...) {
     va_list args;
     va_start(args, format);

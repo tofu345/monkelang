@@ -4,9 +4,25 @@
 
 #include <stdarg.h>
 #include <stdint.h>
+#include <stdio.h>
 
 typedef enum {
     OpConstant = 1,
+    OpPop,
+    OpAdd,
+    OpSub,
+    OpMul,
+    OpDiv,
+
+    OpTrue,
+    OpFalse,
+
+    OpEqual,
+    OpNotEqual,
+    OpGreaterThan,
+
+    OpMinus,
+    OpBang,
 } Opcode;
 
 typedef struct {
@@ -27,6 +43,9 @@ typedef struct {
 
 // Reads operands in `ins[1:]` with [def] and store num bytes read in [n]
 Operands read_operands(int *n, const Definition *def, uint8_t *ins);
+
+// read `arr[0:2]` big endian.
+int read_big_endian_uint16(uint8_t *arr);
 
 // Takes [Opcode] and [int] operands
 Instructions make(Opcode op, ...);

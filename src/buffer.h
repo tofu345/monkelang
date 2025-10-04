@@ -1,7 +1,5 @@
 #pragma once
 
-#include "utils.h"
-
 // From: wren DECLARE_BUFFER
 #define BUFFER(name, typ)                                                     \
     typedef struct {                                                          \
@@ -26,7 +24,11 @@
     void name##BufferFill(name##Buffer* buf, typ val, int length) {           \
         if (buf->length + length >= buf->capacity) {                          \
             int capacity = power_of_2_ceil(buf->length + length);             \
-            buf->data = reallocate(buf->data, capacity * sizeof(typ));        \
+            buf->data = realloc(buf->data, capacity * sizeof(typ));           \
+            if (buf->data == NULL) {                                          \
+                fprintf(stderr, "buf malloc");                                \
+                exit(1);                                                      \
+            };                                                                \
             buf->capacity = capacity;                                         \
         }                                                                     \
         for (int i = 0; i < length; i++) {                                    \

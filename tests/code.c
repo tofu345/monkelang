@@ -4,6 +4,8 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 void setUp(void) {}
 
@@ -15,6 +17,7 @@ void test_make(void) {
         uint8_t expected[4]; // NULL-terminated
     } tests[] = {
         {make(OpConstant, 65534), {OpConstant, 255, 254}},
+        {make(OpAdd), {OpAdd}},
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
 
@@ -39,7 +42,7 @@ void test_make(void) {
 
 void test_instructions_string(void) {
     Instructions tests[] = {
-        make(OpConstant, 1),
+        make(OpAdd),
         make(OpConstant, 2),
         make(OpConstant, 65535)
     };
@@ -55,9 +58,9 @@ void test_instructions_string(void) {
         free(tests[i].data);
     }
 
-    char *expected_body = "0000 OpConstant 1\n\
-0003 OpConstant 2\n\
-0006 OpConstant 65535\n";
+    char *expected_body = "0000 OpAdd\n\
+0001 OpConstant 2\n\
+0004 OpConstant 65535\n";
 
     char *buf = NULL;
     size_t len;

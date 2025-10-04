@@ -3,10 +3,11 @@
 #include "ast.h"
 #include "code.h"
 #include "object.h"
-#include "parser.h"
 
 // TODO FIXME: Change ObjectBuffer to hold concrete [Objects]
 BUFFER(Constant, Object);
+// TODO: replace [evaluator.c/OBJ]
+#define OBJ(t, d) (Object){ .typ = t, .is_marked = false, .data = { d } }
 
 typedef struct {
     Instructions instructions;
