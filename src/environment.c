@@ -58,9 +58,6 @@ void trace_mark_object(Object* obj) {
 
 static void
 mark(Env* env) {
-    for (int i = 0; i < env->tracking.length; i++) {
-        trace_mark_object(env->tracking.data[i]);
-    }
     for (int i = 0; i < env->frames.length; i++) {
         hti it = ht_iterator(env->frames.data[i]->table);
         while (ht_next(&it)) {
@@ -125,7 +122,6 @@ Env* env_new() {
     FrameBufferInit(&env->frames);
     env->current = frame_new(env);
     ObjectBufferInit(&env->objects);
-    ObjectBufferInit(&env->tracking);
     return env;
 }
 
@@ -135,7 +131,6 @@ void env_destroy(Env* env) {
         free(env->frames.data[i]);
     }
     free(env->frames.data);
-    free(env->tracking.data);
     for (int i = 0; i < env->objects.length; i++) {
         object_destroy(env->objects.data[i]);
         free(env->objects.data[i]);
@@ -160,12 +155,4 @@ Object* env_get(Env* env, char* name) {
 void env_set(Env* env, char* name, Object* obj) {
     if (ht_set(env->current->table, name, obj) == NULL)
         ALLOC_FAIL();
-}
-
-void track(Env *env, Object *obj) {
-    ObjectBufferPush(&env->tracking, obj);
-}
-
-void untrack(Env* env, size_t num_objects) {
-    env->tracking.length -= num_objects;
 }

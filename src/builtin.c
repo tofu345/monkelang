@@ -157,7 +157,3 @@ ht* builtins_init() {
     }
     return tbl;
 }
-
-Object* builtin_get(Env* env, char* name) {
-    return ht_get(env->builtins, name);
-}

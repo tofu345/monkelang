@@ -31,15 +31,6 @@ struct Env {
     // TODO: allocate only non-primitive types.
     ObjectBuffer objects;
 
-    // [Objects] that will always be marked during [mark_and_sweep].
-    //
-    // Needed because [mark_and_sweep] is called after a function (not
-    // [builtins]) finishes, not great, I know.
-	//
-	// In Infix Expressions, when evaluating right expression, left will be
-	// freed if [right] contains a call expression :|
-    ObjectBuffer tracking;
-
     ht* builtins;
 };
 
@@ -61,7 +52,3 @@ Object* env_get(Env* env, char* name);
 
 // add to [env->current] table with [name] and append to [env->objects].
 void env_set(Env* env, char* name, Object* obj);
-
-// add to [env->tracking]
-void track(Env* env, Object* obj);
-void untrack(Env* env, size_t num_objects);

@@ -1,6 +1,7 @@
 #include "evaluator.h"
 #include "ast.h"
 #include "environment.h"
+#include "hash-table/ht.h"
 #include "object.h"
 #include "utils.h"
 #include "builtin.h"
@@ -303,9 +304,7 @@ eval_infix_expression(Env* env, InfixExpression* ie) {
     if (IS_ERROR(left))
         return left;
 
-    track(env, left);
     Object* right = eval(env, ie->right);
-    untrack(env, 1);
     if (IS_ERROR(right))
         return right;
 
@@ -355,7 +354,7 @@ eval_identifier(Env* env, Identifier* i) {
     if (val != NULL)
         return val;
 
-    Object* builtin = builtin_get(env, i->tok.literal);
+    Object* builtin = ht_get(env->builtins, i->tok.literal);
     if (builtin != NULL)
         return builtin;
 
@@ -370,8 +369,6 @@ eval_expressions(Env* env, NodeBuffer args) {
     for (int i = 0; i < args.length; i++) {
         Object* result = eval(env, args.data[i]);
         if (IS_ERROR(result)) {
-            untrack(env, i);
-
             if (results.length == 0)
                 ObjectBufferPush(&results, result);
             else {
@@ -381,10 +378,7 @@ eval_expressions(Env* env, NodeBuffer args) {
             return results;
         }
         ObjectBufferPush(&results, result);
-        track(env, result); // keep in scope
     }
-
-    untrack(env, args.length);
 
     return results;
 }

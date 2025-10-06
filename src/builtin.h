@@ -4,4 +4,3 @@
 #include "hash-table/ht.h"
 
 ht* builtins_init();
-Object* builtin_get(Env* env, char* name);
