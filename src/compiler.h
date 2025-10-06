@@ -10,10 +10,18 @@ BUFFER(Constant, Object);
 #define OBJ(t, d) (Object){ .typ = t, .is_marked = false, .data = { d } }
 
 typedef struct {
+    Opcode opcode;
+    int position;
+} EmittedInstruction;
+
+typedef struct {
     Instructions instructions;
     ConstantBuffer constants;
 
     StringBuffer errors;
+
+    EmittedInstruction last_instruction;
+    EmittedInstruction previous_instruction;
 } Compiler;
 
 // Init with `Compiler c = {}`.

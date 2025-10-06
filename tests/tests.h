@@ -5,7 +5,8 @@
 #include "../src/code.h"
 
 typedef enum {
-    test_int = 1,
+    test_null,
+    test_int,
     test_float,
     test_str,
     test_bool,
@@ -24,3 +25,4 @@ typedef struct {
 } Test;
 
 #define TEST(t, v) (Test){ test_##t, { ._##t = v } }
+#define TEST_NULL (Test){}

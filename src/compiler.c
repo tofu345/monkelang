@@ -11,13 +11,12 @@
 // emit append [Instruction] with [Opcode] and [int] operands
 static int emit(Compiler *c, Opcode op, ...);
 static int add_constant(Compiler *c, Object obj);
-// add [ins] to [Compiler.instructions] and free [ins].
-static int add_instruction(Compiler *c, uint8_t *ins, int length);
+static int add_instruction(Compiler *c, Instructions ins);
 
 DEFINE_BUFFER(Constant, Object);
 
 void compiler_init(Compiler *c) {
-    *c = (Compiler){}; // equiv to memset(0)?
+    memset(c, 0, sizeof(Compiler));
 }
 
 void compiler_destroy(Compiler *c) {
@@ -29,14 +28,53 @@ void compiler_destroy(Compiler *c) {
     free(c->instructions.data);
 }
 
+static bool
+last_instruction_is_pop(Compiler *c) {
+    return c->last_instruction.opcode == OpPop;
+}
+
+static void
+remove_last_pop(Compiler *c) {
+    c->instructions.length = c->last_instruction.position;
+    c->last_instruction = c->previous_instruction;
+}
+
+static void
+replace_instruction(Compiler *c, int pos, Instructions new) {
+    for (int i = 0; i < new.length; i++) {
+        c->instructions.data[pos + i] = new.data[i];
+    }
+}
+
+static void
+change_operand(Compiler *c, int op_pos, int operand) {
+    Opcode op = c->instructions.data[op_pos];
+    Instructions new = make(op, operand);
+    replace_instruction(c, op_pos, new);
+    free(new.data);
+}
+
 static int
 _compile(Compiler *c, Node n) {
-    int err;
     switch (n.typ) {
+        case n_BlockStatement:
+            {
+                BlockStatement* bs = n.obj;
+                for (int i = 0; i < bs->stmts.length; i++) {
+                    if (_compile(c, bs->stmts.data[i])) {
+                        return -1;
+                    }
+                }
+                return 0;
+            }
+
         case n_ExpressionStatement:
             {
                 ExpressionStatement *es = n.obj;
-                if (_compile(c, es->expression) == -1) { return -1; }
+                if (_compile(c, es->expression)) {
+                    return -1;
+                }
+
                 emit(c, OpPop);
                 return 0;
             }
@@ -45,13 +83,11 @@ _compile(Compiler *c, Node n) {
             {
                 InfixExpression *ie = n.obj;
                 if ('<' == ie->op[0]) {
-                    err = _compile(c, ie->right);
-                    if (err == -1) {
+                    if (_compile(c, ie->right)) {
                         return -1;
                     }
 
-                    err = _compile(c, ie->left);
-                    if (err == -1) {
+                    if (_compile(c, ie->left)) {
                         return -1;
                     }
 
@@ -59,13 +95,11 @@ _compile(Compiler *c, Node n) {
                     return 0;
                 }
 
-                err = _compile(c, ie->left);
-                if (err == -1) {
+                if (_compile(c, ie->left)) {
                     return -1;
                 }
 
-                err = _compile(c, ie->right);
-                if (err == -1) {
+                if (_compile(c, ie->right)) {
                     return -1;
                 }
 
@@ -100,8 +134,7 @@ _compile(Compiler *c, Node n) {
         case n_PrefixExpression:
             {
                 PrefixExpression *pe = n.obj;
-                err = _compile(c, pe->right);
-                if (err == -1) {
+                if (_compile(c, pe->right)) {
                     return -1;
                 }
 
@@ -115,6 +148,45 @@ _compile(Compiler *c, Node n) {
                     error(&c->errors, "unknown operator %s", pe->op);
                     return -1;
                 }
+                return 0;
+            }
+
+        case n_IfExpression:
+            {
+                IfExpression *ie = n.obj;
+                if (_compile(c, ie->condition)) {
+                    return -1;
+                }
+
+                // Emit an `OpJumpNotTruthy` with a bogus value
+                int jump_not_truthy_pos = emit(c, OpJumpNotTruthy, 9999);
+
+                if (_compile(c, NODE(n_BlockStatement, ie->consequence))) {
+                    return -1;
+                }
+                if (last_instruction_is_pop(c)) {
+                    remove_last_pop(c);
+                }
+
+                // Emit an `OpJump` with a bogus value
+                int jump_pos = emit(c, OpJump, 9999);
+
+                int after_consequence_pos = c->instructions.length;
+                change_operand(c, jump_not_truthy_pos, after_consequence_pos);
+
+                if (ie->alternative == NULL) {
+                    emit(c, OpNull);
+                } else {
+                    if (_compile(c, NODE(n_BlockStatement, ie->alternative))) {
+                        return -1;
+                    }
+                    if (last_instruction_is_pop(c)) {
+                        remove_last_pop(c);
+                    }
+                }
+
+                int after_alternative_pos = c->instructions.length;
+                change_operand(c, jump_pos, after_alternative_pos);
                 return 0;
             }
 
@@ -149,13 +221,19 @@ add_constant(Compiler *c, Object obj) {
 }
 
 static int
-add_instruction(Compiler *c, uint8_t *ins, int length) {
+add_instruction(Compiler *c, Instructions ins) {
     int pos_new_instruction = c->instructions.length;
-    instructions_allocate(&c->instructions, length);
+    instructions_allocate(&c->instructions, ins.length);
     memcpy(c->instructions.data + pos_new_instruction,
-            ins, length * sizeof(uint8_t));
-    free(ins);
+            ins.data, ins.length * sizeof(uint8_t));
     return pos_new_instruction;
+}
+
+static void
+set_last_instruction(Compiler *c, Opcode op, int pos) {
+    c->previous_instruction = c->last_instruction;
+    c->last_instruction =
+        (EmittedInstruction){ .opcode = op, .position = pos };
 }
 
 static int
@@ -163,14 +241,17 @@ emit(Compiler *c, Opcode op, ...) {
     va_list ap;
     va_start(ap, op);
     Instructions ins = make_valist(op, ap);
-    return add_instruction(c, ins.data, ins.length);
+    int pos = add_instruction(c, ins);
+    set_last_instruction(c, op, pos);
+    free(ins.data);
+    return pos;
 }
 
 int compile(Compiler *c, Program *prog) {
-    int err;
     for (int i = 0; i < prog->stmts.length; i++) {
-        err = _compile(c, prog->stmts.data[i]);
-        if (err == -1) { return -1; }
+        if (_compile(c, prog->stmts.data[i])) {
+            return -1;
+        }
     }
     return 0;
 }

@@ -4,11 +4,15 @@
 #include "object.h"
 #include "utils.h"
 
+#define TRUE OBJ(o_Boolean, .boolean = true)
+#define FALSE OBJ(o_Boolean, .boolean = false)
+
 void vm_init(VM *vm, Bytecode* code) {
     vm->constants = code->constants;
     vm->instructions = code->instructions;
     vm->errors = (StringBuffer){};
-    vm->stack = allocate(StackSize * sizeof(Object));
+    vm->stack = calloc(StackSize, sizeof(Object));
+    if (vm->stack == NULL) { die("calloc stack"); };
     vm->sp = 0;
 }
 
@@ -124,11 +128,15 @@ execute_comparison(VM *vm, Opcode op) {
 static int
 execute_bang_operator(VM *vm) {
     Object operand = vm_pop(vm);
-    if (operand.typ == o_Boolean) {
-        operand.data.boolean = !operand.data.boolean;
-        return vm_push(vm, operand);
+    switch (operand.typ) {
+        case o_Boolean:
+            operand.data.boolean = !operand.data.boolean;
+            return vm_push(vm, operand);
+        case o_Null:
+            return vm_push(vm, TRUE);
+        default:
+            return vm_push(vm, FALSE);
     }
-    return vm_push(vm, OBJ(o_Boolean, .boolean = false));
 }
 
 static int
@@ -141,6 +149,18 @@ execute_minus_operator(VM *vm) {
     }
     operand.data.integer = -operand.data.integer;
     return vm_push(vm, operand);
+}
+
+static bool
+is_truthy(Object obj) {
+    switch (obj.typ) {
+        case o_Boolean:
+            return obj.data.boolean;
+        case o_Null:
+            return false;
+        default:
+            return true;
+    }
 }
 
 int vm_run(VM *vm) {
@@ -172,11 +192,11 @@ int vm_run(VM *vm) {
                 break;
 
             case OpTrue:
-                err = vm_push(vm, OBJ(o_Boolean, .boolean = true));
+                err = vm_push(vm, TRUE);
                 if (err == -1) { return -1; };
                 break;
             case OpFalse:
-                err = vm_push(vm, OBJ(o_Boolean, .boolean = false));
+                err = vm_push(vm, FALSE);
                 if (err == -1) { return -1; };
                 break;
 
@@ -193,6 +213,29 @@ int vm_run(VM *vm) {
                 break;
             case OpMinus:
                 err = execute_minus_operator(vm);
+                if (err == -1) { return -1; };
+                break;
+
+            case OpJump:
+                {
+                    int pos = read_big_endian_uint16(vm->instructions.data + ip + 1);
+                    ip = pos - 1;
+                    break;
+                }
+            case OpJumpNotTruthy:
+                {
+                    int pos = read_big_endian_uint16(vm->instructions.data + ip + 1);
+                    ip += 2;
+
+                    Object condition = vm_pop(vm);
+                    if (!is_truthy(condition)) {
+                        ip = pos - 1;
+                    }
+                    break;
+                }
+
+            case OpNull:
+                err = vm_push(vm, (Object){});
                 if (err == -1) { return -1; };
                 break;
 
@@ -220,5 +263,6 @@ void vm_destroy(VM *vm) {
     for (int i = 0; i < vm->errors.length; i++) {
         free(vm->errors.data[i]);
     }
+    // invalid pointer.. for some reason.
     free(vm->stack);
 }

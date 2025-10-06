@@ -23,6 +23,10 @@ typedef enum {
 
     OpMinus,
     OpBang,
+
+    OpJumpNotTruthy,
+    OpJump,
+    OpNull,
 } Opcode;
 
 typedef struct {
@@ -31,7 +35,7 @@ typedef struct {
 
 typedef struct {
     const char *name;
-    Operands widths;
+    const int *widths, length;
 } Definition;
 
 const Definition *lookup(Opcode op);
@@ -56,4 +60,4 @@ Instructions make_valist(Opcode op, va_list operands);
 
 // allocate [length] extra elements and increment [buf.length] by [length]
 void instructions_allocate(Instructions *buf, int length);
-int fprint_instruction(FILE *out, Instructions ins);
+int fprint_instructions(FILE *out, Instructions ins);

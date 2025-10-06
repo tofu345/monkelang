@@ -8,10 +8,12 @@
 #include <stdio.h>
 
 #define DEF(code) \
-    { #code, { _##code, sizeof(_##code) / sizeof(_##code[0]) } }
-#define DEF_EMPTY(code) { #code, { NULL, 0 } }
+    { #code, _##code, sizeof(_##code) / sizeof(_##code[0]) }
+#define DEF_EMPTY(code) { #code, NULL, 0 }
 
-int _OpConstant[] = { 2 };
+const int _OpConstant[] = { 2 };
+const int _OpJumpNotTruthy[] = { 2 };
+const int _OpJump[] = { 2 };
 
 const Definition definitions[] = {
     DEF(OpConstant),
@@ -27,6 +29,9 @@ const Definition definitions[] = {
     DEF_EMPTY(OpGreaterThan),
     DEF_EMPTY(OpMinus),
     DEF_EMPTY(OpBang),
+    DEF(OpJumpNotTruthy),
+    DEF(OpJump),
+    DEF_EMPTY(OpNull),
 };
 
 const Definition *
@@ -59,13 +64,13 @@ put_big_endian_uint16(uint8_t *arr, uint16_t n) {
 
 Operands read_operands(int *n, const Definition *def, uint8_t* ins) {
     Operands operands = {
-        .data = allocate(def->widths.length * sizeof(int)),
-        .length = def->widths.length
+        .data = allocate(def->length * sizeof(int)),
+        .length = def->length
     };
 
     int width, offset = 0;
-    for (int i = 0; i < def->widths.length; i++) {
-        width = def->widths.data[i];
+    for (int i = 0; i < def->length; i++) {
+        width = def->widths[i];
         switch (width) {
             case 2:
                 // offset + 1 to skip Opcode
@@ -89,9 +94,9 @@ make_valist(Opcode op, va_list operands) {
     ins.data[0] = op;
     int operand, width, offset = 1;
 
-    for (int i = 0; i < def->widths.length; i++) {
+    for (int i = 0; i < def->length; i++) {
         operand = va_arg(operands, int);
-        width = def->widths.data[i];
+        width = def->widths[i];
         instructions_allocate(&ins, width);
         switch (width) {
             case 2:
@@ -124,7 +129,7 @@ void instructions_allocate(Instructions *buf, int length) {
 
 static int
 fprint_definition_operands(FILE *out, const Definition *def, Operands operands) {
-    int operand_count = def->widths.length;
+    int operand_count = def->length;
     if (operands.length != operand_count) {
         FPRINTF(out, "ERROR: operand len %d does not match defined %d\n",
             operands.length, operand_count);
@@ -143,7 +148,7 @@ fprint_definition_operands(FILE *out, const Definition *def, Operands operands) 
     return 0;
 }
 
-int fprint_instruction(FILE *out, Instructions ins) {
+int fprint_instructions(FILE *out, Instructions ins) {
     int err, read, i = 0;
     const Definition *def;
     Operands operands;

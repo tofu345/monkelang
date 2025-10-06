@@ -73,8 +73,10 @@ constants(Constant c, ...) {
 
 int test_integer_object(long expected, Object actual) {
     if (o_Integer != actual.typ) {
-        printf("object is not Integer. got=%s\n",
+        printf("object is not Integer. got=%s (",
                 show_object_type(actual.typ));
+        object_fprint(&actual, stdout);
+        puts(")");
         return -1;
     }
 
@@ -88,8 +90,10 @@ int test_integer_object(long expected, Object actual) {
 
 int test_boolean_object(bool expected, Object actual) {
     if (actual.typ != o_Boolean) {
-        printf("object is not Boolean. got=%s\n",
+        printf("object is not Boolean. got=%s (",
                 show_object_type(actual.typ));
+        object_fprint(&actual, stdout);
+        puts(")");
         return -1;
     }
 

@@ -58,13 +58,13 @@ void repl(FILE* in, FILE* out) {
             parser_destroy(&p);
             continue;
         }
+        free(input);
 
         c = (Compiler){};
         int err = compile(&c, &prog);
         if (err != 0) {
             fprintf(out, "Woops! Compilation failed:\n");
             print_errors(out, &c.errors);
-            free(input);
             compiler_destroy(&c);
             continue;
         }
@@ -74,7 +74,6 @@ void repl(FILE* in, FILE* out) {
         if (err != 0) {
             fprintf(out, "Woops! Executing bytecode failed:\n");
             print_errors(out, &vm.errors);
-            free(input);
             vm_destroy(&vm);
             continue;
         }
@@ -83,7 +82,6 @@ void repl(FILE* in, FILE* out) {
         object_fprint(&stack_elem, out);
         fputc('\n', out);
 
-        free(input);
         parser_destroy(&p);
         compiler_destroy(&c);
         vm_destroy(&vm);

@@ -161,6 +161,53 @@ void test_boolean_expressions(void) {
     );
 }
 
+void test_conditionals(void) {
+    c_test(
+        "if (true) { 10 }; 3333;",
+        _C( INT(10), INT(3333) ),
+        _I(
+            // 0000
+            make(OpTrue),
+            // 0001
+            make(OpJumpNotTruthy, 10),
+            // 0004
+            make(OpConstant, 0),
+            // 0007
+            make(OpJump, 11),
+            // 0010
+            make(OpNull),
+            // 0011
+            make(OpPop),
+            // 0012
+            make(OpConstant, 1),
+            // 0015
+            make(OpPop)
+        )
+    );
+    c_test(
+        "if (true) { 10 } else { 20 }; 3333;",
+        _C( INT(10), INT(20), INT(3333) ),
+        _I(
+            // 0000
+            make(OpTrue),
+            // 0001
+            make(OpJumpNotTruthy, 10),
+            // 0004
+            make(OpConstant, 0),
+            // 0007
+            make(OpJump, 13),
+            // 0010
+            make(OpConstant, 1),
+            // 0013
+            make(OpPop),
+            // 0014
+            make(OpConstant, 2),
+            // 0017
+            make(OpPop)
+        )
+    );
+}
+
 static void test_instructions(Instructions expected, Instructions actual);
 static void test_constants(Constants expected, ConstantBuffer actual);
 
@@ -237,5 +284,6 @@ int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_integer_arithmetic);
     RUN_TEST(test_boolean_expressions);
+    RUN_TEST(test_conditionals);
     return UNITY_END();
 }

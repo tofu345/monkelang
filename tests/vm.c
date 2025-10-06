@@ -60,6 +60,21 @@ test_boolean_expressions(void) {
 }
 
 static void
+test_conditionals(void) {
+    vm_test("if (true) { 10 }", TEST(int, 10));
+    vm_test("if (true) { 10 } else { 20 }", TEST(int, 10));
+    vm_test("if (false) { 10 } else { 20 } ", TEST(int, 20));
+    vm_test("if (1) { 10 }", TEST(int, 10));
+    vm_test("if (1 < 2) { 10 }", TEST(int, 10));
+    vm_test("if (1 < 2) { 10 } else { 20 }", TEST(int, 10));
+    vm_test("if (1 > 2) { 10 } else { 20 }", TEST(int, 20));
+    vm_test("if (1 > 2) { 10 }", TEST_NULL);
+    vm_test("if (false) { 10 }", TEST_NULL);
+    vm_test("!(if (false) { 5; })", TEST(bool, true));
+    vm_test("if ((if (false) { 10 })) { 10 } else { 20 }", TEST(int, 20));
+}
+
+static void
 test_expected_object(Test expected, Object actual) {
     int err;
     switch (expected.typ) {
@@ -74,6 +89,16 @@ test_expected_object(Test expected, Object actual) {
             err = test_boolean_object(expected.val._bool, actual);
             if (err != 0) {
                 TEST_FAIL_MESSAGE("test_boolean_object failed");
+            }
+            break;
+
+        case test_null:
+            if (actual.typ != o_Null) {
+                printf("object is not Null, got=%s (",
+                        show_object_type(actual.typ));
+                object_fprint(&actual, stdout);
+                puts(")");
+                TEST_FAIL();
             }
             break;
 
@@ -106,9 +131,11 @@ vm_test(char *input, Test expected) {
     compiler_destroy(&c);
     vm_destroy(&vm);
 }
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_integer_arithmetic);
     RUN_TEST(test_boolean_expressions);
+    RUN_TEST(test_conditionals);
     return UNITY_END();
 }
