@@ -1,7 +1,7 @@
 #include "compiler.h"
 #include "ast.h"
 #include "code.h"
-#include "object.h"
+#include "symbol_table.h"
 #include "utils.h"
 
 #include <stdarg.h>
@@ -10,22 +10,30 @@
 
 // emit append [Instruction] with [Opcode] and [int] operands
 static int emit(Compiler *c, Opcode op, ...);
-static int add_constant(Compiler *c, Object obj);
-static int add_instruction(Compiler *c, Instructions ins);
+static int add_constant(Compiler *c, Constant obj_const);
 
-DEFINE_BUFFER(Constant, Object);
+DEFINE_BUFFER(Constant, Constant);
 
 void compiler_init(Compiler *c) {
     memset(c, 0, sizeof(Compiler));
+    symbol_table_init(&c->symbol_table);
 }
 
-void compiler_destroy(Compiler *c) {
+void compiler_with(Compiler *c, SymbolTable *symbol_table,
+        ConstantBuffer constants) {
+    memset(c, 0, sizeof(Compiler));
+    c->symbol_table = *symbol_table;
+    c->constants = constants;
+}
+
+void compiler_free(Compiler *c) {
     for (int i = 0; i < c->errors.length; i++) {
         free(c->errors.data[i]);
     }
     free(c->errors.data);
-    free(c->constants.data);
     free(c->instructions.data);
+    free(c->constants.data);
+    symbol_table_free(&c->symbol_table);
 }
 
 static bool
@@ -76,6 +84,29 @@ _compile(Compiler *c, Node n) {
                 }
 
                 emit(c, OpPop);
+                return 0;
+            }
+
+        case n_LetStatement:
+            {
+                LetStatement *ls = n.obj;
+                if (_compile(c, ls->value)) {
+                    return -1;
+                }
+                Symbol *symbol = sym_define(&c->symbol_table, ls->name->tok.literal);
+                emit(c, OpSetGlobal, symbol->index);
+                return 0;
+            }
+
+        case n_Identifier:
+            {
+                Identifier *id = n.obj;
+                Symbol *symbol = sym_resolve(&c->symbol_table, id->tok.literal);
+                if (symbol == NULL) {
+                    error(&c->errors, "undefined variable %s", id->tok.literal);
+                    return -1;
+                }
+                emit(c, OpGetGlobal, symbol->index);
                 return 0;
             }
 
@@ -190,10 +221,26 @@ _compile(Compiler *c, Node n) {
                 return 0;
             }
 
+        case n_ArrayLiteral:
+            {
+                NodeBuffer elems = ((ArrayLiteral *)n.obj)->elements;
+                for (int i = 0; i < elems.length; i++) {
+                    if (_compile(c, elems.data[i])) {
+                        return -1;
+                    }
+                }
+
+                emit(c, OpArray, elems.length);
+                return 0;
+            }
+
         case n_IntegerLiteral:
             {
                 IntegerLiteral *il = n.obj;
-                Object integer = OBJ(o_Integer, .integer = il->value);
+                Constant integer = {
+                    .type = c_Integer,
+                    .data = { .integer = il->value }
+                };
                 emit(c, OpConstant, add_constant(c, integer));
                 return 0;
             }
@@ -209,24 +256,26 @@ _compile(Compiler *c, Node n) {
                 return 0;
             }
 
+        case n_StringLiteral:
+            {
+                StringLiteral *sl = n.obj;
+                Constant str = {
+                    .type = c_String,
+                    .data = { .string = sl->tok.literal }
+                };
+                emit(c, OpConstant, add_constant(c, str));
+                return 0;
+            }
+
         default:
             return 0;
     }
 }
 
 static int
-add_constant(Compiler *c, Object obj) {
-    ConstantBufferPush(&c->constants, obj);
+add_constant(Compiler *c, Constant obj_const) {
+    ConstantBufferPush(&c->constants, obj_const);
     return c->constants.length - 1;
-}
-
-static int
-add_instruction(Compiler *c, Instructions ins) {
-    int pos_new_instruction = c->instructions.length;
-    instructions_allocate(&c->instructions, ins.length);
-    memcpy(c->instructions.data + pos_new_instruction,
-            ins.data, ins.length * sizeof(uint8_t));
-    return pos_new_instruction;
 }
 
 static void
@@ -238,12 +287,11 @@ set_last_instruction(Compiler *c, Opcode op, int pos) {
 
 static int
 emit(Compiler *c, Opcode op, ...) {
-    va_list ap;
-    va_start(ap, op);
-    Instructions ins = make_valist(op, ap);
-    int pos = add_instruction(c, ins);
+    va_list operands;
+    va_start(operands, op);
+    int pos = make_valist_into(&c->instructions, op, operands);
+    va_end(operands);
     set_last_instruction(c, op, pos);
-    free(ins.data);
     return pos;
 }
 

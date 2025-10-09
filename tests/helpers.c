@@ -1,35 +1,29 @@
 #include "unity/unity.h"
 #include "helpers.h"
 
-void print_errors(StringBuffer* errs) {
+void print_errors(ErrorBuffer* errs) {
     for (int i = 0; i < errs->length; i++) {
         printf("%s\n", errs->data[i]);
+        free(errs->data[i]);
     }
-    TEST_FAIL();
+    errs->length = 0;
 }
 
 void check_parser_errors(Parser* p) {
     if (p->errors.length == 0) { return; }
     printf("parser had %d errors\n", p->errors.length);
     print_errors(&p->errors);
+    parser_free(p);
+    TEST_FAIL();
 }
 
-void check_compiler_errors(Compiler* c) {
-    if (c->errors.length == 0) { return; }
-    printf("compiler had %d errors\n", c->errors.length);
-    print_errors(&c->errors);
-}
-
-Program parse(char *input) {
-    Lexer l = lexer_new(input);
+Program test_parse(char *input) {
     Parser p;
-    parser_init(&p, &l);
-    Program prog = parse_program(&p);
-
+    parser_init(&p);
+    Program prog = parse(&p, input);
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
     check_parser_errors(&p);
-    parser_destroy(&p);
-
+    parser_free(&p);
     return prog;
 }
 
@@ -56,8 +50,8 @@ Constants
 constants(Constant c, ...) {
     va_list ap;
     int length = 0, capacity = 8;
-    Constant *constants =
-        allocate(8 * sizeof(Constant));
+    Constant *constants = malloc(capacity * sizeof(Constant));
+    if (constants == NULL) { die("constants: malloc"); }
     va_start(ap, c);
     do {
         if (length >= capacity) {
@@ -68,40 +62,5 @@ constants(Constant c, ...) {
         c = va_arg(ap, Constant);
     } while (c.type != 0);
     va_end(ap);
-    return (Constants){constants, length};
-}
-
-int test_integer_object(long expected, Object actual) {
-    if (o_Integer != actual.typ) {
-        printf("object is not Integer. got=%s (",
-                show_object_type(actual.typ));
-        object_fprint(&actual, stdout);
-        puts(")");
-        return -1;
-    }
-
-    if (expected != actual.data.integer) {
-        printf("object has wrong value. want=%ld got=%ld\n",
-                expected, actual.data.integer);
-        return -1;
-    }
-    return 0;
-}
-
-int test_boolean_object(bool expected, Object actual) {
-    if (actual.typ != o_Boolean) {
-        printf("object is not Boolean. got=%s (",
-                show_object_type(actual.typ));
-        object_fprint(&actual, stdout);
-        puts(")");
-        return -1;
-    }
-
-    if (actual.data.boolean != expected) {
-        printf("object has wrong value. got=%d, want=%d\n",
-                actual.data.boolean, expected);
-        return -1;
-    }
-
-    return 0;
+    return (Constants){ constants, length };
 }

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "buffer.h"
-
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -27,15 +25,21 @@ typedef enum {
     OpJumpNotTruthy,
     OpJump,
     OpNull,
+
+    OpGetGlobal,
+    OpSetGlobal,
+
+    OpArray,
 } Opcode;
 
+// Operands widths in bytes and number.
 typedef struct {
-    int *data, length;
+    int *widths, length;
 } Operands;
 
 typedef struct {
     const char *name;
-    const int *widths, length;
+    const Operands operands;
 } Definition;
 
 const Definition *lookup(Opcode op);
@@ -45,19 +49,17 @@ typedef struct {
     int length, capacity;
 } Instructions;
 
-// Reads operands in `ins[1:]` with [def] and store num bytes read in [n]
+// allocate [length] extra elements and increment [buf.length] by [length].
+void instructions_allocate(Instructions *buf, int length);
+
+int fprint_instructions(FILE *out, Instructions ins);
+
+// Reads operands in `ins[1:]` with [def] and store num bytes read in [n].
 Operands read_operands(int *n, const Definition *def, uint8_t *ins);
 
 // read `arr[0:2]` big endian.
 int read_big_endian_uint16(uint8_t *arr);
 
-// Takes [Opcode] and [int] operands
 Instructions make(Opcode op, ...);
-
-// Takes [Opcode] and va_list of [int] operands.
-// Calls [va_end()] on [operands]
-Instructions make_valist(Opcode op, va_list operands);
-
-// allocate [length] extra elements and increment [buf.length] by [length]
-void instructions_allocate(Instructions *buf, int length);
-int fprint_instructions(FILE *out, Instructions ins);
+int make_into(Instructions *ins, Opcode op, ...);
+int make_valist_into(Instructions *ins, Opcode op, va_list operands);

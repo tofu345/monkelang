@@ -1,7 +1,6 @@
 #include "unity/unity.h"
 #include "helpers.h"
 
-#include "../src/ast.h"
 #include "../src/parser.h"
 #include "unity/unity_internals.h"
 
@@ -208,6 +207,111 @@ void test_conditionals(void) {
     );
 }
 
+void test_global_let_statements(void) {
+    c_test(
+        "\
+        let one = 1;\
+        let two = 2;\
+        ",
+        _C( INT(1), INT(2) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpSetGlobal, 0),
+            make(OpConstant, 1),
+            make(OpSetGlobal, 1)
+        )
+    );
+    c_test(
+        "\
+        let one = 1;\
+        one;\
+        ",
+        _C( INT(1) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpSetGlobal, 0),
+            make(OpGetGlobal, 0),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "\
+        let one = 1;\
+        let two = one;\
+        two;\
+        ",
+        _C( INT(1) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpSetGlobal, 0),
+            make(OpGetGlobal, 0),
+            make(OpSetGlobal, 1),
+            make(OpGetGlobal, 1),
+            make(OpPop)
+        )
+    );
+}
+
+void test_string_expressions(void) {
+    c_test(
+        "\"monkey\"",
+        _C( STR("monkey") ),
+        _I(
+            make(OpConstant, 0),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "\"mon\" + \"key\"",
+        _C( STR("mon"), STR("key") ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 1),
+            make(OpAdd),
+            make(OpPop)
+        )
+    );
+}
+
+void test_array_literals(void) {
+    c_test(
+        "[]",
+        (Constants){},
+        _I(
+            make(OpArray, 0),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "[1, 2, 3]",
+        _C( INT(1), INT(2), INT(3) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 1),
+            make(OpConstant, 2),
+            make(OpArray, 3),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "[1 + 2, 3 - 4, 5 * 6]",
+        _C( INT(1), INT(2), INT(3), INT(4), INT(5), INT(6) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 1),
+            make(OpAdd),
+            make(OpConstant, 2),
+            make(OpConstant, 3),
+            make(OpSub),
+            make(OpConstant, 4),
+            make(OpConstant, 5),
+            make(OpMul),
+            make(OpArray, 3),
+            make(OpPop)
+        )
+    );
+}
+
 static void test_instructions(Instructions expected, Instructions actual);
 static void test_constants(Constants expected, ConstantBuffer actual);
 
@@ -217,10 +321,18 @@ c_test(
     Constants expectedConstants,
     Instructions expectedInstructions
 ) {
-    Program prog = parse(input);
-    Compiler c = {};
-    compile(&c, &prog);
-    check_compiler_errors(&c);
+    Program prog = test_parse(input);
+    Compiler c;
+    compiler_init(&c);
+    if (compile(&c, &prog) != 0) {
+        printf("compiler had %d errors\n", c.errors.length);
+        print_errors(&c.errors);
+        compiler_free(&c);
+        free(expectedInstructions.data);
+        free(expectedConstants.data);
+        program_free(&prog);
+        TEST_FAIL();
+    };
     Bytecode *code = bytecode(&c);
 
     test_instructions(expectedInstructions, code->instructions);
@@ -228,17 +340,17 @@ c_test(
 
     free(expectedInstructions.data);
     free(expectedConstants.data);
-    program_destroy(&prog);
-    compiler_destroy(&c);
+    program_free(&prog);
+    compiler_free(&c);
 }
 
 static void
 test_instructions(Instructions expected, Instructions actual) {
     if (actual.length != expected.length) {
         printf("wrong instructions length.\nwant=\n");
-        fprint_instruction(stdout, expected);
+        fprint_instructions(stdout, expected);
         printf("got=\n");
-        fprint_instruction(stdout, actual);
+        fprint_instructions(stdout, actual);
         TEST_FAIL();
     }
 
@@ -247,12 +359,48 @@ test_instructions(Instructions expected, Instructions actual) {
             printf("wrong instruction at %d. want=%d, got=%d\n",
                     i, expected.data[i], actual.data[i]);
             printf("want=\n");
-            fprint_instruction(stdout, expected);
+            fprint_instructions(stdout, expected);
             printf("got=\n");
-            fprint_instruction(stdout, actual);
+            fprint_instructions(stdout, actual);
             TEST_FAIL();
         }
     }
+}
+
+bool expect_constant_is(ConstantType expected, Constant actual) {
+    if (actual.type != expected) {
+        printf("constant is not %d. got=%d", expected, actual.type);
+        return false;
+    }
+    return true;
+}
+
+static int
+test_string_constant(char *expected, Constant actual) {
+    if (!expect_constant_is(c_String, actual)) {
+        return -1;
+    }
+
+    if (strcmp(actual.data.string, expected) != 0) {
+        printf("object has wrong value. got='%s', want='%s'\n",
+                actual.data.string, expected);
+        return -1;
+    }
+    return 0;
+}
+
+static int
+test_integer_constant(long expected, Constant actual) {
+    if (!expect_constant_is(c_Integer, actual)) {
+        return -1;
+    }
+
+    if (expected != actual.data.integer) {
+        printf("object has wrong value. want=%ld got=%ld\n",
+                expected, actual.data.integer);
+        return -1;
+    }
+    return 0;
 }
 
 static void
@@ -266,10 +414,18 @@ test_constants(Constants expected, ConstantBuffer actual) {
     int err;
     for (int i = 0; i < expected.length; i++) {
         switch (expected.data[i].type) {
-            case c_int:
-                err = test_integer_object(expected.data[i].data._int, actual.data[i]);
+            case c_Integer:
+                err = test_integer_constant(expected.data[i].data.integer, actual.data[i]);
                 if (err != 0) {
-                    printf("constant %d - testIntegerObject failed\n", i);
+                    printf("constant %d - test_integer_object failed\n", i);
+                    TEST_FAIL();
+                }
+                break;
+
+            case c_String:
+                err = test_string_constant(expected.data[i].data.string, actual.data[i]);
+                if (err != 0) {
+                    printf("constant %d - test_string_object failed\n", i);
                     TEST_FAIL();
                 }
                 break;
@@ -285,5 +441,8 @@ int main(void) {
     RUN_TEST(test_integer_arithmetic);
     RUN_TEST(test_boolean_expressions);
     RUN_TEST(test_conditionals);
+    RUN_TEST(test_global_let_statements);
+    RUN_TEST(test_string_expressions);
+    RUN_TEST(test_array_literals);
     return UNITY_END();
 }

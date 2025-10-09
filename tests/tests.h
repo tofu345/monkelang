@@ -2,7 +2,9 @@
 
 #include <stdbool.h>
 
-#include "../src/code.h"
+typedef struct {
+    int *data, length;
+} TestArray;
 
 typedef enum {
     test_null,
@@ -10,13 +12,15 @@ typedef enum {
     test_float,
     test_str,
     test_bool,
+    test_arr,
 } Type;
 
 typedef union {
     long _int;
     double _float;
-    const char* _str;
+    char* _str;
     bool _bool;
+    TestArray *_arr;
 } Value;
 
 typedef struct {

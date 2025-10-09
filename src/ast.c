@@ -1,5 +1,4 @@
 #include "ast.h"
-#include "buffer.h"
 #include "token.h"
 #include "utils.h"
 
@@ -253,41 +252,41 @@ int node_fprint(const Node n, FILE* fp) {
 }
 
 static void
-destroy_prefix_expression(PrefixExpression* pe) {
+free_prefix_expression(PrefixExpression* pe) {
     free(pe->tok.literal);
-    node_destroy(pe->right);
+    node_free(pe->right);
     free(pe);
 }
 
 static void
-destroy_infix_expression(InfixExpression* ie) {
-    node_destroy(ie->left);
+free_infix_expression(InfixExpression* ie) {
+    node_free(ie->left);
     free(ie->op);
-    node_destroy(ie->right);
+    node_free(ie->right);
     free(ie);
 }
 
-void destroy_block_statement(BlockStatement* bs) {
+void free_block_statement(BlockStatement* bs) {
     free(bs->tok.literal);
     for (int i = 0; i < bs->stmts.length; i++) {
-        node_destroy(bs->stmts.data[i]);
+        node_free(bs->stmts.data[i]);
     }
     free(bs->stmts.data);
     free(bs);
 }
 
 static void
-destroy_if_expression(IfExpression* ie) {
+free_if_expression(IfExpression* ie) {
     free(ie->tok.literal);
-    node_destroy(ie->condition);
+    node_free(ie->condition);
     if (ie->consequence != NULL)
-        destroy_block_statement(ie->consequence);
+        free_block_statement(ie->consequence);
     if (ie->alternative != NULL)
-        destroy_block_statement(ie->alternative);
+        free_block_statement(ie->alternative);
     free(ie);
 }
 
-void destroy_function_literal(FunctionLiteral* fl) {
+void free_function_literal(FunctionLiteral* fl) {
     free(fl->tok.literal);
     for (int i = 0; i < fl->params.length; i++) {
         free(fl->params.data[i]->tok.literal);
@@ -295,17 +294,17 @@ void destroy_function_literal(FunctionLiteral* fl) {
     }
     free(fl->params.data);
     if (fl->body != NULL)
-        destroy_block_statement(fl->body);
+        free_block_statement(fl->body);
     free(fl);
 }
 
 static void
-destroy_call_expression(CallExpression* ce) {
+free_call_expression(CallExpression* ce) {
     free(ce->tok.literal);
-    node_destroy(ce->function);
+    node_free(ce->function);
     if (ce->args.data != NULL) {
         for (int i = 0; i < ce->args.length; i++) {
-            node_destroy(ce->args.data[i]);
+            node_free(ce->args.data[i]);
         }
         free(ce->args.data);
     }
@@ -313,98 +312,98 @@ destroy_call_expression(CallExpression* ce) {
 }
 
 static void
-destroy_let_statement(LetStatement* ls) {
+free_let_statement(LetStatement* ls) {
     free(ls->tok.literal);
     if (ls->name != NULL) {
         free(ls->name->tok.literal);
         free(ls->name);
     }
-    node_destroy(ls->value);
+    node_free(ls->value);
     free(ls);
 }
 
 static void
-destroy_return_statement(ReturnStatement* rs) {
+free_return_statement(ReturnStatement* rs) {
     free(rs->tok.literal);
-    node_destroy(rs->return_value);
+    node_free(rs->return_value);
     free(rs);
 }
 
 static void
-destroy_expression_statement(ExpressionStatement* es) {
-    node_destroy(es->expression);
+free_expression_statement(ExpressionStatement* es) {
+    node_free(es->expression);
     free(es);
 }
 
 static void
-destroy_array_literal(ArrayLiteral* al) {
+free_array_literal(ArrayLiteral* al) {
     free(al->tok.literal);
     if (al->elements.data != NULL) {
         for (int i = 0; i < al->elements.length; i++)
-            node_destroy(al->elements.data[i]);
+            node_free(al->elements.data[i]);
         free(al->elements.data);
     }
     free(al);
 }
 
 static void
-destroy_index_expression(IndexExpression* ie) {
+free_index_expression(IndexExpression* ie) {
     free(ie->tok.literal);
-    node_destroy(ie->left);
-    node_destroy(ie->index);
+    node_free(ie->left);
+    node_free(ie->index);
     free(ie);
 }
 
-void destroy_hash_literal(HashLiteral* hl) {
+void free_hash_literal(HashLiteral* hl) {
     free(hl->tok.literal);
     for (int i = 0; i < hl->pairs.length; i++) {
         Pair* pair = &hl->pairs.data[i];
-        node_destroy(pair->key);
-        node_destroy(pair->val);
+        node_free(pair->key);
+        node_free(pair->val);
     }
     free(hl->pairs.data);
     free(hl);
 }
 
-void node_destroy(Node n) {
+void node_free(Node n) {
     if (n.obj == NULL) return;
 
     switch (n.typ) {
         case n_PrefixExpression:
-            return destroy_prefix_expression(n.obj);
+            return free_prefix_expression(n.obj);
 
         case n_InfixExpression:
-            return destroy_infix_expression(n.obj);
+            return free_infix_expression(n.obj);
 
         case n_IfExpression:
-            return destroy_if_expression(n.obj);
+            return free_if_expression(n.obj);
 
         case n_FunctionLiteral:
-            return destroy_function_literal(n.obj);
+            return free_function_literal(n.obj);
 
         case n_CallExpression:
-            return destroy_call_expression(n.obj);
+            return free_call_expression(n.obj);
 
         case n_LetStatement:
-            return destroy_let_statement(n.obj);
+            return free_let_statement(n.obj);
 
         case n_ReturnStatement:
-            return destroy_return_statement(n.obj);
+            return free_return_statement(n.obj);
 
         case n_ExpressionStatement:
-            return destroy_expression_statement(n.obj);
+            return free_expression_statement(n.obj);
 
         case n_BlockStatement:
-            return destroy_block_statement(n.obj);
+            return free_block_statement(n.obj);
 
         case n_ArrayLiteral:
-            return destroy_array_literal(n.obj);
+            return free_array_literal(n.obj);
 
         case n_IndexExpression:
-            return destroy_index_expression(n.obj);
+            return free_index_expression(n.obj);
 
         case n_HashLiteral:
-            return destroy_hash_literal(n.obj);
+            return free_hash_literal(n.obj);
 
         default:
             // since first field of `n.obj` is `Token`

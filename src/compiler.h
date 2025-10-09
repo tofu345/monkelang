@@ -1,13 +1,29 @@
 #pragma once
 
-#include "ast.h"
+#include "parser.h"
 #include "code.h"
 #include "object.h"
+#include "symbol_table.h"
 
-// TODO FIXME: Change ObjectBuffer to hold concrete [Objects]
-BUFFER(Constant, Object);
 // TODO: replace [evaluator.c/OBJ]
-#define OBJ(t, d) (Object){ .typ = t, .is_marked = false, .data = { d } }
+#define OBJ(typ, dat) (Object){ .type = typ, .data = { dat } }
+
+typedef enum {
+    c_Integer = 1,
+    c_Float,
+    c_String
+} ConstantType;
+
+typedef struct {
+    ConstantType type;
+    union {
+        long integer;
+        double floating;
+        char *string;
+    } data;
+} Constant;
+
+BUFFER(Constant, Constant);
 
 typedef struct {
     Opcode opcode;
@@ -18,19 +34,22 @@ typedef struct {
     Instructions instructions;
     ConstantBuffer constants;
 
-    StringBuffer errors;
-
     EmittedInstruction last_instruction;
     EmittedInstruction previous_instruction;
+
+    SymbolTable symbol_table;
+
+    ErrorBuffer errors;
 } Compiler;
 
-// Init with `Compiler c = {}`.
-// void compiler_init(Compiler *c);
+void compiler_init(Compiler *c);
+void compiler_with(Compiler *c, SymbolTable *symbol_table,
+        ConstantBuffer constants);
 
-// free [compiler.errors]
-void compiler_destroy(Compiler *c);
+void compiler_free(Compiler *c);
 
-// returns non-0 on err
+// returns 0 on success.
+// otherwise non-0 with errors in [c.errors].
 int compile(Compiler *c, Program *prog);
 
 typedef struct {

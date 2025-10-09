@@ -75,6 +75,114 @@ test_conditionals(void) {
 }
 
 static void
+test_global_let_statements(void) {
+    vm_test("let one = 1; one", TEST(int, 1));
+    vm_test("let one = 1; let two = 2; one + two", TEST(int, 3));
+    vm_test("let one = 1; let two = one + one; one + two", TEST(int, 3));
+}
+
+static void
+test_string_expressions(void) {
+    vm_test("\"monkey\"", TEST(str, "monkey"));
+    vm_test("\"mon\" + \"key\"", TEST(str, "monkey"));
+    vm_test("\"mon\" + \"key\" + \"banana\"", TEST(str, "monkeybanana"));
+}
+
+// create NULL-terminated array of integers
+static Test test_array(int n, ...);
+
+static void
+test_array_literals(void) {
+    vm_test("[]", test_array(0));
+    vm_test("[1, 2, 3]", test_array(1, 2, 3, 0));
+    vm_test("[1 + 2, 3 * 4, 5 + 6]", test_array(3, 12, 11, 0));
+}
+
+static Test
+test_array(int n, ...) {
+    va_list ap;
+    int length = 0, capacity = 8;
+    TestArray *nums = malloc(sizeof(TestArray));
+    if (nums == NULL) { die("test_array: malloc"); }
+    nums->data = malloc(capacity * sizeof(int));
+    if (nums->data == NULL) { die("test_array: malloc arr data"); }
+
+    if (n == 0) {
+        nums->length = 0;
+        return TEST(arr, nums);
+    }
+
+    va_start(ap, n);
+    do {
+        if (length >= capacity) {
+            nums = realloc(nums, capacity *= 2);
+            if (nums == NULL) die("realloc");
+        }
+        nums->data[length++] = n;
+        n = va_arg(ap, int);
+    } while (n != 0);
+    va_end(ap);
+    nums->length = length;
+    return TEST(arr, nums);
+}
+
+static bool
+expect_object_is(ObjectType expected, Object actual) {
+    if (actual.type != expected) {
+        printf("object is not %s. got=%s (",
+                show_object_type(expected),
+                show_object_type(actual.type));
+        object_fprint(actual, stdout);
+        puts(")");
+        return false;
+    }
+    return true;
+}
+
+static int
+test_integer_object(long expected, Object actual) {
+    if (!expect_object_is(o_Integer, actual)) {
+        return -1;
+    }
+
+    if (expected != actual.data.integer) {
+        printf("object has wrong value. want=%ld got=%ld\n",
+                expected, actual.data.integer);
+        return -1;
+    }
+    return 0;
+}
+
+static int
+test_boolean_object(bool expected, Object actual) {
+    if (!expect_object_is(o_Boolean, actual)) {
+        return -1;
+    }
+
+    if (actual.data.boolean != expected) {
+        printf("object has wrong value. got=%s, want=%d\n",
+                actual.data.boolean ? "true" : "false",
+                expected);
+        return -1;
+    }
+    return 0;
+}
+
+static int
+test_string_object(char *expected, Object actual) {
+    if (!expect_object_is(o_String, actual)) {
+        return -1;
+    }
+
+    if (strcmp(actual.data.string->data, expected) != 0) {
+        printf("object has wrong value. got='%s', want='%s'\n",
+                actual.data.string->data, expected);
+        return -1;
+    }
+    return 0;
+}
+
+static void
 test_expected_object(Test expected, Object actual) {
     int err;
     switch (expected.typ) {
@@ -92,15 +200,50 @@ test_expected_object(Test expected, Object actual) {
             }
             break;
 
-        case test_null:
-            if (actual.typ != o_Null) {
-                printf("object is not Null, got=%s (",
-                        show_object_type(actual.typ));
-                object_fprint(&actual, stdout);
-                puts(")");
-                TEST_FAIL();
+        case test_str:
+            err = test_string_object(expected.val._str, actual);
+            if (err != 0) {
+                TEST_FAIL_MESSAGE("test_string_object failed");
             }
             break;
+
+        case test_null:
+            if (!expect_object_is(o_Null, actual))
+                TEST_FAIL();
+            break;
+
+        case test_arr:
+            {
+                if (!expect_object_is(o_Array, actual)) {
+                    free(expected.val._arr->data);
+                    free(expected.val._arr);
+                    TEST_FAIL();
+                }
+
+                if (expected.val._arr->length != actual.data.array->length) {
+                    printf("wrong number of elements. want=%d, got=%d\n",
+                            expected.val._arr->length, actual.data.array->length);
+                    free(expected.val._arr->data);
+                    free(expected.val._arr);
+                    TEST_FAIL();
+                }
+
+                int err;
+                for (int i = 0; i < expected.val._arr->length; i++) {
+                    err =
+                        test_integer_object(expected.val._arr->data[i],
+                                actual.data.array->data[i]);
+                    if (err != 0) {
+                        printf("test array element %d: test_integer_object failed", i);
+                        free(expected.val._arr->data);
+                        free(expected.val._arr);
+                        TEST_FAIL();
+                    }
+                }
+                free(expected.val._arr->data);
+                free(expected.val._arr);
+                break;
+            }
 
         default:
             die("test_expected_object: Test of type %d not handled",
@@ -108,34 +251,52 @@ test_expected_object(Test expected, Object actual) {
     }
 }
 
+// shared across all vm_test() calls, managed in main().
+VM vm;
+
 static void
 vm_test(char *input, Test expected) {
-    Program prog = parse(input);
-    Compiler c = {};
-    compile(&c, &prog);
-    check_compiler_errors(&c);
-    Bytecode *code = bytecode(&c);
+    Program prog = test_parse(input);
+    Compiler c;
+    compiler_init(&c);
+    if (compile(&c, &prog) != 0) {
+        printf("compiler had %d errors\n", c.errors.length);
+        print_errors(&c.errors);
+        program_free(&prog);
+        compiler_free(&c);
+        TEST_FAIL();
+    };
 
-    VM vm;
-    vm_init(&vm, code);
+    vm_with(&vm, bytecode(&c));
     if (vm_run(&vm) == -1) {
         printf("vm had %d errors\n", vm.errors.length);
         print_errors(&vm.errors);
+        program_free(&prog);
+        compiler_free(&c);
+        TEST_FAIL();
     }
 
     Object stack_elem = vm_last_popped(&vm);
-
     test_expected_object(expected, stack_elem);
 
-    program_destroy(&prog);
-    compiler_destroy(&c);
-    vm_destroy(&vm);
+    // cleanup after ourselves
+    memset(vm.stack, 0, StackSize * sizeof(Object));
+
+    program_free(&prog);
+    compiler_free(&c);
 }
 
 int main(void) {
+    vm_init(&vm, NULL, NULL, NULL);
+
     UNITY_BEGIN();
     RUN_TEST(test_integer_arithmetic);
     RUN_TEST(test_boolean_expressions);
     RUN_TEST(test_conditionals);
+    RUN_TEST(test_global_let_statements);
+    RUN_TEST(test_string_expressions);
+    RUN_TEST(test_array_literals);
+
+    vm_free(&vm);
     return UNITY_END();
 }

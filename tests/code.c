@@ -41,22 +41,10 @@ void test_make(void) {
 }
 
 void test_instructions_string(void) {
-    Instructions tests[] = {
-        make(OpAdd),
-        make(OpConstant, 2),
-        make(OpConstant, 65535)
-    };
-    int length = sizeof(tests) / sizeof(tests[0]);
-
-    // concat all tests into tests[0]
-    int index = tests[0].length;
-    for (int i = 1; i < length; i++) {
-        int len = tests[i].length;
-        instructions_allocate(tests, len);
-        memcpy(tests[0].data + index, tests[i].data, len * sizeof(uint8_t));
-        index += len;
-        free(tests[i].data);
-    }
+    Instructions test = {};
+    make_into(&test, OpAdd);
+    make_into(&test, OpConstant, 2);
+    make_into(&test, OpConstant, 65535);
 
     char *expected_body = "0000 OpAdd\n\
 0001 OpConstant 2\n\
@@ -66,10 +54,10 @@ void test_instructions_string(void) {
     size_t len;
     FILE *fp = open_memstream(&buf, &len);
 
-    int err = fprint_instruction(fp, tests[0]);
-    TEST_ASSERT_MESSAGE(err == 0, "fprint_instruction failed");
+    int err = fprint_instructions(fp, test);
+    TEST_ASSERT_MESSAGE(err == 0, "fprint_instructions failed");
 
-    free(tests[0].data);
+    free(test.data);
     fflush(fp);
 
     if (strcmp(expected_body, buf) != 0) {
@@ -111,13 +99,13 @@ void test_read_operands(void) {
         bool fail = false;
         for (int i = 0; i < operands.length; i++) {
             //                       skip opcode -vvv
-            if (operands.data[i] != tt.bytecode[i + 1]) {
+            if (operands.widths[i] != tt.bytecode[i + 1]) {
                 printf("operand %d wrong. want=%d, got=%d\n",
-                        i, tt.bytecode[i + 1], operands.data[i]);
+                        i, tt.bytecode[i + 1], operands.widths[i]);
                 fail = true;
             }
         }
-        free(operands.data);
+        free(operands.widths);
         free(tt.actual.data);
         if (fail) TEST_FAIL();
     }

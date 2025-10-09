@@ -7,16 +7,14 @@
 #include <stddef.h>
 #include <stdio.h>
 
-#define DEF(code) \
-    { #code, _##code, sizeof(_##code) / sizeof(_##code[0]) }
-#define DEF_EMPTY(code) { #code, NULL, 0 }
+#define DEF(code, operands) { #code, _##operands }
+#define DEF_EMPTY(code) { #code, { NULL, 0 } }
 
-const int _OpConstant[] = { 2 };
-const int _OpJumpNotTruthy[] = { 2 };
-const int _OpJump[] = { 2 };
+const int _two_widths[] = { 2 };
+const Operands _two = { .widths = (int *)_two_widths, .length = 1 };
 
 const Definition definitions[] = {
-    DEF(OpConstant),
+    DEF(OpConstant, two),
     DEF_EMPTY(OpPop),
     DEF_EMPTY(OpAdd),
     DEF_EMPTY(OpSub),
@@ -29,9 +27,12 @@ const Definition definitions[] = {
     DEF_EMPTY(OpGreaterThan),
     DEF_EMPTY(OpMinus),
     DEF_EMPTY(OpBang),
-    DEF(OpJumpNotTruthy),
-    DEF(OpJump),
+    DEF(OpJumpNotTruthy, two),
+    DEF(OpJump, two),
     DEF_EMPTY(OpNull),
+    DEF(OpGetGlobal, two),
+    DEF(OpSetGlobal, two),
+    DEF(OpArray, two),
 };
 
 const Definition *
@@ -44,8 +45,7 @@ lookup(Opcode op) {
 }
 
 int read_big_endian_uint16(uint8_t *arr) {
-    int out = (arr[0] << 8) | arr[1];
-    return out;
+    return (arr[0] << 8) | arr[1];
 }
 
 // store n in `arr[0:2]` big endian.
@@ -64,17 +64,18 @@ put_big_endian_uint16(uint8_t *arr, uint16_t n) {
 
 Operands read_operands(int *n, const Definition *def, uint8_t* ins) {
     Operands operands = {
-        .data = allocate(def->length * sizeof(int)),
-        .length = def->length
+        .widths = malloc(def->operands.length * sizeof(int)),
+        .length = def->operands.length
     };
+    if (operands.widths == NULL) { die("read_operands: malloc"); }
 
     int width, offset = 0;
-    for (int i = 0; i < def->length; i++) {
-        width = def->widths[i];
+    ins++; // skip Opcode
+    for (int i = 0; i < def->operands.length; i++) {
+        width = def->operands.widths[i];
         switch (width) {
             case 2:
-                // offset + 1 to skip Opcode
-                operands.data[i] = read_big_endian_uint16(ins + offset + 1);
+                operands.widths[i] = read_big_endian_uint16(ins + offset);
                 break;
             default:
                 die("read_operands: operand width %d not implemented for %s",
@@ -86,42 +87,55 @@ Operands read_operands(int *n, const Definition *def, uint8_t* ins) {
     return operands;
 }
 
-Instructions
-make_valist(Opcode op, va_list operands) {
+int
+make_valist_into(Instructions *ins, Opcode op, va_list operands) {
     const Definition *def = lookup(op);
-    Instructions ins = {};
-    instructions_allocate(&ins, 1);
-    ins.data[0] = op;
-    int operand, width, offset = 1;
+    int start = ins->length;
 
-    for (int i = 0; i < def->length; i++) {
+    instructions_allocate(ins, 1);
+    ins->data[start] = op;
+    int operand, width, offset = start + 1;
+
+    for (int i = 0; i < def->operands.length; i++) {
         operand = va_arg(operands, int);
-        width = def->widths[i];
-        instructions_allocate(&ins, width);
+        width = def->operands.widths[i];
+        instructions_allocate(ins, width);
         switch (width) {
             case 2:
-                put_big_endian_uint16(ins.data + offset, operand);
+                put_big_endian_uint16(ins->data + offset, operand);
                 break;
             default:
                 die("make: operand width %d not implemented", width);
         }
         offset += width;
     }
-    va_end(operands);
-    return ins;
+    return start;
+}
+
+int
+make_into(Instructions *ins, Opcode op, ...) {
+    va_list ap;
+    va_start(ap, op);
+    int pos = make_valist_into(ins, op, ap);
+    va_end(ap);
+    return pos;
 }
 
 Instructions
 make(Opcode op, ...) {
     va_list ap;
     va_start(ap, op);
-    return make_valist(op, ap);
+    Instructions ins = {};
+    make_valist_into(&ins, op, ap);
+    va_end(ap);
+    return ins;
 }
 
 void instructions_allocate(Instructions *buf, int length) {
     if (buf->length + length >= buf->capacity) {
         int capacity = power_of_2_ceil(buf->length + length);
-        buf->data = reallocate(buf->data, capacity * sizeof(uint8_t));
+        buf->data = realloc(buf->data, capacity * sizeof(uint8_t));
+        if (buf->data == NULL) { die("instructions_allocate: realloc"); }
         buf->capacity = capacity;
     }
     buf->length += length;
@@ -129,7 +143,7 @@ void instructions_allocate(Instructions *buf, int length) {
 
 static int
 fprint_definition_operands(FILE *out, const Definition *def, Operands operands) {
-    int operand_count = def->length;
+    int operand_count = def->operands.length;
     if (operands.length != operand_count) {
         FPRINTF(out, "ERROR: operand len %d does not match defined %d\n",
             operands.length, operand_count);
@@ -141,7 +155,7 @@ fprint_definition_operands(FILE *out, const Definition *def, Operands operands) 
             FPRINTF(out, "%s\n", def->name);
             return 0;
         case 1:
-            FPRINTF(out, "%s %d\n", def->name, operands.data[0]);
+            FPRINTF(out, "%s %d\n", def->name, operands.widths[0]);
             return 0;
     }
     FPRINTF(out, "ERROR: unhandled operand_count for %s\n", def->name);
@@ -157,7 +171,7 @@ int fprint_instructions(FILE *out, Instructions ins) {
         operands = read_operands(&read, def, ins.data + i);
         FPRINTF(out, "%04d ", i);
         err = fprint_definition_operands(out, def, operands);
-        free(operands.data);
+        free(operands.widths);
         if (err == -1) return -1;
         i += 1 + read;
     }

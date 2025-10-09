@@ -4,7 +4,6 @@
 
 #include "../src/ast.h"
 #include "../src/parser.h"
-#include "../src/lexer.h"
 #include "../src/token.h"
 
 #include <stddef.h>
@@ -45,10 +44,9 @@ return 10;\
 return 993322;\
 ";
 
-    Lexer l = lexer_new(input);
     Parser p;
-    parser_init(&p, &l);
-    Program prog = parse_program(&p);
+    parser_init(&p);
+    Program prog = parse(&p, input);
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
@@ -64,17 +62,16 @@ return 993322;\
                 "wrong ReturnStatement.Token.literal");
     }
 
-    program_destroy(&prog);
-    parser_destroy(&p);
+    program_free(&prog);
+    parser_free(&p);
 }
 
 void test_identifier_expression(void) {
     char* input = "foobar;";
 
-    Lexer l = lexer_new(input);
     Parser p;
-    parser_init(&p, &l);
-    Program prog = parse_program(&p);
+    parser_init(&p);
+    Program prog = parse(&p, input);
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
@@ -93,8 +90,8 @@ void test_identifier_expression(void) {
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
             "foobar", ident->tok.literal, "wrong Identifier.Token.value");
 
-    program_destroy(&prog);
-    parser_destroy(&p);
+    program_free(&prog);
+    parser_free(&p);
 }
 
 static void
@@ -139,10 +136,9 @@ test_float_literal(Node n, double value) {
 void test_integer_literal_expression(void) {
     char* input = "5;";
 
-    Lexer l = lexer_new(input);
     Parser p;
-    parser_init(&p, &l);
-    Program prog = parse_program(&p);
+    parser_init(&p);
+    Program prog = parse(&p, input);
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
@@ -164,17 +160,16 @@ void test_integer_literal_expression(void) {
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
             "5", int_lit->tok.literal, "wrong IntegerLiteral.Token.literal");
 
-    program_destroy(&prog);
-    parser_destroy(&p);
+    program_free(&prog);
+    parser_free(&p);
 }
 
 void test_float_literal_expression(void) {
     char* input = "5.01;";
 
-    Lexer l = lexer_new(input);
     Parser p;
-    parser_init(&p, &l);
-    Program prog = parse_program(&p);
+    parser_init(&p);
+    Program prog = parse(&p, input);
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
@@ -196,8 +191,8 @@ void test_float_literal_expression(void) {
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
             "5.01", fl_lit->tok.literal, "wrong FloatLiteral.Token.literal");
 
-    program_destroy(&prog);
-    parser_destroy(&p);
+    program_free(&prog);
+    parser_free(&p);
 }
 
 static void
@@ -255,10 +250,9 @@ void test_let_statements(void) {
     for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
-        Lexer l = lexer_new(test.input);
         Parser p;
-        parser_init(&p, &l);
-        Program prog = parse_program(&p);
+        parser_init(&p);
+        Program prog = parse(&p, test.input);
         TEST_ASSERT_NOT_NULL_MESSAGE(
                 prog.stmts.data, "program.statements NULL");
         check_parser_errors(&p);
@@ -269,8 +263,8 @@ void test_let_statements(void) {
         LetStatement* ls = stmt.obj;
         test_literal_expression(ls->value, test.expectedVal);
 
-        program_destroy(&prog);
-        parser_destroy(&p);
+        program_free(&prog);
+        parser_free(&p);
     }
 }
 
@@ -287,10 +281,9 @@ void test_parsing_prefix_expressions(void) {
     for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
-        Lexer l = lexer_new(test.input);
         Parser p;
-        parser_init(&p, &l);
-        Program prog = parse_program(&p);
+        parser_init(&p);
+        Program prog = parse(&p, test.input);
         TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
         check_parser_errors(&p);
@@ -313,8 +306,8 @@ void test_parsing_prefix_expressions(void) {
 
         test_literal_expression(pe->right, test.value);
 
-        program_destroy(&prog);
-        parser_destroy(&p);
+        program_free(&prog);
+        parser_free(&p);
     }
 }
 
@@ -341,10 +334,9 @@ void test_parsing_infix_expressions(void) {
     for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
-        Lexer l = lexer_new(test.input);
         Parser p;
-        parser_init(&p, &l);
-        Program prog = parse_program(&p);
+        parser_init(&p);
+        Program prog = parse(&p, test.input);
         TEST_ASSERT_NOT_NULL_MESSAGE
             (prog.stmts.data, "program.statements NULL");
 
@@ -370,8 +362,8 @@ void test_parsing_infix_expressions(void) {
 
         test_literal_expression(ie->right, test.right_value);
 
-        program_destroy(&prog);
-        parser_destroy(&p);
+        program_free(&prog);
+        parser_free(&p);
     }
 }
 
@@ -501,10 +493,9 @@ void test_operator_precedence_parsing(void) {
     for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
-        Lexer l = lexer_new(test.input);
         Parser p;
-        parser_init(&p, &l);
-        Program prog = parse_program(&p);
+        parser_init(&p);
+        Program prog = parse(&p, test.input);
         TEST_ASSERT_NOT_NULL_MESSAGE
             (prog.stmts.data, "program.statements NULL");
         check_parser_errors(&p);
@@ -529,8 +520,8 @@ void test_operator_precedence_parsing(void) {
 
         fclose(fp);
         free(buf);
-        program_destroy(&prog);
-        parser_destroy(&p);
+        program_free(&prog);
+        parser_free(&p);
     }
 }
 
@@ -558,10 +549,9 @@ void test_boolean_expression(void) {
     for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
-        Lexer l = lexer_new(test.input);
         Parser p;
-        parser_init(&p, &l);
-        Program prog = parse_program(&p);
+        parser_init(&p);
+        Program prog = parse(&p, test.input);
         TEST_ASSERT_NOT_NULL_MESSAGE
             (prog.stmts.data, "program.statements NULL");
         check_parser_errors(&p);
@@ -582,18 +572,17 @@ void test_boolean_expression(void) {
         TEST_ASSERT_MESSAGE(
                 b->value == test.expected, "wrong BooleanLiteral.value");
 
-        program_destroy(&prog);
-        parser_destroy(&p);
+        program_free(&prog);
+        parser_free(&p);
     }
 }
 
 void test_if_expression(void) {
     char* input = "if (x < y) { x }";
 
-    Lexer l = lexer_new(input);
     Parser p;
-    parser_init(&p, &l);
-    Program prog = parse_program(&p);
+    parser_init(&p);
+    Program prog = parse(&p, input);
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
@@ -623,17 +612,16 @@ void test_if_expression(void) {
     TEST_ASSERT_NULL_MESSAGE(ie->alternative,
             "IfExpression.alternative should be NULL");
 
-    program_destroy(&prog);
-    parser_destroy(&p);
+    program_free(&prog);
+    parser_free(&p);
 }
 
 void test_if_else_expression(void) {
     char* input = "if (x < y) { x } else { y }";
 
-    Lexer l = lexer_new(input);
     Parser p;
-    parser_init(&p, &l);
-    Program prog = parse_program(&p);
+    parser_init(&p);
+    Program prog = parse(&p, input);
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
@@ -669,17 +657,16 @@ void test_if_else_expression(void) {
     ExpressionStatement* alternative = ie->alternative->stmts.data[0].obj;
     test_identifier(alternative->expression, "y");
 
-    program_destroy(&prog);
-    parser_destroy(&p);
+    program_free(&prog);
+    parser_free(&p);
 }
 
 void test_function_literal_parsing(void) {
     char* input = "fn(x, y) { x + y; }";
 
-    Lexer l = lexer_new(input);
     Parser p;
-    parser_init(&p, &l);
-    Program prog = parse_program(&p);
+    parser_init(&p);
+    Program prog = parse(&p, input);
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
@@ -715,14 +702,14 @@ void test_function_literal_parsing(void) {
     test_infix_expression(body_stmt->expression,
             TEST(str, "x"), "+", TEST(str, "y"));
 
-    program_destroy(&prog);
-    parser_destroy(&p);
+    program_free(&prog);
+    parser_free(&p);
 }
 
 void test_function_parameter_parsing(void) {
     struct Test {
-        const char* input;
-        const char* expectedParams[3];
+        char* input;
+        char* expectedParams[3];
         int len;
     } tests[] = {
         {"fn() {};", {}, 0},
@@ -733,10 +720,9 @@ void test_function_parameter_parsing(void) {
     for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
-        Lexer l = lexer_new(test.input);
         Parser p;
-        parser_init(&p, &l);
-        Program prog = parse_program(&p);
+        parser_init(&p);
+        Program prog = parse(&p, test.input);
         TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
         check_parser_errors(&p);
         TEST_ASSERT_EQUAL_INT_MESSAGE
@@ -757,18 +743,17 @@ void test_function_parameter_parsing(void) {
                     TEST(str, test.expectedParams[i]));
         }
 
-        program_destroy(&prog);
-        parser_destroy(&p);
+        program_free(&prog);
+        parser_free(&p);
     }
 }
 
 void test_call_expression_parsing(void) {
     char* input = "add(1, 2 * 3, 4 + 5);";
 
-    Lexer l = lexer_new(input);
     Parser p;
-    parser_init(&p, &l);
-    Program prog = parse_program(&p);
+    parser_init(&p);
+    Program prog = parse(&p, input);
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
@@ -797,17 +782,16 @@ void test_call_expression_parsing(void) {
 
     test_infix_expression(ce->args.data[2], TEST(int, 4), "+", TEST(int, 5));
 
-    program_destroy(&prog);
-    parser_destroy(&p);
+    program_free(&prog);
+    parser_free(&p);
 }
 
 void test_string_literal_expression(void) {
     char* input = "\"hello world\";";
 
-    Lexer l = lexer_new(input);
     Parser p;
-    parser_init(&p, &l);
-    Program prog = parse_program(&p);
+    parser_init(&p);
+    Program prog = parse(&p, input);
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
@@ -820,17 +804,16 @@ void test_string_literal_expression(void) {
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
             "hello world", sl->tok.literal, "wrong StringLiteral.Value");
 
-    program_destroy(&prog);
-    parser_destroy(&p);
+    program_free(&prog);
+    parser_free(&p);
 }
 
 void test_parsing_array_literals(void) {
     char* input = "[1, 2 * 2, 3 + 3, 0xdeadbeef, 0b11011]";
 
-    Lexer l = lexer_new(input);
     Parser p;
-    parser_init(&p, &l);
-    Program prog = parse_program(&p);
+    parser_init(&p);
+    Program prog = parse(&p, input);
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
@@ -851,17 +834,16 @@ void test_parsing_array_literals(void) {
     _test_integer_literal(al->elements.data[3], 0xdeadbeef, "0xdeadbeef");
     _test_integer_literal(al->elements.data[4], 0b11011, "0b11011");
 
-    program_destroy(&prog);
-    parser_destroy(&p);
+    program_free(&prog);
+    parser_free(&p);
 }
 
 void test_parsing_index_expressions(void) {
     char* input = "myArray[1 + 1]";
 
-    Lexer l = lexer_new(input);
     Parser p;
-    parser_init(&p, &l);
-    Program prog = parse_program(&p);
+    parser_init(&p);
+    Program prog = parse(&p, input);
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
@@ -876,17 +858,16 @@ void test_parsing_index_expressions(void) {
     test_identifier(ie->left, "myArray");
     test_infix_expression(ie->index, TEST(int, 1), "+", TEST(int, 1));
 
-    program_destroy(&prog);
-    parser_destroy(&p);
+    program_free(&prog);
+    parser_free(&p);
 }
 
 void test_parsing_hash_literals_string_keys(void) {
     char* input = "{\"one\": 1, \"two\": 2, \"three\": 3}";
 
-    Lexer l = lexer_new(input);
     Parser p;
-    parser_init(&p, &l);
-    Program prog = parse_program(&p);
+    parser_init(&p);
+    Program prog = parse(&p, input);
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
@@ -916,17 +897,16 @@ void test_parsing_hash_literals_string_keys(void) {
         test_integer_literal(pair->val, expected[i].value);
     }
 
-    program_destroy(&prog);
-    parser_destroy(&p);
+    program_free(&prog);
+    parser_free(&p);
 }
 
 void test_parsing_empty_hash_literal(void) {
     char* input = "{}";
 
-    Lexer l = lexer_new(input);
     Parser p;
-    parser_init(&p, &l);
-    Program prog = parse_program(&p);
+    parser_init(&p);
+    Program prog = parse(&p, input);
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
@@ -941,17 +921,16 @@ void test_parsing_empty_hash_literal(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             0, hl->pairs.length, "wrong HashLiteral.pairs length");
 
-    program_destroy(&prog);
-    parser_destroy(&p);
+    program_free(&prog);
+    parser_free(&p);
 }
 
 void test_parsing_hash_literals_with_expressions(void) {
     char* input = "{\"one\": 0 + 1, \"two\": 10 - 8, \"three\": 15 / 5}";
 
-    Lexer l = lexer_new(input);
     Parser p;
-    parser_init(&p, &l);
-    Program prog = parse_program(&p);
+    parser_init(&p);
+    Program prog = parse(&p, input);
     TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
@@ -986,8 +965,8 @@ void test_parsing_hash_literals_with_expressions(void) {
                 TEST(int, test.left), test.op, TEST(int, test.right));
     }
 
-    program_destroy(&prog);
-    parser_destroy(&p);
+    program_free(&prog);
+    parser_free(&p);
 }
 
 int main(void) {

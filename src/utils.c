@@ -4,20 +4,6 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-DEFINE_BUFFER(String, char*);
-
-inline void* allocate(size_t size) {
-    void* ptr = malloc(size);
-    if (ptr == NULL) die("allocate");
-    return ptr;
-}
-
-inline void* reallocate(void* ptr, size_t size) {
-    void* new_ptr = realloc(ptr, size);
-    if (new_ptr == NULL) die("reallocate");
-    return new_ptr;
-}
-
 void die(const char *fmt, ...) {
     va_list ap;
     int saved_errno;
@@ -43,14 +29,17 @@ int power_of_2_ceil(int n) {
     n |= n >> 8;
     n |= n >> 16;
     n++;
+    if (n < 4) { n = 4; }
     return n;
 }
 
-void error(StringBuffer* buf, char* format, ...) {
+DEFINE_BUFFER(Error, char*);
+
+void error(ErrorBuffer* buf, char* format, ...) {
     va_list args;
     va_start(args, format);
     char* msg = NULL;
-    if (vasprintf(&msg, format, args) == -1) die("new_error: vasprintf");
-    StringBufferPush(buf, msg);
+    if (vasprintf(&msg, format, args) == -1) die("error(): vasprintf");
+    ErrorBufferPush(buf, msg);
     va_end(args);
 }

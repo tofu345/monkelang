@@ -13,6 +13,12 @@ static Node parse_statement(Parser* p);
 static Node parse_expression(Parser* p, enum Precedence precedence);
 static NodeBuffer parse_expression_list(Parser* p, TokenType end);
 
+void* allocate(size_t size) {
+    void* ptr = malloc(size);
+    if (ptr == NULL) die("parser: malloc");
+    return ptr;
+}
+
 struct {
     TokenType typ;
     enum Precedence precedence;
@@ -58,8 +64,8 @@ parser_error(Parser* p, char* format, ...) {
     va_list args;
     va_start(args, format);
     char* msg = NULL;
-    if (vasprintf(&msg, format, args) == -1) ALLOC_FAIL();
-    StringBufferPush(&p->errors, msg);
+    if (vasprintf(&msg, format, args) == -1) die("malloc");
+    ErrorBufferPush(&p->errors, msg);
     va_end(args);
 }
 
@@ -119,7 +125,6 @@ static Node
 parse_expression(Parser* p, enum Precedence precedence) {
     PrefixParseFn prefix = p->prefix_parse_fns[p->cur_token.type];
     if (prefix == NULL) {
-        // TODO: better error message
         no_prefix_parse_error(p, p->cur_token.type);
         free(p->cur_token.literal);
         return (Node){};
@@ -216,7 +221,7 @@ parse_infix_expression(Parser* p, Node left) {
     next_token(p);
     ie->right = parse_expression(p, precedence);
     if (ie->right.obj == NULL) {
-        node_destroy(left);
+        node_free(left);
         free(ie->tok.literal);
         free(ie);
         return (Node){};
@@ -257,7 +262,7 @@ parse_grouped_expression(Parser* p) {
     next_token(p);
     Node n = parse_expression(p, p_Lowest);
     if (n.obj == NULL || !expect_peek(p, t_Rparen)) {
-        node_destroy(n);
+        node_free(n);
         return (Node){};
     }
     free(p->cur_token.literal); // ')' token
@@ -282,7 +287,7 @@ parse_block_statement(Parser* p) {
 
     if (!cur_token_is(p, t_Rbrace)) {
         cur_tok_error(p, t_Rbrace);
-        destroy_block_statement(bs);
+        free_block_statement(bs);
         return NULL;
     }
 
@@ -348,13 +353,13 @@ parse_function_literal(Parser* p) {
     int err = parse_function_parameters(p, fl);
     if (err == -1 || !expect_peek(p, t_Lbrace)) {
         fl->body = NULL;
-        destroy_function_literal(fl);
+        free_function_literal(fl);
         return (Node){};
     }
 
     fl->body = parse_block_statement(p);
     if (fl->body == NULL) {
-        destroy_function_literal(fl);
+        free_function_literal(fl);
         return (Node){};
     }
 
@@ -392,13 +397,13 @@ parse_hash_literal(Parser* p) {
 
         Node key = parse_expression(p, p_Lowest);
         if (key.obj == NULL) {
-            destroy_hash_literal(hl);
+            free_hash_literal(hl);
             return (Node){};
         }
 
         if (!expect_peek(p, t_Colon)) {
-            node_destroy(key);
-            destroy_hash_literal(hl);
+            node_free(key);
+            free_hash_literal(hl);
             return (Node){};
         }
 
@@ -408,8 +413,8 @@ parse_hash_literal(Parser* p) {
         Node value = parse_expression(p, p_Lowest);
         if (value.obj == NULL) {
             free(p->cur_token.literal);
-            node_destroy(key);
-            destroy_hash_literal(hl);
+            node_free(key);
+            free_hash_literal(hl);
             return (Node){};
         }
 
@@ -418,14 +423,14 @@ parse_hash_literal(Parser* p) {
         if (peek_token_is(p, t_Rbrace)) break;
 
         if (!expect_peek(p, t_Comma)) {
-            destroy_hash_literal(hl);
+            free_hash_literal(hl);
             return (Node){};
         }
         free(p->cur_token.literal);
     }
 
     if (!expect_peek(p, t_Rbrace)) {
-        destroy_hash_literal(hl);
+        free_hash_literal(hl);
         return (Node){};
     }
     free(p->cur_token.literal);
@@ -441,7 +446,7 @@ parse_call_expression(Parser* p, Node function) {
     ce->args = parse_expression_list(p, t_Rparen);
     if (ce->args.length == -1) {
         free(ce->tok.literal);
-        node_destroy(function);
+        node_free(function);
         free(ce);
         return (Node){};
     }
@@ -457,7 +462,7 @@ parse_index_expression(Parser* p, Node left) {
     ie->index = parse_expression(p, p_Lowest);
     if (ie->index.obj == NULL || !expect_peek(p, t_Rbracket)) {
         free(ie->tok.literal);
-        node_destroy(left);
+        node_free(left);
         free(ie);
         return (Node){};
     }
@@ -469,7 +474,7 @@ static NodeBuffer
 __parse_expression_list_err(NodeBuffer buf) {
     if (buf.data != NULL) {
         for (int i = 0; i < buf.length; i++)
-            node_destroy(buf.data[i]);
+            node_free(buf.data[i]);
         free(buf.data);
         buf.data = NULL;
     }
@@ -537,13 +542,13 @@ parse_if_expression(Parser* p) {
     free(p->cur_token.literal); // ')' tok
 
     if (!expect_peek(p, t_Lbrace)) {
-        node_destroy(NODE(n_IfExpression, ie));
+        node_free(NODE(n_IfExpression, ie));
         return (Node){};
     }
 
     ie->consequence = parse_block_statement(p);
     if (ie->consequence == NULL) {
-        node_destroy(NODE(n_IfExpression, ie));
+        node_free(NODE(n_IfExpression, ie));
         return (Node){};
     }
 
@@ -552,13 +557,13 @@ parse_if_expression(Parser* p) {
         free(p->cur_token.literal); // 'else' tok
 
         if (!expect_peek(p, t_Lbrace)) {
-            node_destroy(NODE(n_IfExpression, ie));
+            node_free(NODE(n_IfExpression, ie));
             return (Node){};
         }
 
         ie->alternative = parse_block_statement(p);
         if (ie->alternative == NULL) {
-            node_destroy(NODE(n_IfExpression, ie));
+            node_free(NODE(n_IfExpression, ie));
             return (Node){};
         }
     }
@@ -579,7 +584,6 @@ parse_let_statement(Parser* p) {
 
     stmt->name = allocate(sizeof(Identifier));
     stmt->name->tok = p->cur_token;
-    stmt->name->tok.literal = p->cur_token.literal;
 
     if (!expect_peek(p, t_Assign)) {
         free(stmt->tok.literal);
@@ -593,7 +597,7 @@ parse_let_statement(Parser* p) {
 
     stmt->value = parse_expression(p, p_Lowest);
     if (stmt->value.obj == NULL) {
-        node_destroy(NODE(n_LetStatement, stmt));
+        node_free(NODE(n_LetStatement, stmt));
         return (Node){};
     }
 
@@ -661,9 +665,8 @@ parse_statement(Parser* p) {
     }
 }
 
-void parser_init(Parser* p, Lexer* l) {
-    p->l = l;
-    StringBufferInit(&p->errors);
+void parser_init(Parser* p) {
+    p->errors = (ErrorBuffer){};
 
     memset(p->prefix_parse_fns, 0, t_Return * sizeof(PrefixParseFn));
     p->prefix_parse_fns[t_Ident] = parse_identifier;
@@ -691,13 +694,9 @@ void parser_init(Parser* p, Lexer* l) {
     p->infix_parse_fns[t_Gt] = parse_infix_expression;
     p->infix_parse_fns[t_Lparen] = parse_call_expression;
     p->infix_parse_fns[t_Lbracket] = parse_index_expression;
-
-    // Read two tokens, so curToken and peekToken are both set
-    p->cur_token = lexer_next_token(p->l);
-    p->peek_token = lexer_next_token(p->l);
 }
 
-void parser_destroy(Parser* p) {
+void parser_free(Parser* p) {
     for (int i = 0; i < p->errors.length; i++) {
         free(p->errors.data[i]);
     }
@@ -705,25 +704,29 @@ void parser_destroy(Parser* p) {
     free(p->peek_token.literal);
 }
 
-Program parse_program(Parser* p) {
-    Program prog;
-    NodeBufferInit(&prog.stmts);
+Program parse(Parser* p, const char *input) {
+    Lexer l;
+    lexer_init(&l, input);
+    p->l = &l;
+    p->cur_token = lexer_next_token(&l);
+    p->peek_token = lexer_next_token(&l);
+
+    Program prog = {};
     while (p->cur_token.type != t_Eof) {
         Node stmt = parse_statement(p);
         if (stmt.obj != NULL)
             NodeBufferPush(&prog.stmts, stmt);
-        else if (p->errors.length >= MAX_ERRORS) {
+        else if (p->errors.length >= MAX_ERRORS)
             break;
-        }
 
         next_token(p);
     }
     return prog;
 }
 
-void program_destroy(Program* p) {
+void program_free(Program* p) {
     for (int i = 0; i < p->stmts.length; i++) {
-        node_destroy(p->stmts.data[i]);
+        node_free(p->stmts.data[i]);
     }
     free(p->stmts.data);
 }

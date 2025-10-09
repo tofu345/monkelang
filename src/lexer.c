@@ -24,23 +24,21 @@ static void read_char(Lexer* l) {
     }
 }
 
-Lexer lexer_new(const char* input) {
-    Lexer l;
-    l.col = 0;
-    l.line = 1;
-    l.input = input;
-    l.input_len = strlen(input);
-    l.position = 0;
-    l.read_position = 0;
-    read_char(&l);
-    return l;
+void lexer_init(Lexer *l, const char *input) {
+    l->col = 0;
+    l->line = 1;
+    l->input = input;
+    l->input_len = strlen(input);
+    l->position = 0;
+    l->read_position = 0;
+    read_char(l);
 }
 
 static void
 new_token(Token* t, TokenType type, char ch) {
     // must malloc here
     char* lit = malloc(2 * sizeof(char));
-    if (lit == NULL) ALLOC_FAIL();
+    if (lit == NULL) die("malloc");
     lit[0] = ch;
     lit[1] = '\0';
     t->literal = lit;
@@ -80,7 +78,7 @@ static char peek_char(Lexer *l) {
 
 static char* copy_string(Lexer* l, int from, int len) {
     char* ident = malloc((len + 1) * sizeof(char));
-    if (ident == NULL) ALLOC_FAIL();
+    if (ident == NULL) die("malloc");
     for (int i = 0; i < len; i++) {
         ident[i] = l->input[from + i];
     }
@@ -115,9 +113,9 @@ static char* read_digit(Lexer* l, TokenType* t) {
     int position = l->position;
     int len = 0;
 
-    char peek = peek_char(l);
     bool (*valid) (char) = &is_digit;
     if (l->ch == '0') {
+        char peek = peek_char(l);
         if (peek == 'x' || peek == 'X')
             valid = &is_hex_digit;
         else if (peek == 'b' || peek == 'B')
@@ -153,7 +151,7 @@ Token lexer_next_token(Lexer* l) {
             char ch = l->ch;
             read_char(l);
             char* lit = malloc(3 * sizeof(char));
-            if (lit == NULL) ALLOC_FAIL();
+            if (lit == NULL) die("malloc");
             lit[0] = ch;
             lit[1] = l->ch;
             lit[2] = '\0';
@@ -167,7 +165,7 @@ Token lexer_next_token(Lexer* l) {
             char ch = l->ch;
             read_char(l);
             char* lit = malloc(3 * sizeof(char));
-            if (lit == NULL) ALLOC_FAIL();
+            if (lit == NULL) die("malloc");
             lit[0] = ch;
             lit[1] = l->ch;
             lit[2] = '\0';

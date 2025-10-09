@@ -16,8 +16,8 @@ typedef struct {
     size_t read_position; // current reading position in input (after current char)
 } Lexer;
 
-// create new lexer object, the input (NULL-terminated) is not copied.
-Lexer lexer_new(const char* input);
+// initiliaze lexer object with input (NULL-terminated).
+void lexer_init(Lexer *l, const char* input);
 
 // Returns the next token parsed from input, this token contains a
 // literal that is copied from the input and must be freed by the

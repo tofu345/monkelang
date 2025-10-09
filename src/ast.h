@@ -1,6 +1,5 @@
 #pragma once
 
-#include "buffer.h"
 #include "utils.h"
 #include "token.h"
 #include "hash-table/ht.h"
@@ -40,9 +39,6 @@ typedef struct {
     void* obj; // if NULL, err
 } Node;
 
-bool is_expression(Node n);
-bool is_statement(Node n);
-
 // Retrieve token_literal of `obj.tok.literal` the object must contain a
 // `Token` as its first field
 char* token_literal(Node n);
@@ -51,20 +47,17 @@ char* token_literal(Node n);
 int node_fprint(const Node n, FILE* fp);
 
 // free `n.obj`
-void node_destroy(Node n);
+void node_free(Node n);
 
 BUFFER(Node, Node);
 
-// Ast Root Node, created by parser
 typedef struct {
     NodeBuffer stmts;
 } Program;
 
 // Returns -1 on write to FILE err
-// TODO: return index of statement where fprint failed on to resume later
 int program_fprint(Program* p, FILE* fp);
 
-// TODO? remove tok or value?
 typedef struct {
     Token tok; // the 't_Ident' token
 } Identifier;
@@ -118,7 +111,7 @@ typedef struct {
     NodeBuffer stmts;
 } BlockStatement;
 
-void destroy_block_statement(BlockStatement* bs);
+void free_block_statement(BlockStatement* bs);
 int fprint_block_statement(BlockStatement* bs, FILE* fp);
 
 typedef struct {
@@ -136,7 +129,7 @@ typedef struct {
     BlockStatement* body;
 } FunctionLiteral;
 
-void destroy_function_literal(FunctionLiteral* fl);
+void free_function_literal(FunctionLiteral* fl);
 
 typedef struct {
     Token tok; // the '(' token
@@ -171,4 +164,4 @@ typedef struct {
     PairBuffer pairs;
 } HashLiteral;
 
-void destroy_hash_literal(HashLiteral* hl);
+void free_hash_literal(HashLiteral* hl);
