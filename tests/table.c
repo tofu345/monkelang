@@ -106,7 +106,6 @@ test_table_expand(void) {
     table tbl;
     if (table_init(&tbl) == NULL) die("malloc");
 
-    // eh.
     int num = 129;
     for (int i = 0; i < num; i++) {
         table_set(&tbl, OBJ(o_Integer, i), OBJ(o_Integer, i));

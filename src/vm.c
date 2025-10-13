@@ -123,7 +123,7 @@ execute_binary_string_operation(VM *vm, Opcode op, Object left, Object right) {
     }
 
     // copy [left] and [right] into new string
-    // NOTE: must occur before [vm_allocate] to use after free.
+    // NOTE: must occur before [vm_allocate], if not, potential use after free.
     int length = left.data.string->length + right.data.string->length,
         capacity = power_of_2_ceil(length + 1);
     char *result = allocate(vm, capacity * sizeof(char));
@@ -524,6 +524,7 @@ static void
 mark_alloc(Object obj) {
     assert(obj.type >= o_String);
 
+    // access [Alloc] prepended to ptr with [vm_allocate]
     Alloc *alloc = ((Alloc *)obj.data.ptr) - 1;
     alloc->is_marked = true;
 }

@@ -12,17 +12,10 @@ static void
 print_errors(FILE* out, ErrorBuffer *buf) {
     for (int i = 0; i < buf->length; i++) {
         fprintf(out, "%s\n", buf->data[i]);
+        free(buf->data[i]);
     }
     if (buf->length >= MAX_ERRORS)
         fprintf(out, "too many errors, stopping now\n");
-}
-
-static void
-free_errors(ErrorBuffer *errs) {
-    for (int i = 0; i < errs->length; i++) {
-        free(errs->data[i]);
-    }
-    errs->length = 0;
 }
 
 void repl(FILE* in, FILE* out) {
@@ -81,12 +74,13 @@ cleanup:
         program_free(&prog);
         free(p.peek_token.literal);
         p.peek_token.literal = NULL;
-        free_errors(&p.errors);
-        free_errors(&c.errors);
+        p.errors.length = 0;
+
+        c.errors.length = 0;
         c.instructions.length = 0;
-        free(c.constants.data);
-        memset(&c.constants, 0, sizeof(ConstantBuffer));
-        free_errors(&vm.errors);
+        c.constants.length = 0;
+
+        vm.errors.length = 0;
     }
 
     parser_free(&p);

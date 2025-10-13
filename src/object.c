@@ -62,16 +62,14 @@ fprint_hash(table *tbl, FILE* fp) {
     FPRINTF(fp, "{");
     tbl_it it;
     tbl_iterator(&it, tbl);
-    for (size_t i = 0; i < tbl->length - 1 && tbl_next(&it); i++) {
+    size_t last = tbl->length - 1;
+    for (size_t i = 0; tbl_next(&it); i++) {
         object_fprint(it.cur_key, fp);
         FPRINTF(fp, ": ");
         object_fprint(it.cur_val, fp);
-        FPRINTF(fp, ", ");
-    }
-    if (tbl->length >= 1 && tbl_next(&it)) {
-        object_fprint(it.cur_key, fp);
-        FPRINTF(fp, ": ");
-        object_fprint(it.cur_val, fp);
+        if (i != last) {
+            FPRINTF(fp, ", ");
+        }
     }
     FPRINTF(fp, "}");
     return 0;
