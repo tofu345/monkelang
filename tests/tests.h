@@ -13,6 +13,7 @@ typedef enum {
     test_str,
     test_bool,
     test_arr,
+    test_hash,
 } Type;
 
 typedef union {

@@ -64,7 +64,7 @@ parser_error(Parser* p, char* format, ...) {
     va_list args;
     va_start(args, format);
     char* msg = NULL;
-    if (vasprintf(&msg, format, args) == -1) die("malloc");
+    if (vasprintf(&msg, format, args) == -1) die("parser_error");
     ErrorBufferPush(&p->errors, msg);
     va_end(args);
 }
@@ -123,7 +123,7 @@ no_prefix_parse_error(Parser* p, TokenType t) {
 
 static Node
 parse_expression(Parser* p, enum Precedence precedence) {
-    PrefixParseFn prefix = p->prefix_parse_fns[p->cur_token.type];
+    PrefixParseFn *prefix = p->prefix_parse_fns[p->cur_token.type];
     if (prefix == NULL) {
         no_prefix_parse_error(p, p->cur_token.type);
         free(p->cur_token.literal);
@@ -135,7 +135,7 @@ parse_expression(Parser* p, enum Precedence precedence) {
 
     while (!peek_token_is(p, t_Semicolon)
             && precedence < peek_precedence(p)) {
-        InfixParseFn infix = p->infix_parse_fns[p->peek_token.type];
+        InfixParseFn *infix = p->infix_parse_fns[p->peek_token.type];
         if (infix == NULL)
             return left_exp;
 
@@ -657,8 +657,9 @@ parse_statement(Parser* p) {
         return parse_return_statement(p);
     case t_Illegal:
         parser_error(p,
-                ":%d,%d: illegal character found",
+                ":%d,%d: illegal character",
                 p->cur_token.line, p->cur_token.col);
+        free(p->cur_token.literal);
         return (Node){};
     default:
         return parse_expression_statement(p);
@@ -666,9 +667,8 @@ parse_statement(Parser* p) {
 }
 
 void parser_init(Parser* p) {
-    p->errors = (ErrorBuffer){};
+    memset(p, 0, sizeof(Parser));
 
-    memset(p->prefix_parse_fns, 0, t_Return * sizeof(PrefixParseFn));
     p->prefix_parse_fns[t_Ident] = parse_identifier;
     p->prefix_parse_fns[t_Int] = parse_integer_literal;
     p->prefix_parse_fns[t_Float] = parse_float_literal;
@@ -683,7 +683,6 @@ void parser_init(Parser* p) {
     p->prefix_parse_fns[t_Lbracket] = parse_array_literal;
     p->prefix_parse_fns[t_Lbrace] = parse_hash_literal;
 
-    memset(p->infix_parse_fns, 0, t_Return * sizeof(InfixParseFn));
     p->infix_parse_fns[t_Plus] = parse_infix_expression;
     p->infix_parse_fns[t_Minus] = parse_infix_expression;
     p->infix_parse_fns[t_Slash] = parse_infix_expression;

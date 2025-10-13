@@ -19,5 +19,6 @@ typedef struct {
 void symbol_table_init(SymbolTable *st);
 void symbol_table_free(SymbolTable *st);
 
+// copy [name] and define [Symbol]
 Symbol *sym_define(SymbolTable *st, char *name);
 Symbol *sym_resolve(SymbolTable *st, char *name);

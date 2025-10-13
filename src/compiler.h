@@ -5,9 +5,6 @@
 #include "object.h"
 #include "symbol_table.h"
 
-// TODO: replace [evaluator.c/OBJ]
-#define OBJ(typ, dat) (Object){ .type = typ, .data = { dat } }
-
 typedef enum {
     c_Integer = 1,
     c_Float,

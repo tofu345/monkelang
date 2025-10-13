@@ -25,14 +25,10 @@ free_errors(ErrorBuffer *errs) {
     errs->length = 0;
 }
 
-BUFFER(Program, Program);
-DEFINE_BUFFER(Program, Program);
-
 void repl(FILE* in, FILE* out) {
     Parser p;
     parser_init(&p);
     Program prog;
-    ProgramBuffer progs = {};
 
     Compiler c;
     compiler_init(&c);
@@ -40,18 +36,20 @@ void repl(FILE* in, FILE* out) {
     VM vm;
     vm_init(&vm, NULL, NULL, NULL);
 
+    char *input;
     int err;
+    size_t len;
+    Object stack_elem;
     while (1) {
         fprintf(out, ">> ");
-        char *input = NULL;
-        size_t len = 0;
+        input = NULL;
+        len = 0;
         if (getline(&input, &len, in) == -1) {
             free(input);
             break;
         }
 
         prog = parse(&p, input);
-        ProgramBufferPush(&progs, prog);
         if (p.errors.length > 0) {
             fprintf(out, "Woops! We ran into some monkey business here!\n");
             print_errors(out, &p.errors);
@@ -73,24 +71,24 @@ void repl(FILE* in, FILE* out) {
             goto cleanup;
         }
 
-        Object stack_elem = vm_last_popped(&vm);
+        stack_elem = vm_last_popped(&vm);
         object_fprint(stack_elem, out);
         fputc('\n', out);
         vm.stack[0] = (Object){}; // remove stack_elem
 
 cleanup:
         free(input);
+        program_free(&prog);
         free(p.peek_token.literal);
         p.peek_token.literal = NULL;
         free_errors(&p.errors);
         free_errors(&c.errors);
         c.instructions.length = 0;
+        free(c.constants.data);
+        memset(&c.constants, 0, sizeof(ConstantBuffer));
         free_errors(&vm.errors);
     }
 
-    for (int i = 0; i < progs.length; i++)
-        program_free(&progs.data[i]);
-    free(progs.data);
     parser_free(&p);
     compiler_free(&c);
     vm_free(&vm);

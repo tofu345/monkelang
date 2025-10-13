@@ -1,6 +1,8 @@
 #include "object.h"
 #include "utils.h"
+#include "table.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,20 +11,20 @@ DEFINE_BUFFER(Object, Object);
 DEFINE_BUFFER(Char, char);
 
 static int
-fprintf_integer(ObjectData i, FILE* fp) {
-    FPRINTF(fp, "%ld", i.integer);
+fprintf_integer(long i, FILE* fp) {
+    FPRINTF(fp, "%ld", i);
     return 0;
 }
 
 static int
-fprintf_float(ObjectData f, FILE* fp) {
-    FPRINTF(fp, "%.3f", f.floating);
+fprintf_float(double f, FILE* fp) {
+    FPRINTF(fp, "%.3f", f);
     return 0;
 }
 
 static int
-fprintf_boolean(ObjectData b, FILE* fp) {
-    FPRINTF(fp, "%s", b.boolean ? "true" : "false");
+fprintf_boolean(bool b, FILE* fp) {
+    FPRINTF(fp, "%s", b ? "true" : "false");
     return 0;
 }
 
@@ -33,33 +35,17 @@ fprintf_null(FILE* fp) {
 }
 
 static int
-fprintf_error(ObjectData e, FILE* fp) {
-    FPRINTF(fp, "error: %s", e.str);
-    return 0;
-}
-
-// static int
-// fprint_function(FILE* fp) {
-//     // [Object] with type [o_Function] points to [FunctionLiteral] which
-//     // is managed by [Program] i.e freed with [Program]. For simplicity,
-//     // printing functions is disabled.
-//     FPRINTF(fp, "<function>");
-//     return 0;
-// }
-
-static int
-fprintf_string(ObjectData sl, FILE* fp) {
-    if (sl.string->length == 0) {
+fprintf_string(CharBuffer *str, FILE* fp) {
+    if (str->length == 0) {
         FPRINTF(fp, "\"\"");
     } else {
-        FPRINTF(fp, "\"%.*s\"", sl.string->length, sl.string->data);
+        FPRINTF(fp, "\"%.*s\"", str->length, str->data);
     }
     return 0;
 }
 
 static int
-fprint_array(ObjectData o, FILE* fp) {
-    ObjectBuffer* array = o.array;
+fprint_array(ObjectBuffer *array, FILE* fp) {
     FPRINTF(fp, "[");
     for (int i = 0; i < array->length - 1; i++) {
         object_fprint(array->data[i], fp);
@@ -71,56 +57,49 @@ fprint_array(ObjectData o, FILE* fp) {
     return 0;
 }
 
-// static int
-// fprint_hash_literal_entry(ht_entry* entry, FILE* fp) {
-//     FPRINTF(fp, "%s: ", entry->key);
-//     object_fprint(entry->value, fp);
-//     return 0;
-// }
-
-// static int
-// fprint_hash(ObjectData o, FILE* fp) {
-//     FPRINTF(fp, "{");
-//     ht* tbl = o.hash;
-//     hti it = ht_iterator(tbl);
-//     for (size_t i = 0; i < tbl->length - 1 && ht_next(&it); i++) {
-//         fprint_hash_literal_entry(it.current, fp);
-//         FPRINTF(fp, ", ");
-//     }
-//     if (tbl->length >= 1 && ht_next(&it))
-//         fprint_hash_literal_entry(it.current, fp);
-//     FPRINTF(fp, "}");
-//     return 0;
-// }
+static int
+fprint_hash(table *tbl, FILE* fp) {
+    FPRINTF(fp, "{");
+    tbl_it it;
+    tbl_iterator(&it, tbl);
+    for (size_t i = 0; i < tbl->length - 1 && tbl_next(&it); i++) {
+        object_fprint(it.cur_key, fp);
+        FPRINTF(fp, ": ");
+        object_fprint(it.cur_val, fp);
+        FPRINTF(fp, ", ");
+    }
+    if (tbl->length >= 1 && tbl_next(&it)) {
+        object_fprint(it.cur_key, fp);
+        FPRINTF(fp, ": ");
+        object_fprint(it.cur_val, fp);
+    }
+    FPRINTF(fp, "}");
+    return 0;
+}
 
 int object_fprint(Object o, FILE* fp) {
     switch (o.type) {
         case o_Integer:
-            return fprintf_integer(o.data, fp);
+            return fprintf_integer(o.data.integer, fp);
+
         case o_Float:
-            return fprintf_float(o.data, fp);
+            return fprintf_float(o.data.floating, fp);
+
         case o_Boolean:
-            return fprintf_boolean(o.data, fp);
+            return fprintf_boolean(o.data.boolean, fp);
+
         case o_Null:
             return fprintf_null(fp);
-        case o_Error:
-            return fprintf_error(o.data, fp);
-        // case o_BuiltinFunction:
-        //     FPRINTF(fp, "<builtin function>");
-        //     return 0;
-        // case o_Function:
-        // case o_Closure:
-        //     return fprint_function(fp);
+
         case o_String:
-            return fprintf_string(o.data, fp);
+            return fprintf_string(o.data.string, fp);
+
         case o_Array:
-            return fprint_array(o.data, fp);
-        // case o_Hash:
-        //     return fprint_hash(o.d, fp);
-        // case o_ReturnValue:
-        //     fprintf(stderr, "object_fprint: cannot print ReturnValue\n");
-        //     exit(1);
-        //     return 0;
+            return fprint_array(o.data.array, fp);
+
+        case o_Hash:
+            return fprint_hash(o.data.hash, fp);
+
         default:
             fprintf(stderr, "object_fprint: object type not handled %d\n",
                     o.type);
@@ -134,19 +113,19 @@ bool object_eq(Object left, Object right) {
     switch (left.type) {
         case o_Float:
             return left.data.floating == right.data.floating;
+
         case o_Integer:
             return left.data.integer == right.data.integer;
+
         case o_Boolean:
             return left.data.boolean == right.data.boolean;
+
         case o_Null:
             return true;
-        case o_Error:
-            return !strcmp(left.data.str, right.data.str);
-        // case o_ReturnValue:
-        //     return object_eq(from_return_value(left),
-        //             from_return_value(right));
+
         case o_String:
             return !strcmp(left.data.string->data, right.data.string->data);
+
         case o_Array:
             {
                 ObjectBuffer* l_arr = left.data.array;
@@ -157,6 +136,7 @@ bool object_eq(Object left, Object right) {
                         return false;
                 return true;
             }
+
         // TODO: cmp function error
         default:
             fprintf(stderr, "object_eq: object type not handled %s\n",
@@ -166,27 +146,12 @@ bool object_eq(Object left, Object right) {
     }
 }
 
-// Object* to_return_value(Object* obj) {
-//     struct ReturnValue* return_val = (void*)obj;
-//     return_val->value_typ = return_val->typ;
-//     return_val->typ = o_ReturnValue;
-//     return obj;
-// }
-
-// Object* from_return_value(Object* obj) {
-//     if (obj->typ != o_ReturnValue) return obj;
-//     struct ReturnValue* return_val = (void*)obj;
-//     return_val->typ = return_val->value_typ;
-//     return obj;
-// }
-
 const char* object_types[] = {
     "Null",
     "Integer",
     "Float",
     "Boolean",
     "String",
-    "Error",
     "Array",
     "Hash",
 };

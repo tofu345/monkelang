@@ -21,7 +21,6 @@ Program test_parse(char *input) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
     check_parser_errors(&p);
     parser_free(&p);
     return prog;

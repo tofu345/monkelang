@@ -312,6 +312,79 @@ void test_array_literals(void) {
     );
 }
 
+void test_hash_literals(void) {
+    c_test(
+        "{}",
+        (Constants){},
+        _I(
+            make(OpHash, 0),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "{1: 2, 3: 4, 5: 6}",
+        _C( INT(1), INT(2), INT(3), INT(4), INT(5), INT(6) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 1),
+            make(OpConstant, 2),
+            make(OpConstant, 3),
+            make(OpConstant, 4),
+            make(OpConstant, 5),
+            make(OpHash, 6),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "{1: 2 + 3, 4: 5 * 6}",
+        _C( INT(1), INT(2), INT(3), INT(4), INT(5), INT(6) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 1),
+            make(OpConstant, 2),
+            make(OpAdd),
+            make(OpConstant, 3),
+            make(OpConstant, 4),
+            make(OpConstant, 5),
+            make(OpMul),
+            make(OpHash, 4),
+            make(OpPop)
+        )
+    );
+}
+
+void test_index_expressions(void) {
+    c_test(
+        "[1, 2, 3][1 + 1]",
+        _C( INT(1), INT(2), INT(3), INT(1), INT(1) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 1),
+            make(OpConstant, 2),
+            make(OpArray, 3),
+            make(OpConstant, 3),
+            make(OpConstant, 4),
+            make(OpAdd),
+            make(OpIndex),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "{1: 2}[2 - 1]",
+        _C( INT(1), INT(2), INT(2), INT(1) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 1),
+            make(OpHash, 2),
+            make(OpConstant, 2),
+            make(OpConstant, 3),
+            make(OpSub),
+            make(OpIndex),
+            make(OpPop)
+        )
+    );
+}
+
 static void test_instructions(Instructions expected, Instructions actual);
 static void test_constants(Constants expected, ConstantBuffer actual);
 
@@ -444,5 +517,7 @@ int main(void) {
     RUN_TEST(test_global_let_statements);
     RUN_TEST(test_string_expressions);
     RUN_TEST(test_array_literals);
+    RUN_TEST(test_hash_literals);
+    RUN_TEST(test_index_expressions);
     return UNITY_END();
 }

@@ -7,8 +7,8 @@
 
 typedef struct Parser Parser;
 
-typedef Node (*PrefixParseFn) (Parser* p);
-typedef Node (*InfixParseFn) (Parser* p, Node left);
+typedef Node PrefixParseFn (Parser* p);
+typedef Node InfixParseFn (Parser* p, Node left);
 
 // All `parse_*` functions must return with `p->cur_token` in use or freed
 struct Parser {
@@ -19,8 +19,8 @@ struct Parser {
     ErrorBuffer errors;
 
     // TODO: change and reduce array size.
-    PrefixParseFn prefix_parse_fns[t_Return];
-    InfixParseFn infix_parse_fns[t_Return];
+    PrefixParseFn *prefix_parse_fns[t_Return];
+    InfixParseFn *infix_parse_fns[t_Return];
 };
 
 void parser_init(Parser* p);

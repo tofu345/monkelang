@@ -1,9 +1,11 @@
 #include "unity/unity.h"
 #include "helpers.h"
 #include "tests.h"
-#include "unity/unity_internals.h"
 
 #include "../src/vm.h"
+#include "../src/table.h"
+
+#include <stdio.h>
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -88,18 +90,42 @@ test_string_expressions(void) {
     vm_test("\"mon\" + \"key\" + \"banana\"", TEST(str, "monkeybanana"));
 }
 
-// create NULL-terminated array of integers
-static Test test_array(int n, ...);
+// create *NULL-terminated* array of integers.
+static TestArray *make_test_array(int n, ...);
+#define ARR(...) TEST(arr, make_test_array(__VA_ARGS__))
 
 static void
 test_array_literals(void) {
-    vm_test("[]", test_array(0));
-    vm_test("[1, 2, 3]", test_array(1, 2, 3, 0));
-    vm_test("[1 + 2, 3 * 4, 5 + 6]", test_array(3, 12, 11, 0));
+    vm_test("[]", ARR(0));
+    vm_test("[1, 2, 3]", ARR(1, 2, 3, 0));
+    vm_test("[1 + 2, 3 * 4, 5 + 6]", ARR(3, 12, 11, 0));
 }
 
-static Test
-test_array(int n, ...) {
+#define HASH(...) (Test){ test_hash, { ._arr = make_test_array(__VA_ARGS__) } }
+
+static void
+test_hash_literals(void) {
+    vm_test("{}", HASH(0));
+    vm_test("{1: 2, 2: 3}", HASH(1, 2, 2, 3, 0));
+    vm_test("{1 + 1: 2 * 2, 3 + 3: 4 * 4}", HASH(2, 4, 6, 16, 0));
+}
+
+static void
+test_index_expressions(void) {
+    vm_test("[1, 2, 3][1]", TEST(int, 2));
+    vm_test("[1, 2, 3][0 + 2]", TEST(int, 3));
+    vm_test("[[1, 1, 1]][0][0]", TEST(int, 1));
+    vm_test("[][0]", TEST_NULL);
+    vm_test("[1, 2, 3][99]", TEST_NULL);
+    vm_test("[1][-1]", TEST_NULL);
+    vm_test("{1: 1, 2: 2}[1]", TEST(int, 1));
+    vm_test("{1: 1, 2: 2}[2]", TEST(int, 2));
+    vm_test("{1: 1}[0]", TEST_NULL);
+    vm_test("{}[0]", TEST_NULL);
+}
+
+static TestArray *
+make_test_array(int n, ...) {
     va_list ap;
     int length = 0, capacity = 8;
     TestArray *nums = malloc(sizeof(TestArray));
@@ -109,7 +135,7 @@ test_array(int n, ...) {
 
     if (n == 0) {
         nums->length = 0;
-        return TEST(arr, nums);
+        return nums;
     }
 
     va_start(ap, n);
@@ -123,7 +149,7 @@ test_array(int n, ...) {
     } while (n != 0);
     va_end(ap);
     nums->length = length;
-    return TEST(arr, nums);
+    return nums;
 }
 
 static bool
@@ -215,33 +241,63 @@ test_expected_object(Test expected, Object actual) {
         case test_arr:
             {
                 if (!expect_object_is(o_Array, actual)) {
-                    free(expected.val._arr->data);
-                    free(expected.val._arr);
                     TEST_FAIL();
                 }
 
-                if (expected.val._arr->length != actual.data.array->length) {
+                ObjectBuffer *arr = actual.data.ptr;
+                if (expected.val._arr->length != arr->length) {
                     printf("wrong number of elements. want=%d, got=%d\n",
-                            expected.val._arr->length, actual.data.array->length);
-                    free(expected.val._arr->data);
-                    free(expected.val._arr);
+                            expected.val._arr->length, arr->length);
                     TEST_FAIL();
                 }
 
                 int err;
                 for (int i = 0; i < expected.val._arr->length; i++) {
-                    err =
-                        test_integer_object(expected.val._arr->data[i],
-                                actual.data.array->data[i]);
+                    err = test_integer_object(expected.val._arr->data[i],
+                                arr->data[i]);
                     if (err != 0) {
                         printf("test array element %d: test_integer_object failed", i);
-                        free(expected.val._arr->data);
-                        free(expected.val._arr);
                         TEST_FAIL();
                     }
                 }
                 free(expected.val._arr->data);
                 free(expected.val._arr);
+                break;
+            }
+
+        case test_hash:
+            {
+                if (!expect_object_is(o_Hash, actual)) {
+                    TEST_FAIL();
+                }
+
+                table *tbl = actual.data.hash;
+                TestArray *exp = expected.val._arr;
+                size_t num_pairs = exp->length / 2;
+                if (num_pairs != tbl->length) {
+                    printf("wrong number of elements. want=%zu, got=%zu\n",
+                            num_pairs, tbl->length);
+                    TEST_FAIL();
+                }
+
+                // test `tbl[expected key]` == `expected value`
+                int err;
+                for (int i = 0; i + 1 < exp->length; i += 2) {
+                    Object value = table_get(tbl, OBJ(o_Integer, exp->data[i]));
+                    if (value.type == o_Null) {
+                        printf("no pair for key %d", i);
+                        TEST_FAIL();
+                    }
+
+                    err = test_integer_object(exp->data[i + 1], value);
+                    if (err != 0) {
+                        printf("test hash element %d failed", i);
+                        TEST_FAIL();
+                    }
+                }
+
+                free(exp->data);
+                free(exp);
                 break;
             }
 
@@ -296,6 +352,8 @@ int main(void) {
     RUN_TEST(test_global_let_statements);
     RUN_TEST(test_string_expressions);
     RUN_TEST(test_array_literals);
+    RUN_TEST(test_hash_literals);
+    RUN_TEST(test_index_expressions);
 
     vm_free(&vm);
     return UNITY_END();

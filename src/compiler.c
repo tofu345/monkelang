@@ -221,6 +221,21 @@ _compile(Compiler *c, Node n) {
                 return 0;
             }
 
+        case n_IndexExpression:
+            {
+                IndexExpression *ie = n.obj;
+                if (_compile(c, ie->left)) {
+                    return -1;
+                }
+
+                if (_compile(c, ie->index)) {
+                    return -1;
+                }
+
+                emit(c, OpIndex);
+                return 0;
+            }
+
         case n_ArrayLiteral:
             {
                 NodeBuffer elems = ((ArrayLiteral *)n.obj)->elements;
@@ -234,6 +249,21 @@ _compile(Compiler *c, Node n) {
                 return 0;
             }
 
+        case n_HashLiteral:
+            {
+                PairBuffer pairs = ((HashLiteral *)n.obj)->pairs;
+                for (int i = 0; i < pairs.length; i++) {
+                    if (_compile(c, pairs.data[i].key)) {
+                        return -1;
+                    }
+                    if (_compile(c, pairs.data[i].val)) {
+                        return -1;
+                    }
+                }
+                emit(c, OpHash, pairs.length * 2);
+                return 0;
+            }
+
         case n_IntegerLiteral:
             {
                 IntegerLiteral *il = n.obj;
@@ -242,6 +272,17 @@ _compile(Compiler *c, Node n) {
                     .data = { .integer = il->value }
                 };
                 emit(c, OpConstant, add_constant(c, integer));
+                return 0;
+            }
+
+        case n_FloatLiteral:
+            {
+                FloatLiteral *il = n.obj;
+                Constant floating = {
+                    .type = c_Float,
+                    .data = { .floating = il->value }
+                };
+                emit(c, OpConstant, add_constant(c, floating));
                 return 0;
             }
 

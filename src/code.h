@@ -30,6 +30,8 @@ typedef enum {
     OpSetGlobal,
 
     OpArray,
+    OpHash,
+    OpIndex,
 } Opcode;
 
 // Operands widths in bytes and number.

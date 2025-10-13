@@ -33,6 +33,8 @@ const Definition definitions[] = {
     DEF(OpGetGlobal, two),
     DEF(OpSetGlobal, two),
     DEF(OpArray, two),
+    DEF(OpHash, two),
+    DEF_EMPTY(OpIndex),
 };
 
 const Definition *
@@ -132,10 +134,10 @@ make(Opcode op, ...) {
 }
 
 void instructions_allocate(Instructions *buf, int length) {
-    if (buf->length + length >= buf->capacity) {
+    if (buf->length + length > buf->capacity) {
         int capacity = power_of_2_ceil(buf->length + length);
         buf->data = realloc(buf->data, capacity * sizeof(uint8_t));
-        if (buf->data == NULL) { die("instructions_allocate: realloc"); }
+        if (buf->data == NULL) { die("instructions_allocate"); }
         buf->capacity = capacity;
     }
     buf->length += length;

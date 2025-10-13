@@ -5,36 +5,37 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-typedef enum __attribute__ ((__packed__)) {
-    // Primitives (concrete values or ptrs do not need freeing by GC)
-    o_Null, // TODO? `null` tokens, lexing and parsing?
-    o_Integer,
-    o_Float,
-    o_Boolean,
+// TODO o_Error, `null` token, lexing and parsing
 
-    // Heap Allocated Objects
-    o_String,
-    o_Error,
-    o_Array,
-    o_Hash,
-} ObjectType;
+#define OBJ(t, d) (Object){ .type = t, .data = { d } }
 
 typedef struct Object Object;
 BUFFER(Object, Object);
 BUFFER(Char, char);
+typedef struct table table;
 
-// typedef struct Closure Closure;
-// typedef struct Env Env;
-// typedef Object* Builtin(Env* env, ObjectBuffer* args);
+typedef enum __attribute__ ((__packed__)) {
+    // Primitive data types:
+    o_Null,
+    o_Integer,
+    o_Float,
+    o_Boolean,
+
+    // Compound data types:
+    o_String,
+    o_Array,
+    o_Hash,
+} ObjectType;
 
 typedef union {
     long integer;
     double floating;
     bool boolean;
 
-    CharBuffer* string; // [o_String]
+    CharBuffer* string;
     ObjectBuffer* array;
-    ht* hash;
+    table* hash;
+    void *ptr;
 } ObjectData;
 
 struct Object {
@@ -43,5 +44,7 @@ struct Object {
 };
 
 const char* show_object_type(ObjectType t);
-int object_fprint(Object o, FILE* fp);
 bool object_eq(Object left, Object right);
+
+// print [Object] to [fp], returns -1 on error
+int object_fprint(Object o, FILE* fp);
