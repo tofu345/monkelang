@@ -1,26 +1,10 @@
 #pragma once
 
+#include "constants.h"
 #include "parser.h"
 #include "code.h"
 #include "object.h"
 #include "symbol_table.h"
-
-typedef enum {
-    c_Integer = 1,
-    c_Float,
-    c_String
-} ConstantType;
-
-typedef struct {
-    ConstantType type;
-    union {
-        long integer;
-        double floating;
-        char *string;
-    } data;
-} Constant;
-
-BUFFER(Constant, Constant);
 
 typedef struct {
     Opcode opcode;
@@ -29,19 +13,31 @@ typedef struct {
 
 typedef struct {
     Instructions instructions;
-    ConstantBuffer constants;
-
     EmittedInstruction last_instruction;
     EmittedInstruction previous_instruction;
+} CompilationScope;
 
-    SymbolTable symbol_table;
+BUFFER(Scope, CompilationScope);
+
+typedef struct {
+    SymbolTable *data;
+    int length, capacity;
+} SymbolTables;
+
+typedef struct {
+    ConstantBuffer constants;
+
+    SymbolTable *cur_symbol_table;
+    SymbolTables symbol_tables;
 
     ErrorBuffer errors;
+
+    Instructions *current_instructions;
+    ScopeBuffer scopes;
+    int scope_index;
 } Compiler;
 
 void compiler_init(Compiler *c);
-void compiler_with(Compiler *c, SymbolTable *symbol_table,
-        ConstantBuffer constants);
 
 void compiler_free(Compiler *c);
 
@@ -49,9 +45,15 @@ void compiler_free(Compiler *c);
 // otherwise non-0 with errors in [c.errors].
 int compile(Compiler *c, Program *prog);
 
+// append [Instruction] with [Opcode] and [int] operands
+int emit(Compiler *c, Opcode op, ...);
+
+void enter_scope(Compiler *c);
+Instructions *leave_scope(Compiler *c);
+
 typedef struct {
-    Instructions instructions;
-    ConstantBuffer constants;
+    Instructions *instructions;
+    ConstantBuffer *constants;
 } Bytecode;
 
-Bytecode *bytecode(Compiler *c);
+Bytecode bytecode(Compiler *c);

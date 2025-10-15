@@ -2,6 +2,8 @@
 
 #include <stdbool.h>
 
+#include "../src/code.h"
+
 typedef struct {
     int *data, length;
 } TestArray;
@@ -14,6 +16,7 @@ typedef enum {
     test_bool,
     test_arr,
     test_hash,
+    test_ins,
 } Type;
 
 typedef union {
@@ -22,6 +25,7 @@ typedef union {
     char* _str;
     bool _bool;
     TestArray *_arr;
+    Instructions *_ins;
 } Value;
 
 typedef struct {
@@ -29,5 +33,5 @@ typedef struct {
     Value val;
 } Test;
 
-#define TEST(t, v) (Test){ test_##t, { ._##t = v } }
-#define TEST_NULL (Test){}
+#define TEST(t, v) &(Test){ test_##t, { ._##t = v } }
+#define TEST_NULL &(Test){}

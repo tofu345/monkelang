@@ -3,8 +3,15 @@
 #include "utils.h"
 
 void symbol_table_init(SymbolTable *st) {
+    st->outer = NULL;
     st->store = ht_create();
-    if (st->store == NULL) die("symbol_table_init");
+    if (st->store == NULL) { die("symbol_table_init"); }
+}
+
+void enclosed_symbol_table(SymbolTable *st, SymbolTable *outer) {
+    st->outer = outer;
+    st->store = ht_create();
+    if (st->store == NULL) { die("enclosed_symbol_table"); }
 }
 
 void symbol_table_free(SymbolTable *st) {
@@ -24,7 +31,12 @@ Symbol *sym_define(SymbolTable *st, char *name) {
 
     symbol->name = name;
     symbol->index = st->store->length;
-    symbol->scope = GlobalScope;
+
+    if (st->outer == NULL) {
+        symbol->scope = GlobalScope;
+    } else {
+        symbol->scope = LocalScope;
+    }
 
     void *ptr = ht_set(st->store, name, symbol);
     if (ptr == NULL) {
@@ -37,9 +49,14 @@ Symbol *sym_define(SymbolTable *st, char *name) {
         free(name);
         free(ptr);
     }
+
     return symbol;
 }
 
 Symbol *sym_resolve(SymbolTable *st, char *name) {
-    return ht_get(st->store, name);
+    Symbol* sym = ht_get(st->store, name);
+    if (sym == NULL && st->outer != NULL) {
+        return sym_resolve(st->outer, name);
+    }
+    return sym;
 }

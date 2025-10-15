@@ -12,9 +12,11 @@
 
 const int _two_widths[] = { 2 };
 const Operands _two = { .widths = (int *)_two_widths, .length = 1 };
+const int _one_widths[] = { 1 };
+const Operands _one = { .widths = (int *)_one_widths, .length = 1 };
 
 const Definition definitions[] = {
-    DEF(OpConstant, two),
+    DEF(OpConstant, two), // constant index
     DEF_EMPTY(OpPop),
     DEF_EMPTY(OpAdd),
     DEF_EMPTY(OpSub),
@@ -27,14 +29,19 @@ const Definition definitions[] = {
     DEF_EMPTY(OpGreaterThan),
     DEF_EMPTY(OpMinus),
     DEF_EMPTY(OpBang),
-    DEF(OpJumpNotTruthy, two),
-    DEF(OpJump, two),
+    DEF(OpJumpNotTruthy, two), // instruction index
+    DEF(OpJump, two),          // instruction index
     DEF_EMPTY(OpNull),
-    DEF(OpGetGlobal, two),
-    DEF(OpSetGlobal, two),
-    DEF(OpArray, two),
-    DEF(OpHash, two),
+    DEF(OpGetGlobal, two), // globals index
+    DEF(OpSetGlobal, two), // globals index
+    DEF(OpArray, two), // num elements
+    DEF(OpHash, two),  // num pairs
     DEF_EMPTY(OpIndex),
+    DEF(OpCall, one), // num arguments
+    DEF_EMPTY(OpReturnValue),
+    DEF_EMPTY(OpReturn),
+    DEF(OpGetLocal, one), // locals index
+    DEF(OpSetLocal, one), // locals index
 };
 
 const Definition *
@@ -48,6 +55,10 @@ lookup(Opcode op) {
 
 int read_big_endian_uint16(uint8_t *arr) {
     return (arr[0] << 8) | arr[1];
+}
+
+int read_big_endian_uint8(uint8_t *arr) {
+    return arr[0];
 }
 
 // store n in `arr[0:2]` big endian.
@@ -79,6 +90,11 @@ Operands read_operands(int *n, const Definition *def, uint8_t* ins) {
             case 2:
                 operands.widths[i] = read_big_endian_uint16(ins + offset);
                 break;
+
+            case 1:
+                operands.widths[i] = read_big_endian_uint8(ins + offset);
+                break;
+
             default:
                 die("read_operands: operand width %d not implemented for %s",
                         width, def->name);
@@ -106,6 +122,11 @@ make_valist_into(Instructions *ins, Opcode op, va_list operands) {
             case 2:
                 put_big_endian_uint16(ins->data + offset, operand);
                 break;
+
+            case 1:
+                ins->data[offset] = operand;
+                break;
+
             default:
                 die("make: operand width %d not implemented", width);
         }

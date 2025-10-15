@@ -1,6 +1,8 @@
 #include "unity/unity.h"
 #include "helpers.h"
 
+#include <string.h>
+
 void print_errors(ErrorBuffer* errs) {
     for (int i = 0; i < errs->length; i++) {
         printf("%s\n", errs->data[i]);
@@ -26,40 +28,45 @@ Program test_parse(char *input) {
     return prog;
 }
 
-Instructions
-concat(Instructions ins, ...) {
+Instructions *
+concat(Instructions cur, ...) {
+    Instructions *concatted = malloc(sizeof(Instructions));
+    if (concatted == NULL) { die("malloc"); }
+    memcpy(concatted, &cur, sizeof(Instructions));
+
     va_list ap;
-    Instructions cur;
-    int cur_start;
-    va_start(ap, ins);
+    int offset;
+    va_start(ap, cur);
     while (1) {
         cur = va_arg(ap, Instructions);
         if (cur.data == NULL) break;
 
-        cur_start = ins.length;
-        instructions_allocate(&ins, cur.length);
-        memcpy(ins.data + cur_start, cur.data, cur.length * sizeof(uint8_t));
+        offset = concatted->length;
+        instructions_allocate(concatted, cur.length);
+        memcpy(concatted->data + offset, cur.data, cur.length * sizeof(uint8_t));
         free(cur.data);
     }
     va_end(ap);
-    return ins;
+    return concatted;
 }
 
-Constants
-constants(Constant c, ...) {
+ExpectedConstants
+constants(Test *t, ...) {
     va_list ap;
     int length = 0, capacity = 8;
-    Constant *constants = malloc(capacity * sizeof(Constant));
-    if (constants == NULL) { die("constants: malloc"); }
-    va_start(ap, c);
+    Test *buf = malloc(capacity * sizeof(Constant));
+    if (buf == NULL) { die("malloc"); }
+
+    va_start(ap, t);
     do {
         if (length >= capacity) {
-            constants = realloc(constants, capacity *= 2);
-            if (constants == NULL) die("realloc");
+            buf = realloc(buf, capacity *= 2);
+            if (buf == NULL) die("realloc");
         }
-        constants[length++] = c;
-        c = va_arg(ap, Constant);
-    } while (c.type != 0);
+
+        buf[length++] = *t;
+        t = va_arg(ap, Test *);
+    } while (t);
     va_end(ap);
-    return (Constants){ constants, length };
+    return (ExpectedConstants){ buf, length };
 }

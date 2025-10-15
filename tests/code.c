@@ -18,6 +18,7 @@ void test_make(void) {
     } tests[] = {
         {make(OpConstant, 65534), {OpConstant, 255, 254}},
         {make(OpAdd), {OpAdd}},
+        {make(OpGetLocal, 255), {OpGetLocal, 255}},
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
 
@@ -43,12 +44,14 @@ void test_make(void) {
 void test_instructions_string(void) {
     Instructions test = {};
     make_into(&test, OpAdd);
-    make_into(&test, OpConstant, 2);
+    make_into(&test, OpGetLocal, 1);
+    make_into(&test, OpGetLocal, 2);
     make_into(&test, OpConstant, 65535);
 
     char *expected_body = "0000 OpAdd\n\
-0001 OpConstant 2\n\
-0004 OpConstant 65535\n";
+0001 OpGetLocal 1\n\
+0003 OpGetLocal 2\n\
+0005 OpConstant 65535\n";
 
     char *buf = NULL;
     size_t len;
@@ -61,9 +64,9 @@ void test_instructions_string(void) {
     fflush(fp);
 
     if (strcmp(expected_body, buf) != 0) {
-        printf("\ninstructions wrongly formatted\n");
-        printf("want='%s'\n", expected_body);
-        printf("got ='%s'\n", buf);
+        printf("instructions wrongly formatted\n");
+        printf("want=\n%s\n", expected_body);
+        printf("got=\n%s\n", buf);
         TEST_FAIL();
     }
 

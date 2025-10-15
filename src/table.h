@@ -12,18 +12,16 @@
 
 bool hashable(Object key);
 
-// Separated [ObjectType] and [ObjectData] to avoid excessive padding.
-typedef struct {
-    ObjectData key;
-    ObjectData val;
-} table_entry;
-
 // `k_type[i]` is [o_Null] if empty
 typedef struct table_bucket {
     uint64_t hashes[N]; // for faster comparisons.
+
+    // Separated [ObjectType] and [ObjectData] to avoid excessive padding.
     ObjectType k_type[N];
+    ObjectData k_data[N];
     ObjectType v_type[N];
-    table_entry entries[N];
+    ObjectData v_data[N];
+
     struct table_bucket *overflow;
 } table_bucket;
 

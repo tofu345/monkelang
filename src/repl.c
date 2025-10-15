@@ -18,10 +18,14 @@ print_errors(FILE* out, ErrorBuffer *buf) {
         fprintf(out, "too many errors, stopping now\n");
 }
 
+BUFFER(Program, Program);
+DEFINE_BUFFER(Program, Program);
+
 void repl(FILE* in, FILE* out) {
     Parser p;
     parser_init(&p);
     Program prog;
+    ProgramBuffer programs = {};
 
     Compiler c;
     compiler_init(&c);
@@ -47,6 +51,8 @@ void repl(FILE* in, FILE* out) {
             fprintf(out, "Woops! We ran into some monkey business here!\n");
             print_errors(out, &p.errors);
             goto cleanup;
+        } else if (prog.stmts.length >= 1) {
+            ProgramBufferPush(&programs, prog);
         }
 
         err = compile(&c, &prog);
@@ -71,18 +77,19 @@ void repl(FILE* in, FILE* out) {
 
 cleanup:
         free(input);
-        program_free(&prog);
         free(p.peek_token.literal);
         p.peek_token.literal = NULL;
         p.errors.length = 0;
 
+        c.scopes.data[0].instructions.length = 0; // reset main scope
         c.errors.length = 0;
-        c.instructions.length = 0;
-        c.constants.length = 0;
 
         vm.errors.length = 0;
     }
 
+    for (int i = 0; i < programs.length; i++)
+        program_free(&programs.data[i]);
+    free(programs.data);
     parser_free(&p);
     compiler_free(&c);
     vm_free(&vm);

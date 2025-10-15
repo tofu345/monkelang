@@ -1,6 +1,8 @@
 #pragma once
 
 #include "ast.h"
+#include "code.h"
+#include "constants.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -16,10 +18,12 @@ typedef struct table table;
 
 typedef enum __attribute__ ((__packed__)) {
     // Primitive data types:
+    // Data types that do not need garbage collection
     o_Null,
     o_Integer,
     o_Float,
     o_Boolean,
+    o_CompiledFunction,
 
     // Compound data types:
     o_String,
@@ -35,6 +39,7 @@ typedef union {
     CharBuffer* string;
     ObjectBuffer* array;
     table* hash;
+    CompiledFunction *func;
     void *ptr;
 } ObjectData;
 

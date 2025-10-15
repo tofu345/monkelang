@@ -47,26 +47,23 @@ test_table_set(void) {
 
     Object one = OBJ(o_Integer, 1);
     Object two = OBJ(o_Integer, 2);
-    Object three = OBJ(o_Integer, 3);
-    Object four = OBJ(o_Integer, 4);
-    Object five = OBJ(o_Integer, 5);
+    Object _true = OBJ(o_Boolean, true);
+    Object _false = OBJ(o_Boolean, false);
 
     expect_set(&tbl, one, one);
-    expect_set(&tbl, two, two);
-    expect_set(&tbl, three, three);
-    expect_set(&tbl, four, four);
-    expect_set(&tbl, five, five);
+    expect_set(&tbl, two, one);
+    expect_set(&tbl, _true, two);
+    expect_set(&tbl, _false, two);
 
-    if (tbl.length != 5) {
+    if (tbl.length != 4) {
         table_free(&tbl);
         TEST_FAIL_MESSAGE("wrong table length");
     }
 
     expect_get(&tbl, one, one);
-    expect_get(&tbl, two, two);
-    expect_get(&tbl, three, three);
-    expect_get(&tbl, four, four);
-    expect_get(&tbl, five, five);
+    expect_get(&tbl, two, one);
+    expect_get(&tbl, _true, two);
+    expect_get(&tbl, _false, two);
 
     table_free(&tbl);
 }

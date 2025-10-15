@@ -1,6 +1,8 @@
 #include "vm.h"
 #include "code.h"
 #include "compiler.h"
+#include "constants.h"
+#include "frame.h"
 #include "object.h"
 #include "table.h"
 #include "utils.h"
@@ -22,17 +24,8 @@ static void *vm_allocate(VM *vm, ObjectType type, size_t size);
 // [vm.stack] but still in use. see [execute_binary_string_operation]
 static void *allocate(VM *vm, size_t size);
 
-void vm_with(VM *vm, Bytecode *bytecode) {
-    if (bytecode != NULL) {
-        vm->instructions = bytecode->instructions;
-        vm->constants = bytecode->constants;
-    }
-}
-
-void vm_init(VM *vm, Bytecode *bytecode, Object *globals, Object *stack) {
+void vm_init(VM *vm, Object *stack, Object *globals, Frame *frames) {
     memset(vm, 0, sizeof(VM));
-
-    vm_with(vm, bytecode);
 
     vm->bytesTillGC = NextGC;
 
@@ -47,6 +40,32 @@ void vm_init(VM *vm, Bytecode *bytecode, Object *globals, Object *stack) {
         if (globals == NULL) { die("vm globals create"); }
     }
     vm->globals = globals;
+
+    if (frames == NULL) {
+        frames = calloc(MaxFraxes, sizeof(Frame));
+        if (frames == NULL) { die("vm frames create"); }
+    }
+    vm->frames = frames;
+}
+
+void vm_with(VM *vm, Bytecode bytecode) {
+    CompiledFunction main_fn = {
+        .instructions = *bytecode.instructions
+    };
+    frame_init(vm->frames, main_fn, 0);
+    vm->frames_index = 1;
+
+    vm->constants = *bytecode.constants;
+}
+
+Frame *pop_frame(VM *vm) {
+    vm->frames_index--;
+    return vm->frames + vm->frames_index;
+}
+
+void push_frame(VM *vm, Frame *f) {
+    vm->frames[vm->frames_index] = *f;
+    vm->frames_index++;
 }
 
 static int
@@ -313,24 +332,27 @@ vm_push_constant(VM *vm, Constant c) {
 
         case c_String:
             {
-                size_t capacity = 0,
-                       len = strlen(c.data.string);
+                StringConstant str = *c.data.string;
+                size_t capacity = 0;
                 char *buf = NULL;
-                if (len > 0) {
-                    capacity = power_of_2_ceil(len + 1);
+                if (str.length > 0) {
+                    capacity = power_of_2_ceil(str.length + 1);
                     buf = allocate(vm, capacity * sizeof(char));
-                    memcpy(buf, c.data.string, len * sizeof(char));
-                    buf[len] = '\0';
+                    memcpy(buf, str.data, str.length * sizeof(char));
+                    buf[str.length] = '\0';
                 }
 
-                CharBuffer* str = vm_allocate(vm, o_String, sizeof(CharBuffer));
-                *str = (CharBuffer){
+                CharBuffer* str_buf = vm_allocate(vm, o_String, sizeof(CharBuffer));
+                *str_buf = (CharBuffer){
                     .data = buf,
-                    .length = len,
+                    .length = str.length,
                     .capacity = capacity
                 };
-                return vm_push(vm, OBJ(o_String, .string = str));
+                return vm_push(vm, OBJ(o_String, .string = str_buf));
             }
+
+        case c_Instructions:
+            return vm_push(vm, OBJ(o_CompiledFunction, .func = c.data.function));
 
         default:
             die("vm_push_constant: type %d not handled", c.type);
@@ -376,10 +398,35 @@ build_hash(VM *vm, int start_index, int end_index) {
         }
 
         key = table_set(tbl, key, val);
-        if (key.type == o_Null) { die("build_hash: key set"); }
+        if (key.type == o_Null) { die("build_hash: table_set"); }
     }
 
     return OBJ(o_Hash, .hash = tbl);
+}
+
+static int
+call_function(VM *vm, int num_args) {
+    Object fn = vm->stack[vm->sp - 1 - num_args];
+    if (fn.type != o_CompiledFunction) {
+        error(&vm->errors, "calling non-function");
+        return -1;
+    }
+
+    CompiledFunction *func = fn.data.func;
+    if (num_args != func->num_parameters) {
+        error(&vm->errors,
+                "function takes %d argument%s got %d",
+                func->num_parameters,
+                func->num_parameters != 1 ? "s" : "",
+                num_args);
+        return -1;
+    }
+
+    Frame f;
+    frame_init(&f, *func, vm->sp - num_args);
+    push_frame(vm, &f);
+    vm->sp = f.base_pointer + func->num_locals;
+    return 0;
 }
 
 int vm_run(VM *vm) {
@@ -387,13 +434,19 @@ int vm_run(VM *vm) {
     int err, pos, num;
     Object obj;
 
-    for (int ip = 0; ip < vm->instructions.length; ip++) {
-        op = vm->instructions.data[ip];
+    int ip;
+    Frame *current_frame = vm->frames;
+    Instructions ins = instructions(current_frame);
+
+    while (current_frame->ip < ins.length - 1) {
+        ip = ++current_frame->ip;
+        op = ins.data[ip];
+
         switch (op) {
             case OpConstant:
                 // constants index
-                num = read_big_endian_uint16(vm->instructions.data + ip + 1);
-                ip += 2;
+                num = read_big_endian_uint16(ins.data + ip + 1);
+                current_frame->ip += 2;
 
                 err = vm_push_constant(vm, vm->constants.data[num]);
                 if (err == -1) { return -1; };
@@ -437,16 +490,16 @@ int vm_run(VM *vm) {
                 break;
 
             case OpJump:
-                pos = read_big_endian_uint16(vm->instructions.data + ip + 1);
-                ip = pos - 1;
+                pos = read_big_endian_uint16(ins.data + ip + 1);
+                current_frame->ip = pos - 1;
                 break;
             case OpJumpNotTruthy:
-                pos = read_big_endian_uint16(vm->instructions.data + ip + 1);
-                ip += 2;
+                pos = read_big_endian_uint16(ins.data + ip + 1);
+                current_frame->ip += 2;
 
                 obj = vm_pop(vm);
                 if (!is_truthy(obj)) {
-                    ip = pos - 1;
+                    current_frame->ip = pos - 1;
                 }
                 break;
 
@@ -457,24 +510,24 @@ int vm_run(VM *vm) {
 
             case OpSetGlobal:
                 // globals index
-                num = read_big_endian_uint16(vm->instructions.data + ip + 1);
-                ip += 2;
+                pos = read_big_endian_uint16(ins.data + ip + 1);
+                current_frame->ip += 2;
 
-                vm->globals[num] = vm_pop(vm);
+                vm->globals[pos] = vm_pop(vm);
                 break;
             case OpGetGlobal:
                 // globals index
-                num = read_big_endian_uint16(vm->instructions.data + ip + 1);
-                ip += 2;
+                pos = read_big_endian_uint16(ins.data + ip + 1);
+                current_frame->ip += 2;
 
-                err = vm_push(vm, vm->globals[num]);
+                err = vm_push(vm, vm->globals[pos]);
                 if (err == -1) { return -1; };
                 break;
 
             case OpArray:
                 // number of array elements
-                num = read_big_endian_uint16(vm->instructions.data + ip + 1);
-                ip += 2;
+                num = read_big_endian_uint16(ins.data + ip + 1);
+                current_frame->ip += 2;
 
                 obj = build_array(vm, vm->sp - num, vm->sp);
                 vm->sp -= num;
@@ -485,8 +538,8 @@ int vm_run(VM *vm) {
 
             case OpHash:
                 // number of elements
-                num = read_big_endian_uint16(vm->instructions.data + ip + 1);
-                ip += 2;
+                num = read_big_endian_uint16(ins.data + ip + 1);
+                current_frame->ip += 2;
 
                 obj = build_hash(vm, vm->sp - num, vm->sp);
                 if (obj.type == o_Null) { return -1; };
@@ -498,6 +551,59 @@ int vm_run(VM *vm) {
 
             case OpIndex:
                 err = execute_index_expression(vm);
+                if (err == -1) { return -1; };
+                break;
+
+            case OpCall:
+                // num arguments
+                num = read_big_endian_uint8(ins.data + ip + 1);
+                current_frame->ip += 1;
+
+                err = call_function(vm, num);
+                if (err == -1) { return -1; };
+
+                current_frame++;
+                ins = instructions(current_frame);
+                break;
+
+            case OpReturnValue:
+                // return value
+                obj = vm_pop(vm);
+
+                pop_frame(vm);
+                vm->sp = current_frame->base_pointer - 1;
+
+                err = vm_push(vm, obj);
+                if (err == -1) { return -1; };
+
+                current_frame--;
+                ins = instructions(current_frame);
+                break;
+
+            case OpReturn:
+                pop_frame(vm);
+                vm->sp = current_frame->base_pointer - 1;
+
+                err = vm_push(vm, _null);
+                if (err == -1) { return -1; };
+
+                current_frame--;
+                ins = instructions(current_frame);
+                break;
+
+            case OpSetLocal:
+                // locals index
+                pos = read_big_endian_uint8(ins.data + ip + 1);
+                current_frame->ip += 1;
+
+                vm->stack[current_frame->base_pointer + pos] = vm_pop(vm);
+                break;
+            case OpGetLocal:
+                // locals index
+                pos = read_big_endian_uint8(ins.data + ip + 1);
+                current_frame->ip += 1;
+
+                err = vm_push(vm, vm->stack[current_frame->base_pointer + pos]);
                 if (err == -1) { return -1; };
                 break;
 
@@ -536,6 +642,7 @@ trace_mark_object(Object obj) {
         case o_Integer:
         case o_Float:
         case o_Boolean:
+        case o_CompiledFunction:
             return;
 
         // case o_Error:
@@ -605,6 +712,7 @@ void vm_free(VM *vm) {
     free(vm->errors.data);
     free(vm->stack);
     free(vm->globals);
+    free(vm->frames);
 }
 
 void mark_and_sweep(VM *vm) {

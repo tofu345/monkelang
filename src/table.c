@@ -74,14 +74,14 @@ void table_free(table *tbl) {
 }
 
 static Object
-bucket_get_value(table_bucket *bucket, uint64_t hash) {
+bucket_get_value(table_bucket *bucket, uint64_t hash, ObjectType type) {
     while (bucket != NULL) {
         for (size_t i = 0; i < N; i++) {
             if (bucket->k_type[i] == o_Null)
                 return (Object){};
 
-            if (bucket->hashes[i] == hash)
-                return (Object){ bucket->v_type[i], bucket->entries[i].val };
+            if (bucket->hashes[i] == hash && bucket->k_type[i] == type)
+                return (Object){ bucket->v_type[i], bucket->v_data[i] };
         }
         bucket = bucket->overflow;
     }
@@ -92,15 +92,15 @@ Object table_get(table *tbl, Object key) {
     if (key.type == o_Null) return (Object){};
     uint64_t hash = object_hash(key);
     size_t index = hash_index(hash, tbl->_buckets_length);
-    return bucket_get_value(tbl->buckets + index, hash);
+    return bucket_get_value(tbl->buckets + index, hash, key.type);
 }
 
 static void
 _bucket_set(table_bucket *bucket, int i, Object key, Object val) {
     bucket->k_type[i] = key.type;
-    bucket->entries[i].key = key.data;
+    bucket->k_data[i] = key.data;
     bucket->v_type[i] = val.type;
-    bucket->entries[i].val = val.data;
+    bucket->v_data[i] = val.data;
 }
 
 static Object
@@ -114,10 +114,10 @@ bucket_set(table *tbl, table_bucket *bucket, uint64_t hash, Object key,
             tbl->length++;
             return val;
 
-        } else if (bucket->hashes[i] == hash) {
-            Object old_val = (Object){ bucket->v_type[i], bucket->entries[i].val };
+        } else if (bucket->hashes[i] == hash && bucket->k_type[i] == key.type) {
+            Object old_val = (Object){ bucket->v_type[i], bucket->v_data[i] };
             bucket->v_type[i] = val.type;
-            bucket->entries[i].val = val.data;
+            bucket->v_data[i] = val.data;
             return old_val;
         }
     }
@@ -211,7 +211,7 @@ table_remove(table *tbl, Object key) {
     while (bucket != NULL) {
         for (int i = 0; i < N; i++) {
             if (bucket->k_type[i] == o_Null) break;
-            if (bucket->hashes[i] == hash) {
+            if (bucket->hashes[i] == hash && bucket->k_type[i] == key.type) {
                 int last = i + 1;
                 for (; last < N - 1; last++) {
                     if (bucket->k_type[last + 1] == o_Null) {
@@ -219,11 +219,17 @@ table_remove(table *tbl, Object key) {
                     }
                 }
 
-                Object val = (Object){ bucket->v_type[i], bucket->entries[i].val };
+                Object val = (Object){ bucket->v_type[i], bucket->v_data[i] };
                 _bucket_set(bucket, i, key, val);
-                bucket->entries[i] = bucket->entries[last];
-                bucket->k_type[last] = o_Null;
+
+                // swap [Objects] at [i] and [last]
+                bucket->k_type[i] = bucket->k_type[last];
+                bucket->k_data[i] = bucket->k_data[last];
+                bucket->v_type[i] = bucket->v_type[last];
+                bucket->v_data[i] = bucket->v_data[last];
                 bucket->hashes[i] = bucket->hashes[last];
+
+                bucket->k_type[last] = o_Null;
                 tbl->length--;
                 return val;
             }
@@ -271,11 +277,11 @@ tbl_next(tbl_it *it) {
 
         it->cur_key = (Object){
             .type = key_typ,
-            .data = it->_bucket->entries[it->_index].key
+            .data = it->_bucket->k_data[it->_index]
         };
         it->cur_val = (Object){
             .type = it->_bucket->v_type[it->_index],
-            .data = it->_bucket->entries[it->_index].val
+            .data = it->_bucket->v_data[it->_index]
         };
         it->_index++;
         return true;

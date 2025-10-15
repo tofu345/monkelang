@@ -32,6 +32,13 @@ typedef enum {
     OpArray,
     OpHash,
     OpIndex,
+
+    OpCall,
+    OpReturnValue,
+    OpReturn,
+
+    OpGetLocal,
+    OpSetLocal,
 } Opcode;
 
 // Operands widths in bytes and number.
@@ -61,6 +68,9 @@ Operands read_operands(int *n, const Definition *def, uint8_t *ins);
 
 // read `arr[0:2]` big endian.
 int read_big_endian_uint16(uint8_t *arr);
+
+// read `arr[0]`
+int read_big_endian_uint8(uint8_t *arr);
 
 Instructions make(Opcode op, ...);
 int make_into(Instructions *ins, Opcode op, ...);

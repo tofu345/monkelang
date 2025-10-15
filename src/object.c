@@ -75,6 +75,12 @@ fprint_hash(table *tbl, FILE* fp) {
     return 0;
 }
 
+static int
+fprint_compiled_function(CompiledFunction *func, FILE *fp) {
+    FPRINTF(fp, "CompiledFunction[%p]", func);
+    return 0;
+}
+
 int object_fprint(Object o, FILE* fp) {
     switch (o.type) {
         case o_Integer:
@@ -97,6 +103,9 @@ int object_fprint(Object o, FILE* fp) {
 
         case o_Hash:
             return fprint_hash(o.data.hash, fp);
+
+        case o_CompiledFunction:
+            return fprint_compiled_function(o.data.func, fp);
 
         default:
             fprintf(stderr, "object_fprint: object type not handled %d\n",
@@ -152,6 +161,7 @@ const char* object_types[] = {
     "String",
     "Array",
     "Hash",
+    "CompiledFunction",
 };
 
 const char* show_object_type(ObjectType t) {

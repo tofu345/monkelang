@@ -10,7 +10,8 @@
 void setUp(void) {}
 void tearDown(void) {}
 
-static void vm_test(char *input, Test expected);
+static void vm_test(char *input, Test *expected);
+static void vm_test_error(char *input, char *expected_error);
 
 static void
 test_integer_arithmetic(void) {
@@ -63,13 +64,13 @@ test_boolean_expressions(void) {
 
 static void
 test_conditionals(void) {
-    vm_test("if (true) { 10 }", TEST(int, 10));
+    vm_test("if (true) { 1.0 }", TEST(float, 1.0));
     vm_test("if (true) { 10 } else { 20 }", TEST(int, 10));
     vm_test("if (false) { 10 } else { 20 } ", TEST(int, 20));
     vm_test("if (1) { 10 }", TEST(int, 10));
     vm_test("if (1 < 2) { 10 }", TEST(int, 10));
     vm_test("if (1 < 2) { 10 } else { 20 }", TEST(int, 10));
-    vm_test("if (1 > 2) { 10 } else { 20 }", TEST(int, 20));
+    vm_test("if (1 > 2) { 10 } else { 20.7 }", TEST(float, 20.7));
     vm_test("if (1 > 2) { 10 }", TEST_NULL);
     vm_test("if (false) { 10 }", TEST_NULL);
     vm_test("!(if (false) { 5; })", TEST(bool, true));
@@ -101,7 +102,7 @@ test_array_literals(void) {
     vm_test("[1 + 2, 3 * 4, 5 + 6]", ARR(3, 12, 11, 0));
 }
 
-#define HASH(...) (Test){ test_hash, { ._arr = make_test_array(__VA_ARGS__) } }
+#define HASH(...) &(Test){ test_hash, { ._arr = make_test_array(__VA_ARGS__) } }
 
 static void
 test_hash_literals(void) {
@@ -114,14 +115,219 @@ static void
 test_index_expressions(void) {
     vm_test("[1, 2, 3][1]", TEST(int, 2));
     vm_test("[1, 2, 3][0 + 2]", TEST(int, 3));
-    vm_test("[[1, 1, 1]][0][0]", TEST(int, 1));
+    vm_test("[[1.5, 1, 1]][0][0]", TEST(float, 1.5));
     vm_test("[][0]", TEST_NULL);
     vm_test("[1, 2, 3][99]", TEST_NULL);
     vm_test("[1][-1]", TEST_NULL);
     vm_test("{1: 1, 2: 2}[1]", TEST(int, 1));
-    vm_test("{1: 1, 2: 2}[2]", TEST(int, 2));
+    vm_test("{1: 1, 2: 2.1}[2]", TEST(float, 2.1));
     vm_test("{1: 1}[0]", TEST_NULL);
     vm_test("{}[0]", TEST_NULL);
+}
+
+static void
+test_calling_functions_without_arguments(void) {
+    vm_test(
+        "\
+            let fivePlusTen = fn() { 5 + 10; };\
+            fivePlusTen();\
+        ",
+        TEST(int, 15)
+    );
+    vm_test(
+        "\
+            let one = fn() { 1; };\
+            let two = fn() { 2; };\
+            one() + two()\
+        ",
+        TEST(int, 3)
+    );
+    vm_test(
+        "\
+            let a = fn() { 1 };\
+            let b = fn() { a() + 1 };\
+            let c = fn() { b() + 1 };\
+            c()\
+        ",
+        TEST(int, 3)
+    );
+    vm_test(
+        "\
+            let earlyExit = fn() { return 99; 100; };\
+            earlyExit();\
+        ",
+        TEST(int, 99)
+    );
+    vm_test(
+        "\
+            let earlyExit = fn() { return 99; return 100; };\
+            earlyExit();\
+        ",
+        TEST(int, 99)
+    );
+}
+
+static void
+test_functions_without_return_value(void) {
+    vm_test(
+        "\
+            let noReturn = fn() { };\
+            noReturn();\
+        ",
+        TEST_NULL
+    );
+    vm_test(
+        "\
+            let noReturn = fn() { };\
+            let noReturnTwo = fn() { noReturn(); };\
+            noReturn();\
+            noReturnTwo();\
+        ",
+        TEST_NULL
+    );
+}
+
+static void
+test_first_class_functions(void) {
+    vm_test(
+        "\
+            let returnsOne = fn() { 1; };\
+            let returnsOneReturner = fn() { returnsOne; };\
+            returnsOneReturner()();\
+        ",
+        TEST(int, 1)
+    );
+    vm_test(
+        "\
+            let returnsOneReturner = fn() {\
+                let returnsOne = fn() { 1; };\
+                returnsOne;\
+            };\
+            returnsOneReturner()();\
+        ",
+        TEST(int, 1)
+    );
+}
+
+static void
+test_calling_functions_without_bindings(void) {
+    vm_test(
+        "\
+            let one = fn() { let one = 1; one };\
+            one();\
+        ",
+        TEST(int, 1)
+    );
+    vm_test(
+        "\
+            let oneAndTwo = fn() { let one = 1; let two = 2; one + two; };\
+            oneAndTwo();\
+        ",
+        TEST(int, 3)
+    );
+    vm_test(
+        "\
+            let oneAndTwo = fn() { let one = 1; let two = 2; one + two; };\
+            let threeAndFour = fn() { let three = 3; let four = 4; three + four; };\
+            oneAndTwo() + threeAndFour();\
+        ",
+        TEST(int, 10)
+    );
+    vm_test(
+        "\
+            let firstFoobar = fn() { let foobar = 50; foobar; };\
+            let secondFoobar = fn() { let foobar = 100; foobar; };\
+            firstFoobar() + secondFoobar();\
+        ",
+        TEST(int, 150)
+    );
+    vm_test(
+        "\
+            let globalSeed = 50;\
+            let minusOne = fn() {\
+            let num = 1;\
+                globalSeed - num;\
+            }\
+            let minusTwo = fn() {\
+                let num = 2;\
+                globalSeed - num;\
+            }\
+            minusOne() + minusTwo();\
+        ",
+        TEST(int, 97)
+    );
+}
+
+static void
+test_calling_functions_with_bindings(void) {
+    vm_test(
+        "\
+            let identity = fn(a) { a; };\
+            identity(4);\
+        ",
+        TEST(int, 4)
+    );
+    vm_test(
+        "\
+            let sum = fn(a, b) { a + b; };\
+            sum(1, 2);\
+        ",
+        TEST(int, 3)
+    );
+    vm_test(
+        "\
+            let sum = fn(a, b) {\
+                let c = a + b;\
+                c;\
+            };\
+            sum(1, 2);\
+        ",
+        TEST(int, 3)
+    );
+    vm_test(
+        "\
+            let sum = fn(a, b) {\
+                let c = a + b;\
+                c;\
+            }\
+            sum(1, 2) + sum(3, 4);\
+            ",
+        TEST(int, 10)
+    );
+    vm_test(
+        "\
+            let sum = fn(a, b) {\
+                let c = a + b;\
+                c;\
+            };\
+            let outer = fn() {\
+                sum(1, 2) + sum(3, 4);\
+            };\
+            outer();\
+        ",
+        TEST(int, 10)
+    );
+    vm_test(
+        "\
+            let globalNum = 10;\
+            let sum = fn(a, b) {\
+                let c = a + b;\
+                c + globalNum;\
+            };\
+            let outer = fn() {\
+                sum(1, 2) + sum(3, 4) + globalNum;\
+            };\
+            outer() + globalNum;\
+        ",
+        TEST(int, 50)
+    );
+}
+
+static void
+test_calling_functions_with_wrong_arguments(void) {
+    vm_test_error("fn() { 1; }(1)", "function takes 0 arguments got 1");
+    vm_test_error("fn(a) { a; }()", "function takes 1 argument got 0");
+    vm_test_error("fn(a, b) { a + b; }(1)", "function takes 2 arguments got 1");
 }
 
 static TestArray *
@@ -180,6 +386,20 @@ test_integer_object(long expected, Object actual) {
 }
 
 static int
+test_float_object(double expected, Object actual) {
+    if (!expect_object_is(o_Float, actual)) {
+        return -1;
+    }
+
+    if (expected != actual.data.floating) {
+        printf("object has wrong value. want=%f got=%f\n",
+                expected, actual.data.floating);
+        return -1;
+    }
+    return 0;
+}
+
+static int
 test_boolean_object(bool expected, Object actual) {
     if (!expect_object_is(o_Boolean, actual)) {
         return -1;
@@ -214,6 +434,13 @@ test_expected_object(Test expected, Object actual) {
     switch (expected.typ) {
         case test_int:
             err = test_integer_object(expected.val._int, actual);
+            if (err != 0) {
+                TEST_FAIL_MESSAGE("test_integer_object failed");
+            }
+            break;
+
+        case test_float:
+            err = test_float_object(expected.val._float, actual);
             if (err != 0) {
                 TEST_FAIL_MESSAGE("test_integer_object failed");
             }
@@ -311,7 +538,7 @@ test_expected_object(Test expected, Object actual) {
 VM vm;
 
 static void
-vm_test(char *input, Test expected) {
+vm_test(char *input, Test *expected) {
     Program prog = test_parse(input);
     Compiler c;
     compiler_init(&c);
@@ -333,11 +560,52 @@ vm_test(char *input, Test expected) {
     }
 
     Object stack_elem = vm_last_popped(&vm);
-    test_expected_object(expected, stack_elem);
+    test_expected_object(*expected, stack_elem);
 
-    // cleanup after ourselves
-    memset(vm.stack, 0, StackSize * sizeof(Object));
+    // cleanup after ourselves (should mostly work)
+    for (int i = 0;
+            i < StackSize && vm.stack[i].type != o_Null;
+            i++) {
+        vm.stack[i] = (Object){};
+    }
 
+    program_free(&prog);
+    compiler_free(&c);
+}
+
+static void
+vm_test_error(char *input, char *expected_error) {
+    Program prog = test_parse(input);
+    Compiler c;
+    compiler_init(&c);
+
+    int err = compile(&c, &prog);
+    if (err != 0) {
+        printf("compiler had %d errors\n", c.errors.length);
+        print_errors(&c.errors);
+        program_free(&prog);
+        compiler_free(&c);
+        TEST_FAIL();
+    };
+
+    vm_with(&vm, bytecode(&c));
+    err = vm_run(&vm);
+    if (err != -1 || vm.errors.length != 1) {
+        program_free(&prog);
+        compiler_free(&c);
+        TEST_FAIL_MESSAGE("expected VM error but resulted in none.");
+    }
+
+    if (strcmp(vm.errors.data[0], expected_error) != 0) {
+        printf("wrong VM error: want='%s', got='%s'\n",
+                expected_error, vm.errors.data[0]);
+        program_free(&prog);
+        compiler_free(&c);
+        TEST_FAIL();
+    }
+
+    free(vm.errors.data[0]);
+    vm.errors.length = 0;
     program_free(&prog);
     compiler_free(&c);
 }
@@ -354,6 +622,12 @@ int main(void) {
     RUN_TEST(test_array_literals);
     RUN_TEST(test_hash_literals);
     RUN_TEST(test_index_expressions);
+    RUN_TEST(test_calling_functions_without_arguments);
+    RUN_TEST(test_functions_without_return_value);
+    RUN_TEST(test_first_class_functions);
+    RUN_TEST(test_calling_functions_without_bindings);
+    RUN_TEST(test_calling_functions_with_bindings);
+    RUN_TEST(test_calling_functions_with_wrong_arguments);
 
     vm_free(&vm);
     return UNITY_END();
