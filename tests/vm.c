@@ -38,12 +38,15 @@ test_boolean_expressions(void) {
     vm_test("true", TEST(bool, true));
     vm_test("false", TEST(bool, false));
     vm_test("1 < 2", TEST(bool, true));
+    vm_test("1.5 < 2.", TEST(bool, true));
     vm_test("1 > 2", TEST(bool, false));
     vm_test("1 < 1", TEST(bool, false));
     vm_test("1 > 1", TEST(bool, false));
+    vm_test("1.5 > 1.", TEST(bool, true));
     vm_test("1 == 1", TEST(bool, true));
     vm_test("1 != 1", TEST(bool, false));
     vm_test("1 == 2", TEST(bool, false));
+    vm_test("1.50 == 1.500", TEST(bool, true));
     vm_test("1 != 2", TEST(bool, true));
     vm_test("true == true", TEST(bool, true));
     vm_test("false == false", TEST(bool, true));
@@ -430,9 +433,9 @@ test_boolean_object(bool expected, Object actual) {
     }
 
     if (actual.data.boolean != expected) {
-        printf("object has wrong value. got=%s, want=%d\n",
+        printf("object has wrong value. got=%s, want=%s\n",
                 actual.data.boolean ? "true" : "false",
-                expected);
+                expected ? "true" : "false");
         return -1;
     }
     return 0;

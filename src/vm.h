@@ -46,6 +46,8 @@ void vm_free(VM *vm);
 error vm_run(VM *vm);
 
 Object vm_last_popped(VM *vm);
-Object object_copy(VM* vm, Object obj);
 error vm_push(VM *vm, Object obj);
 Object vm_pop(VM *vm);
+
+// perform deep copy of [obj], can return error
+Object object_copy(VM* vm, Object obj);

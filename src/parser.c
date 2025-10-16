@@ -152,7 +152,6 @@ static Node
 parse_identifier(Parser* p) {
     Identifier* id = allocate(sizeof(Identifier));
     id->tok = p->cur_token;
-    id->tok.literal = p->cur_token.literal;
     return NODE(n_Identifier, id);
 }
 
@@ -713,11 +712,12 @@ Program parse(Parser* p, const char *input) {
     Program prog = {};
     while (p->cur_token.type != t_Eof) {
         Node stmt = parse_statement(p);
-        if (stmt.obj != NULL)
+        if (stmt.obj != NULL) {
             NodeBufferPush(&prog.stmts, stmt);
-        else if (p->errors.length >= MAX_ERRORS)
+        } else if (p->errors.length >= MAX_ERRORS) {
             parser_error(p, "too many errors, stopping now\n");
             break;
+        }
 
         next_token(p);
     }

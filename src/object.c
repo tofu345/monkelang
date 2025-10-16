@@ -77,7 +77,7 @@ fprint_hash(table *tbl, FILE* fp) {
 
 static int
 fprint_compiled_function(CompiledFunction *func, FILE *fp) {
-    FPRINTF(fp, "CompiledFunction[%p]", func);
+    FPRINTF(fp, "Function[%p]", func);
     return 0;
 }
 
@@ -98,6 +98,10 @@ int object_fprint(Object o, FILE* fp) {
         case o_String:
             return fprintf_string(o.data.string, fp);
 
+        case o_Error:
+            FPRINTF(fp, "error: %s", o.data.err);
+            return 0;
+
         case o_Array:
             return fprint_array(o.data.array, fp);
 
@@ -107,6 +111,10 @@ int object_fprint(Object o, FILE* fp) {
         case o_CompiledFunction:
             return fprint_compiled_function(o.data.func, fp);
 
+        case o_BuiltinFunction:
+            FPRINTF(fp, "Builtin");
+            return 0;
+
         default:
             fprintf(stderr, "object_fprint: object type not handled %d\n",
                     o.type);
@@ -114,42 +122,47 @@ int object_fprint(Object o, FILE* fp) {
     }
 }
 
-bool object_eq(Object left, Object right) {
-    if (left.type != right.type) return false;
+Object object_eq(Object left, Object right) {
+    if (left.type != right.type) return BOOL(false);
 
     switch (left.type) {
         case o_Float:
-            return left.data.floating == right.data.floating;
+            return BOOL(left.data.floating == right.data.floating);
 
         case o_Integer:
-            return left.data.integer == right.data.integer;
+            return BOOL(left.data.integer == right.data.integer);
 
         case o_Boolean:
-            return left.data.boolean == right.data.boolean;
+            return BOOL(left.data.boolean == right.data.boolean);
 
         case o_Null:
-            return true;
+            return BOOL(true);
 
         case o_String:
-            return !strcmp(left.data.string->data, right.data.string->data);
+            return BOOL(strcmp(left.data.string->data, right.data.string->data) == 0);
 
         case o_Array:
             {
                 ObjectBuffer* l_arr = left.data.array;
                 ObjectBuffer* r_arr = right.data.array;
-                if (l_arr->length != r_arr->length) return false;
-                for (int i = 0; i < l_arr->length; i++)
-                    if (!object_eq(l_arr->data[i], r_arr->data[i]))
-                        return false;
-                return true;
+                if (l_arr->length != r_arr->length) {
+                    return BOOL(false);
+                }
+                Object eq;
+                for (int i = 0; i < l_arr->length; i++) {
+                    eq = object_eq(l_arr->data[i], r_arr->data[i]);
+                    if (IS_ERR(eq)) {
+                        return eq;
+
+                    } else if (!eq.data.boolean) {
+                        return eq;
+                    }
+                }
+                return BOOL(true);
             }
 
-        // TODO: cmp function error
         default:
-            fprintf(stderr, "object_eq: object type not handled %s\n",
-                    show_object_type(left.type));
-            exit(1);
-            break;
+            return ERR("cannot compare %s\n", show_object_type(left.type));
     }
 }
 
@@ -158,8 +171,8 @@ const char* object_types[] = {
     "Integer",
     "Float",
     "Boolean",
-    "CompiledFunction",
-    "BuiltinFunction",
+    "Function",
+    "Builtin",
     "Error",
     "String",
     "Array",

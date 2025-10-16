@@ -8,12 +8,14 @@
 #include <stdbool.h>
 
 // TODO:
-// - o_Error, `null` token, lexing and parsing
 // - char datatype
+// - Hash -> Table, CompiledFunction -> Function
 // - show_object_type() lowercase type names
+// - support Unicode and emoji's
 
 #define OBJ(t, d) (Object){ .type = t, .data = { d } }
 #define ERR(...) OBJ(o_Error, .err = new_error(__VA_ARGS__))
+#define BOOL(b) OBJ(o_Boolean, .boolean = b)
 #define NULL_OBJ (Object){}
 
 #define IS_ERR(obj) (obj.type == o_Error)
@@ -59,7 +61,9 @@ struct Object {
 };
 
 const char* show_object_type(ObjectType t);
-bool object_eq(Object left, Object right);
+
+// can return error
+Object object_eq(Object left, Object right);
 
 // print [Object] to [fp], returns -1 on error
 int object_fprint(Object o, FILE* fp);

@@ -11,17 +11,16 @@
 #include <assert.h>
 #include <stdio.h>
 
-const Object _true = OBJ(o_Boolean, .boolean = true);
-const Object _false = OBJ(o_Boolean, .boolean = false);
+const Object _true = BOOL(true);
+const Object _false = BOOL(false);
 
 DEFINE_BUFFER(Alloc, Alloc *);
 
-// track [Alloc]ation of [size] and garbage collect if necessary.
-static void *vm_allocate(VM *vm, ObjectType type, size_t size);
+// track [Alloc]ation of Compound Data Type of [size], decrement
+// [vm.bytesTillGC] and garbage collect if necessary.
+static void *compound_object(VM *vm, ObjectType type, size_t size);
 
-// allocate [size] but do *not* garbage collect.
-// - necessary to avoid triggering garbage collection on objects not on the
-// [vm.stack] but still in use. see [execute_binary_string_operation]
+// allocate [size] and decrement [vm.bytesTillGC]
 static void *allocate(VM *vm, size_t size);
 
 void vm_init(VM *vm, Object *stack, Object *globals, Frame *frames) {
@@ -67,6 +66,7 @@ Object object_copy(VM* vm, Object obj) {
         case o_CompiledFunction:
         case o_BuiltinFunction:
             return obj;
+
         case o_String:
             {
                 CharBuffer old_str = *obj.data.string;
@@ -78,7 +78,7 @@ Object object_copy(VM* vm, Object obj) {
                     new_buf[old_str.length] = '\0';
 
                     // copy allocated [Object]
-                    new_str = vm_allocate(vm, o_String, sizeof(CharBuffer));
+                    new_str = compound_object(vm, o_String, sizeof(CharBuffer));
                     *new_str = (CharBuffer) {
                         .data = new_buf,
                             .length = old_str.length,
@@ -86,33 +86,40 @@ Object object_copy(VM* vm, Object obj) {
                     };
                     return OBJ(o_String, .string = new_str);
                 } else {
-                    new_str = vm_allocate(vm, o_String, sizeof(CharBuffer));
+                    new_str = compound_object(vm, o_String, sizeof(CharBuffer));
                     memset(new_str, 0, sizeof(CharBuffer));
                 }
                 return OBJ(o_String, .string = new_str);
             }
+
         case o_Array:
             {
                 ObjectBuffer old_arr = *obj.data.array;
                 ObjectBuffer* new_arr;
                 if (old_arr.length >= 1) {
-                    // copy array and contents individually
+                    // copy array and contents
                     Object *new_buf = allocate(vm, old_arr.capacity * sizeof(Object));
                     for (int i = 0; i < old_arr.length; i++) {
                         new_buf[i] = object_copy(vm, old_arr.data[i]);
                     }
-                    new_arr = vm_allocate(vm, o_Array, sizeof(ObjectBuffer));
+
+                    new_arr = compound_object(vm, o_Array, sizeof(ObjectBuffer));
                     *new_arr = (ObjectBuffer) {
                         .data = new_buf,
                             .length = old_arr.length,
                             .capacity = old_arr.capacity
                     };
                 } else {
-                    new_arr = vm_allocate(vm, o_Array, sizeof(ObjectBuffer));
+                    new_arr = compound_object(vm, o_Array, sizeof(ObjectBuffer));
                     memset(new_arr, 0, sizeof(ObjectBuffer));
                 }
                 return OBJ(o_Array, .array = new_arr);
             }
+
+        case o_Hash:
+            die("object_copy hash: not implemented");
+            return NULL_OBJ;
+
         default:
             die("object_copy: object type not handled %d\n", obj.type);
             return NULL_OBJ;
@@ -210,7 +217,7 @@ execute_binary_string_operation(VM *vm, Opcode op, Object left, Object right) {
             right.data.string->length * sizeof(char));
     result[length] = '\0';
 
-    CharBuffer* obj_data = vm_allocate(vm, o_String, sizeof(CharBuffer));
+    CharBuffer* obj_data = compound_object(vm, o_String, sizeof(CharBuffer));
     *obj_data = (CharBuffer){
         .data = result,
         .length = length,
@@ -239,30 +246,42 @@ execute_binary_operation(VM *vm, Opcode op) {
             show_object_type(left.type), op, show_object_type(right.type));
 }
 
-static Object
-native_bool_to_boolean_object(bool input) {
-    return OBJ(o_Boolean, .boolean = input);
-}
-
 static error
 execute_integer_comparison(VM *vm, Opcode op, Object left, Object right) {
     Object result;
 
     switch (op) {
         case OpEqual:
-            result = native_bool_to_boolean_object(
-                    left.data.integer == right.data.integer);
+            result = BOOL(left.data.integer == right.data.integer);
             break;
         case OpNotEqual:
-            result = native_bool_to_boolean_object(
-                    left.data.integer != right.data.integer);
+            result = BOOL(left.data.integer != right.data.integer);
             break;
         case OpGreaterThan:
-            result = native_bool_to_boolean_object(
-                    left.data.integer > right.data.integer);
+            result = BOOL(left.data.integer > right.data.integer);
             break;
         default:
             return new_error("unkown integer comparison operator: (Opcode: %d)", op);
+    }
+    return vm_push(vm, result);
+}
+
+static error
+execute_float_comparison(VM *vm, Opcode op, Object left, Object right) {
+    Object result;
+
+    switch (op) {
+        case OpEqual:
+            result = BOOL(left.data.floating == right.data.floating);
+            break;
+        case OpNotEqual:
+            result = BOOL(left.data.floating != right.data.floating);
+            break;
+        case OpGreaterThan:
+            result = BOOL(left.data.floating > right.data.floating);
+            break;
+        default:
+            return new_error("unkown float comparison operator: (Opcode: %d)", op);
     }
     return vm_push(vm, result);
 }
@@ -274,15 +293,22 @@ execute_comparison(VM *vm, Opcode op) {
 
     if (left.type == o_Integer && right.type == o_Integer) {
         return execute_integer_comparison(vm, op, left, right);
+
+    } else if (left.type == o_Float && right.type == o_Float) {
+        return execute_float_comparison(vm, op, left, right);
     }
 
-    bool eq = object_eq(left, right);
+    Object eq = object_eq(left, right);
+    if (IS_ERR(eq)) { return eq.data.err; }
 
     switch (op) {
         case OpEqual:
-            return vm_push(vm, native_bool_to_boolean_object(eq));
+            return vm_push(vm, eq);
+
         case OpNotEqual:
-            return vm_push(vm, native_bool_to_boolean_object(!eq));
+            eq.data.boolean = !eq.data.boolean;
+            return vm_push(vm, eq);
+
         default:
             return new_error("unkown comparison operator: (Opcode: %d) (%s %s)",
                     op, show_object_type(left.type), show_object_type(right.type));
@@ -306,11 +332,19 @@ execute_bang_operator(VM *vm) {
 static error
 execute_minus_operator(VM *vm) {
     Object operand = vm_pop(vm);
-    if (operand.type != o_Integer) {
-        return new_error("unsupported type for negation: %s",
-                show_object_type(operand.type));
+    switch (operand.type) {
+        case o_Integer:
+            operand.data.integer = -operand.data.integer;
+            break;
+
+        case o_Float:
+            operand.data.floating = -operand.data.floating;
+            break;
+
+        default:
+            return new_error("unsupported type for negation: %s",
+                    show_object_type(operand.type));
     }
-    operand.data.integer = -operand.data.integer;
     return vm_push(vm, operand);
 }
 
@@ -389,7 +423,7 @@ vm_push_constant(VM *vm, Constant c) {
                     buf[str.length] = '\0';
                 }
 
-                CharBuffer* str_buf = vm_allocate(vm, o_String, sizeof(CharBuffer));
+                CharBuffer* str_buf = compound_object(vm, o_String, sizeof(CharBuffer));
                 *str_buf = (CharBuffer){
                     .data = buf,
                     .length = str.length,
@@ -410,7 +444,7 @@ vm_push_constant(VM *vm, Constant c) {
 static Object
 build_array(VM *vm, int start_index, int end_index) {
     int length = end_index - start_index;
-    ObjectBuffer *elems = vm_allocate(vm, o_Array, sizeof(ObjectBuffer));
+    ObjectBuffer *elems = compound_object(vm, o_Array, sizeof(ObjectBuffer));
 
     if (length <= 0) {
         memset(elems, 0, sizeof(ObjectBuffer));
@@ -430,20 +464,24 @@ build_array(VM *vm, int start_index, int end_index) {
 
 static Object
 build_hash(VM *vm, int start_index, int end_index) {
-    table *tbl = vm_allocate(vm, o_Hash, sizeof(table));
+    table *tbl = compound_object(vm, o_Hash, sizeof(table));
     if (table_init(tbl) == NULL) { die("build_hash"); }
 
-    Object key, val;
+    Object key, val, res;
     for (int i = start_index; i < end_index; i += 2) {
         key = vm->stack[i];
         val = vm->stack[i + 1];
+
         if (!hashable(key)) {
-            table_free(tbl);
-            return ERR("unusable as hash key: %s", show_object_type(key.type));
+            return ERR("unusable as hash key: %s",
+                    show_object_type(key.type));
         }
 
-        key = table_set(tbl, key, val);
-        if (key.type == o_Null) { die("build_hash: table_set"); }
+        res = table_set(tbl, key, val);
+        if (res.type == o_Null) {
+            return ERR("could not set as hash value: %s",
+                    show_object_type(val.type));
+        }
     }
 
     return OBJ(o_Hash, .hash = tbl);
@@ -466,6 +504,7 @@ static error
 call_builtin(VM *vm, Object builtin, int num_args) {
     vm->sp -= num_args;
     Object *args = vm->stack + vm->sp;
+    vm->sp--;
 
     Builtin *fn = builtin.data.ptr;
     Object result = fn(vm, args, num_args);
@@ -756,7 +795,8 @@ trace_mark_object(Object obj) {
 }
 
 // free [Alloc]ation
-void alloc_free(Alloc *alloc) {
+static void
+alloc_free(Alloc *alloc) {
     void *obj_data = alloc + 1;
     switch (alloc->type) {
         case o_String:
@@ -825,9 +865,11 @@ allocate(VM *vm, size_t size) {
 }
 
 static void *
-vm_allocate(VM *vm, ObjectType type, size_t size) {
-    // prepend [Alloc]
+compound_object(VM *vm, ObjectType type, size_t size) {
+    // prepend [Alloc] object.
     size += sizeof(Alloc);
+
+    vm->bytesTillGC -= size;
     if (vm->bytesTillGC <= 0) {
         mark_and_sweep(vm);
         vm->bytesTillGC = NextGC;
