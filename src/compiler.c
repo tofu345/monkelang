@@ -37,11 +37,6 @@ void compiler_init(Compiler *c) {
 }
 
 void compiler_free(Compiler *c) {
-    for (int i = 0; i < c->errors.length; i++) {
-        free(c->errors.data[i]);
-    }
-    free(c->errors.data);
-
     free(c->scopes.data[0].instructions.data); // main scope
     free(c->scopes.data);
 
@@ -115,16 +110,16 @@ load_symbol(Compiler *c, Symbol *s) {
     }
 }
 
-static int
+static error
 _compile(Compiler *c, Node n) {
+    error err;
     switch (n.typ) {
         case n_BlockStatement:
             {
                 BlockStatement* bs = n.obj;
                 for (int i = 0; i < bs->stmts.length; i++) {
-                    if (_compile(c, bs->stmts.data[i])) {
-                        return -1;
-                    }
+                    err = _compile(c, bs->stmts.data[i]);
+                    if (err) { return err; }
                 }
                 return 0;
             }
@@ -132,9 +127,8 @@ _compile(Compiler *c, Node n) {
         case n_ExpressionStatement:
             {
                 ExpressionStatement *es = n.obj;
-                if (_compile(c, es->expression)) {
-                    return -1;
-                }
+                err = _compile(c, es->expression);
+                if (err) { return err; }
 
                 emit(c, OpPop);
                 return 0;
@@ -143,9 +137,8 @@ _compile(Compiler *c, Node n) {
         case n_LetStatement:
             {
                 LetStatement *ls = n.obj;
-                if (_compile(c, ls->value)) {
-                    return -1;
-                }
+                err = _compile(c, ls->value);
+                if (err) { return err; }
 
                 Symbol *symbol = sym_define(c->cur_symbol_table, ls->name->tok.literal);
                 if (symbol->index >= GlobalsSize) { die("too many globals"); }
@@ -161,9 +154,8 @@ _compile(Compiler *c, Node n) {
         case n_ReturnStatement:
             {
                 ReturnStatement *rs = n.obj;
-                if (_compile(c, rs->return_value)) {
-                    return -1;
-                }
+                err = _compile(c, rs->return_value);
+                if (err) { return err; }
 
                 emit(c, OpReturnValue);
                 return 0;
@@ -174,8 +166,7 @@ _compile(Compiler *c, Node n) {
                 Identifier *id = n.obj;
                 Symbol *symbol = sym_resolve(c->cur_symbol_table, id->tok.literal);
                 if (symbol == NULL) {
-                    error(&c->errors, "undefined variable '%s'", id->tok.literal);
-                    return -1;
+                    return new_error("undefined variable '%s'", id->tok.literal);
                 }
 
                 load_symbol(c, symbol);
@@ -186,25 +177,21 @@ _compile(Compiler *c, Node n) {
             {
                 InfixExpression *ie = n.obj;
                 if ('<' == ie->op[0]) {
-                    if (_compile(c, ie->right)) {
-                        return -1;
-                    }
+                    err = _compile(c, ie->right);
+                    if (err) { return err; }
 
-                    if (_compile(c, ie->left)) {
-                        return -1;
-                    }
+                    err = _compile(c, ie->left);
+                    if (err) { return err; }
 
                     emit(c, OpGreaterThan);
                     return 0;
                 }
 
-                if (_compile(c, ie->left)) {
-                    return -1;
-                }
+                err = _compile(c, ie->left);
+                if (err) { return err; }
 
-                if (_compile(c, ie->right)) {
-                    return -1;
-                }
+                err = _compile(c, ie->right);
+                if (err) { return err; }
 
                 if ('+' == ie->op[0]) {
                     emit(c, OpAdd);
@@ -228,8 +215,7 @@ _compile(Compiler *c, Node n) {
                     emit(c, OpNotEqual);
 
                 } else {
-                    error(&c->errors, "unknown operator %s", ie->op);
-                    return -1;
+                    return new_error("unknown operator %s", ie->op);
                 }
                 return 0;
             }
@@ -237,9 +223,8 @@ _compile(Compiler *c, Node n) {
         case n_PrefixExpression:
             {
                 PrefixExpression *pe = n.obj;
-                if (_compile(c, pe->right)) {
-                    return -1;
-                }
+                err = _compile(c, pe->right);
+                if (err) { return err; }
 
                 if ('!' == pe->op[0]) {
                     emit(c, OpBang);
@@ -248,8 +233,7 @@ _compile(Compiler *c, Node n) {
                     emit(c, OpMinus);
 
                 } else {
-                    error(&c->errors, "unknown operator %s", pe->op);
-                    return -1;
+                    return new_error("unknown operator %s", pe->op);
                 }
                 return 0;
             }
@@ -257,16 +241,15 @@ _compile(Compiler *c, Node n) {
         case n_IfExpression:
             {
                 IfExpression *ie = n.obj;
-                if (_compile(c, ie->condition)) {
-                    return -1;
-                }
+                err = _compile(c, ie->condition);
+                if (err) { return err; }
 
                 // Emit an `OpJumpNotTruthy` with a bogus value
                 int jump_not_truthy_pos = emit(c, OpJumpNotTruthy, 9999);
 
-                if (_compile(c, NODE(n_BlockStatement, ie->consequence))) {
-                    return -1;
-                }
+                err = _compile(c, NODE(n_BlockStatement, ie->consequence));
+                if (err) { return err; }
+
                 if (last_instruction_is(c, OpPop)) {
                     remove_last_pop(c);
                 }
@@ -280,9 +263,9 @@ _compile(Compiler *c, Node n) {
                 if (ie->alternative == NULL) {
                     emit(c, OpNull);
                 } else {
-                    if (_compile(c, NODE(n_BlockStatement, ie->alternative))) {
-                        return -1;
-                    }
+                    err = _compile(c, NODE(n_BlockStatement, ie->alternative));
+                    if (err) { return err; }
+
                     if (last_instruction_is(c, OpPop)) {
                         remove_last_pop(c);
                     }
@@ -296,13 +279,11 @@ _compile(Compiler *c, Node n) {
         case n_IndexExpression:
             {
                 IndexExpression *ie = n.obj;
-                if (_compile(c, ie->left)) {
-                    return -1;
-                }
+                err = _compile(c, ie->left);
+                if (err) { return err; }
 
-                if (_compile(c, ie->index)) {
-                    return -1;
-                }
+                err = _compile(c, ie->index);
+                if (err) { return err; }
 
                 emit(c, OpIndex);
                 return 0;
@@ -311,15 +292,13 @@ _compile(Compiler *c, Node n) {
         case n_CallExpression:
             {
                 CallExpression *ce = n.obj;
-                if (_compile(c, ce->function)) {
-                    return -1;
-                }
+                err = _compile(c, ce->function);
+                if (err) { return err; }
 
                 NodeBuffer args = ce->args;
                 for (int i = 0; i < args.length; i++) {
-                    if (_compile(c, args.data[i])) {
-                        return -1;
-                    }
+                    err = _compile(c, args.data[i]);
+                    if (err) { return err; }
                 }
 
                 emit(c, OpCall, args.length);
@@ -330,9 +309,8 @@ _compile(Compiler *c, Node n) {
             {
                 NodeBuffer elems = ((ArrayLiteral *)n.obj)->elements;
                 for (int i = 0; i < elems.length; i++) {
-                    if (_compile(c, elems.data[i])) {
-                        return -1;
-                    }
+                    err = _compile(c, elems.data[i]);
+                    if (err) { return err; }
                 }
 
                 emit(c, OpArray, elems.length);
@@ -343,12 +321,11 @@ _compile(Compiler *c, Node n) {
             {
                 PairBuffer pairs = ((HashLiteral *)n.obj)->pairs;
                 for (int i = 0; i < pairs.length; i++) {
-                    if (_compile(c, pairs.data[i].key)) {
-                        return -1;
-                    }
-                    if (_compile(c, pairs.data[i].val)) {
-                        return -1;
-                    }
+                    err = _compile(c, pairs.data[i].key);
+                    if (err) { return err; }
+
+                    err = _compile(c, pairs.data[i].val);
+                    if (err) { return err; }
                 }
                 emit(c, OpHash, pairs.length * 2);
                 return 0;
@@ -413,9 +390,8 @@ _compile(Compiler *c, Node n) {
                     sym_define(c->cur_symbol_table, params.data[i]->tok.literal);
                 }
 
-                if (_compile(c, NODE(n_BlockStatement, fl->body))) {
-                    return -1;
-                }
+                err = _compile(c, NODE(n_BlockStatement, fl->body));
+                if (err) { return err; }
 
                 if (last_instruction_is(c, OpPop)) {
                     replace_last_pop_with_return(c);
@@ -492,11 +468,11 @@ Instructions *leave_scope(Compiler *c) {
     return ins;
 }
 
-int compile(Compiler *c, Program *prog) {
+error compile(Compiler *c, Program *prog) {
+    error err;
     for (int i = 0; i < prog->stmts.length; i++) {
-        if (_compile(c, prog->stmts.data[i])) {
-            return -1;
-        }
+        err = _compile(c, prog->stmts.data[i]);
+        if (err) { return err; }
     }
     return 0;
 }

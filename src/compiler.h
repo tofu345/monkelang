@@ -30,20 +30,15 @@ typedef struct {
     SymbolTable *cur_symbol_table;
     SymbolTables symbol_tables;
 
-    ErrorBuffer errors;
-
     Instructions *current_instructions;
     ScopeBuffer scopes;
     int scope_index;
 } Compiler;
 
 void compiler_init(Compiler *c);
-
 void compiler_free(Compiler *c);
 
-// returns 0 on success.
-// otherwise non-0 with errors in [c.errors].
-int compile(Compiler *c, Program *prog);
+error compile(Compiler *c, Program *prog);
 
 // append [Instruction] with [Opcode] and [int] operands
 int emit(Compiler *c, Opcode op, ...);

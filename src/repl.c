@@ -14,8 +14,6 @@ print_errors(FILE* out, ErrorBuffer *buf) {
         fprintf(out, "%s\n", buf->data[i]);
         free(buf->data[i]);
     }
-    if (buf->length >= MAX_ERRORS)
-        fprintf(out, "too many errors, stopping now\n");
 }
 
 BUFFER(Program, Program);
@@ -34,7 +32,7 @@ void repl(FILE* in, FILE* out) {
     vm_init(&vm, NULL, NULL, NULL);
 
     char *input;
-    int err;
+    error err;
     size_t len;
     Object stack_elem;
     while (1) {
@@ -59,7 +57,8 @@ void repl(FILE* in, FILE* out) {
         err = compile(&c, &prog);
         if (err != 0) {
             fprintf(out, "Woops! Compilation failed:\n");
-            print_errors(out, &c.errors);
+            puts(err);
+            free(err);
             goto cleanup;
         }
 
@@ -67,7 +66,8 @@ void repl(FILE* in, FILE* out) {
         err = vm_run(&vm);
         if (err != 0) {
             fprintf(out, "Woops! Executing bytecode failed:\n");
-            print_errors(out, &vm.errors);
+            puts(err);
+            free(err);
             goto cleanup;
         }
 
@@ -81,11 +81,7 @@ cleanup:
         free(p.peek_token.literal);
         p.peek_token.literal = NULL;
         p.errors.length = 0;
-
         c.scopes.data[0].instructions.length = 0; // reset main scope
-        c.errors.length = 0;
-
-        vm.errors.length = 0;
     }
 
     for (int i = 0; i < programs.length; i++)

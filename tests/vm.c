@@ -551,27 +551,29 @@ vm_test(char *input, Test *expected) {
     Program prog = test_parse(input);
     Compiler c;
     compiler_init(&c);
-    if (compile(&c, &prog) != 0) {
+    error err = compile(&c, &prog);
+    if (err) {
         printf("test: %s\n", input);
-        printf("compiler had %d errors\n", c.errors.length);
-        print_errors(&c.errors);
+        printf("compiler error: %s\n\n", err);
+        free(err);
         program_free(&prog);
         compiler_free(&c);
         TEST_FAIL();
     };
 
     vm_with(&vm, bytecode(&c));
-    if (vm_run(&vm) == -1) {
+    err = vm_run(&vm);
+    if (err) {
         printf("test: %s\n", input);
-        printf("vm had %d errors\n", vm.errors.length);
-        print_errors(&vm.errors);
+        printf("vm error: %s\n\n", err);
+        free(err);
         program_free(&prog);
         compiler_free(&c);
         TEST_FAIL();
     }
 
     Object stack_elem = vm_last_popped(&vm);
-    int err = test_expected_object(*expected, stack_elem);
+    int _err = test_expected_object(*expected, stack_elem);
 
     // cleanup after ourselves (should mostly work)
     for (int i = 0;
@@ -583,8 +585,8 @@ vm_test(char *input, Test *expected) {
     program_free(&prog);
     compiler_free(&c);
 
-    if (err != 0) {
-        printf("test_expected_object failed for test: %s\n", input);
+    if (_err != 0) {
+        printf("test_expected_object failed for test: %s\n\n", input);
     }
 }
 
@@ -594,10 +596,11 @@ vm_test_error(char *input, char *expected_error) {
     Compiler c;
     compiler_init(&c);
 
-    int err = compile(&c, &prog);
+    error err = compile(&c, &prog);
     if (err != 0) {
-        printf("compiler had %d errors\n", c.errors.length);
-        print_errors(&c.errors);
+        printf("test: %s\n", input);
+        printf("compiler error: %s\n\n", err);
+        free(err);
         program_free(&prog);
         compiler_free(&c);
         TEST_FAIL();
@@ -605,22 +608,22 @@ vm_test_error(char *input, char *expected_error) {
 
     vm_with(&vm, bytecode(&c));
     err = vm_run(&vm);
-    if (err != -1 || vm.errors.length != 1) {
+    if (!err) {
         program_free(&prog);
         compiler_free(&c);
-        TEST_FAIL_MESSAGE("expected VM error but resulted in none.");
+        printf("expected VM error for test: %s\n", input);
+        TEST_FAIL();
     }
 
-    if (strcmp(vm.errors.data[0], expected_error) != 0) {
+    if (strcmp(err, expected_error) != 0) {
         printf("wrong VM error for test: %s\nwant= %s\ngot = %s\n",
-                input, expected_error, vm.errors.data[0]);
+                input, expected_error, err);
         program_free(&prog);
         compiler_free(&c);
         TEST_FAIL();
     }
 
-    free(vm.errors.data[0]);
-    vm.errors.length = 0;
+    free(err);
     program_free(&prog);
     compiler_free(&c);
 }

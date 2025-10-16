@@ -732,19 +732,19 @@ c_test(
     Compiler c;
     compiler_init(&c);
 
-    int err = compile(&c, &prog);
+    error err = compile(&c, &prog);
     if (err != 0) {
-        printf("compiler had %d errors\n", c.errors.length);
-        print_errors(&c.errors);
+        printf("compiler error: %s\n", err);
+        free(err);
         TEST_FAIL();
     };
     Bytecode code = bytecode(&c);
 
-    err = test_instructions(expectedInstructions, code.instructions);
-    if (err != 0) { TEST_FAIL(); }
+    int _err = test_instructions(expectedInstructions, code.instructions);
+    if (_err != 0) { TEST_FAIL(); }
 
-    err = test_constants(expectedConstants, code.constants);
-    if (err != 0) { TEST_FAIL(); }
+    _err = test_constants(expectedConstants, code.constants);
+    if (_err != 0) { TEST_FAIL(); }
 
     program_free(&prog);
     free(expectedInstructions->data);

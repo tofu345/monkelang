@@ -33,19 +33,19 @@ int power_of_2_ceil(int n) {
     return n;
 }
 
-DEFINE_BUFFER(Error, char*);
+DEFINE_BUFFER(Error, error);
 
-void error(ErrorBuffer* buf, char* format, ...) {
+error new_error(char* format, ...) {
     va_list args;
     va_start(args, format);
-    char* msg = NULL;
-    if (vasprintf(&msg, format, args) == -1) die("error(): vasprintf");
-    ErrorBufferPush(buf, msg);
+    char* err = NULL;
+    if (vasprintf(&err, format, args) == -1) die("error(): vasprintf");
     va_end(args);
+    return err;
 }
 
 
-void error_num_args(ErrorBuffer *buf, const char *name, int expected, int actual) {
-    error(buf, "%s takes %d argument%s got %d",
+error error_num_args(const char *name, int expected, int actual) {
+    return new_error("%s takes %d argument%s got %d",
             name, expected, expected != 1 ? "s" : "", actual);
 }

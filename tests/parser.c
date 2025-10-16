@@ -215,22 +215,22 @@ test_boolean_literal(Node n, bool exp) {
 }
 
 static void
-test_literal_expression(Node n, Test test) {
-    switch (test.typ) {
+test_literal_expression(Node n, Test *test) {
+    switch (test->typ) {
         case test_int:
-            test_integer_literal(n, test.val._int);
+            test_integer_literal(n, test->val._int);
             break;
         case test_float:
-            test_float_literal(n, test.val._float);
+            test_float_literal(n, test->val._float);
             break;
         case test_str:
-            test_identifier(n, test.val._str);
+            test_identifier(n, test->val._str);
             break;
         case test_bool:
-            test_boolean_literal(n, test.val._bool);
+            test_boolean_literal(n, test->val._bool);
             break;
         default:
-            fprintf(stderr, "type of exp not handled. got %d", test.typ);
+            fprintf(stderr, "type of exp not handled. got %d", test->typ);
             exit(1);
     }
 }
@@ -239,7 +239,7 @@ void test_let_statements(void) {
     struct Test {
         const char* input;
         const char* expectedIdent;
-        Test expectedVal;
+        Test *expectedVal;
     } tests[] = {
         {"let x = 5;", "x", TEST(int, 5)},
         {"let x = 5.000;", "x", TEST(float, 5.0)},
@@ -272,7 +272,7 @@ void test_parsing_prefix_expressions(void) {
     struct Test {
         char* input;
         char* operator;
-        Test value;
+        Test *value;
     } tests[] = {
         {"!5;", "!", TEST(int, 5)},
         {"-15;", "-", TEST(int, 15)},
@@ -314,9 +314,9 @@ void test_parsing_prefix_expressions(void) {
 void test_parsing_infix_expressions(void) {
     struct Test {
         char* input;
-        Test left_value;
+        Test *left_value;
         char* operator;
-        Test right_value;
+        Test *right_value;
     } tests[] = {
         {"5 + 5;", TEST(int, 5), "+", TEST(int, 5)},
         {"5 - 5;", TEST(int, 5), "-", TEST(int, 5)},
@@ -526,7 +526,7 @@ void test_operator_precedence_parsing(void) {
 }
 
 static void
-test_infix_expression(Node n, Test left, char* operator, Test right) {
+test_infix_expression(Node n, Test *left, char* operator, Test *right) {
     TEST_ASSERT_MESSAGE
         (n_InfixExpression == n.typ, "type not type InfixExpression");
 

@@ -716,6 +716,7 @@ Program parse(Parser* p, const char *input) {
         if (stmt.obj != NULL)
             NodeBufferPush(&prog.stmts, stmt);
         else if (p->errors.length >= MAX_ERRORS)
+            parser_error(p, "too many errors, stopping now\n");
             break;
 
         next_token(p);

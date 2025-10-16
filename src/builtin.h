@@ -4,7 +4,7 @@
 #include "vm.h"
 
 // returns 0 on success
-typedef int Builtin(VM *vm, Object *args, int num_args);
+typedef Object Builtin(VM *vm, Object *args, int num_args);
 
 typedef struct {
     const char* name;

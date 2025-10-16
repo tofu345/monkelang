@@ -31,8 +31,6 @@ typedef struct {
     Frame *frames;
     int frames_index;
 
-    ErrorBuffer errors;
-
     // The current number to allocate till before GC is run.
     int bytesTillGC;
     AllocBuffer allocs;
@@ -43,12 +41,11 @@ void vm_init(VM *vm, Object *stack, Object *globals, Frame *frames);
 
 // prepare to run [bytecode]
 void vm_with(VM *vm, Bytecode bytecode);
-
 void vm_free(VM *vm);
 
-int vm_run(VM *vm);
+error vm_run(VM *vm);
 
 Object vm_last_popped(VM *vm);
 Object object_copy(VM* vm, Object obj);
-int vm_push(VM *vm, Object obj);
+error vm_push(VM *vm, Object obj);
 Object vm_pop(VM *vm);

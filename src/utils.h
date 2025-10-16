@@ -48,10 +48,11 @@
 // from dwm :p
 void die(const char *fmt, ...);
 
-BUFFER(Error, char*);
-void error(ErrorBuffer* buf, char* format, ...);
+typedef char *error;
+BUFFER(Error, error);
 
-void error_num_args(ErrorBuffer *buf, const char *name, int expected, int actual);
+error new_error(char* format, ...);
+error error_num_args(const char *name, int expected, int actual);
 
 // From: wrenPowerOf2Ceil: http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2Float
 int power_of_2_ceil(int n);

@@ -160,6 +160,7 @@ const char* object_types[] = {
     "Boolean",
     "CompiledFunction",
     "BuiltinFunction",
+    "Error",
     "String",
     "Array",
     "Hash",

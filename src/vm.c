@@ -13,7 +13,6 @@
 
 const Object _true = OBJ(o_Boolean, .boolean = true);
 const Object _false = OBJ(o_Boolean, .boolean = false);
-const Object _null = (Object){};
 
 DEFINE_BUFFER(Alloc, Alloc *);
 
@@ -96,18 +95,18 @@ Object object_copy(VM* vm, Object obj) {
             {
                 ObjectBuffer old_arr = *obj.data.array;
                 ObjectBuffer* new_arr;
-                if (old_arr.length > 1) {
+                if (old_arr.length >= 1) {
                     // copy array and contents individually
                     Object *new_buf = allocate(vm, old_arr.capacity * sizeof(Object));
+                    for (int i = 0; i < old_arr.length; i++) {
+                        new_buf[i] = object_copy(vm, old_arr.data[i]);
+                    }
                     new_arr = vm_allocate(vm, o_Array, sizeof(ObjectBuffer));
                     *new_arr = (ObjectBuffer) {
                         .data = new_buf,
                             .length = old_arr.length,
                             .capacity = old_arr.capacity
                     };
-                    for (int i = 0; i < old_arr.length; i++) {
-                        new_buf[i] = object_copy(vm, old_arr.data[i]);
-                    }
                 } else {
                     new_arr = vm_allocate(vm, o_Array, sizeof(ObjectBuffer));
                     memset(new_arr, 0, sizeof(ObjectBuffer));
@@ -130,10 +129,9 @@ Frame *new_frame(VM *vm) {
     return vm->frames + vm->frames_index - 1;
 }
 
-int vm_push(VM *vm, Object obj) {
+error vm_push(VM *vm, Object obj) {
     if (vm->sp >= StackSize) {
-        error(&vm->errors, "stack overflow");
-        return -1;
+        return new_error("stack overflow");
     }
 
     vm->stack[vm->sp++] = obj;
@@ -144,7 +142,7 @@ Object vm_pop(VM *vm) {
     return vm->stack[--vm->sp];
 }
 
-static int
+static error
 execute_binary_float_operation(VM *vm, Opcode op, Object left, Object right) {
     double result;
 
@@ -162,14 +160,13 @@ execute_binary_float_operation(VM *vm, Opcode op, Object left, Object right) {
             result = left.data.floating / right.data.floating;
             break;
         default:
-            error(&vm->errors, "unkown float operator: (Opcode: %d)", op);
-            return -1;
+            return new_error("unkown float operator: (Opcode: %d)", op);
     }
 
     return vm_push(vm, OBJ(o_Float, .floating = result));
 }
 
-static int
+static error
 execute_binary_integer_operation(VM *vm, Opcode op, Object left, Object right) {
     long result;
 
@@ -187,18 +184,16 @@ execute_binary_integer_operation(VM *vm, Opcode op, Object left, Object right) {
             result = left.data.integer / right.data.integer;
             break;
         default:
-            error(&vm->errors, "unkown integer operator: (Opcode: %d)", op);
-            return -1;
+            return new_error("unkown integer operator: (Opcode: %d)", op);
     }
 
     return vm_push(vm, OBJ(o_Integer, .integer = result));
 }
 
-static int
+static error
 execute_binary_string_operation(VM *vm, Opcode op, Object left, Object right) {
     if (op != OpAdd) {
-        error(&vm->errors, "unkown string operator: (Opcode: %d)", op);
-        return -1;
+        return new_error("unkown string operator: (Opcode: %d)", op);
     }
 
     // copy [left] and [right] into new string
@@ -225,7 +220,7 @@ execute_binary_string_operation(VM *vm, Opcode op, Object left, Object right) {
     return vm_push(vm, OBJ(o_String, .string = obj_data));
 }
 
-static int
+static error
 execute_binary_operation(VM *vm, Opcode op) {
     Object right = vm_pop(vm);
     Object left = vm_pop(vm);
@@ -240,10 +235,8 @@ execute_binary_operation(VM *vm, Opcode op) {
         return execute_binary_string_operation(vm, op, left, right);
     }
 
-    error(&vm->errors,
-            "unsupported types for binary operation: %s (Opcode: %d) %s",
+    return new_error("unsupported types for binary operation: %s (Opcode: %d) %s",
             show_object_type(left.type), op, show_object_type(right.type));
-    return -1;
 }
 
 static Object
@@ -251,7 +244,7 @@ native_bool_to_boolean_object(bool input) {
     return OBJ(o_Boolean, .boolean = input);
 }
 
-static int
+static error
 execute_integer_comparison(VM *vm, Opcode op, Object left, Object right) {
     Object result;
 
@@ -269,14 +262,12 @@ execute_integer_comparison(VM *vm, Opcode op, Object left, Object right) {
                     left.data.integer > right.data.integer);
             break;
         default:
-            error(&vm->errors,
-                    "unkown integer comparison operator: (Opcode: %d)", op);
-            return -1;
+            return new_error("unkown integer comparison operator: (Opcode: %d)", op);
     }
     return vm_push(vm, result);
 }
 
-static int
+static error
 execute_comparison(VM *vm, Opcode op) {
     Object right = vm_pop(vm);
     Object left = vm_pop(vm);
@@ -293,13 +284,12 @@ execute_comparison(VM *vm, Opcode op) {
         case OpNotEqual:
             return vm_push(vm, native_bool_to_boolean_object(!eq));
         default:
-            error(&vm->errors, "unkown comparison operator: (Opcode: %d) (%s %s)",
+            return new_error("unkown comparison operator: (Opcode: %d) (%s %s)",
                     op, show_object_type(left.type), show_object_type(right.type));
-            return -1;
     }
 }
 
-static int
+static error
 execute_bang_operator(VM *vm) {
     Object operand = vm_pop(vm);
     switch (operand.type) {
@@ -313,43 +303,41 @@ execute_bang_operator(VM *vm) {
     }
 }
 
-static int
+static error
 execute_minus_operator(VM *vm) {
     Object operand = vm_pop(vm);
     if (operand.type != o_Integer) {
-        error(&vm->errors, "unsupported type for negation: %s",
+        return new_error("unsupported type for negation: %s",
                 show_object_type(operand.type));
-        return -1;
     }
     operand.data.integer = -operand.data.integer;
     return vm_push(vm, operand);
 }
 
-static int
+static error
 execute_array_index(VM *vm, Object array, Object index) {
     ObjectBuffer *arr = array.data.array;
     int i = index.data.integer,
         max = arr->length - 1;
     if (i < 0 || i > max) {
-        return vm_push(vm, _null);
+        return vm_push(vm, NULL_OBJ);
     }
 
     return vm_push(vm, arr->data[i]);
 }
 
-static int
+static error
 execute_hash_index(VM *vm, Object hash, Object index) {
     table *tbl = hash.data.hash;
     if (!hashable(index)) {
-        error(&vm->errors, "unusable as hash key: %s",
+        return new_error("unusable as hash key: %s",
                 show_object_type(index.type));
-        return -1;
     }
 
     return vm_push(vm, table_get(tbl, index));
 }
 
-static int
+static error
 execute_index_expression(VM *vm) {
     Object index = vm_pop(vm);
     Object left = vm_pop(vm);
@@ -361,9 +349,8 @@ execute_index_expression(VM *vm) {
         return execute_hash_index(vm, left, index);
 
     } else {
-        error(&vm->errors, "index operator not supported: %s",
+        return new_error("index operator not supported: %s",
                 show_object_type(left.type));
-        return -1;
     }
 }
 
@@ -381,7 +368,7 @@ is_truthy(Object obj) {
     }
 }
 
-static int
+static error
 vm_push_constant(VM *vm, Constant c) {
     switch (c.type) {
         case c_Integer:
@@ -416,7 +403,7 @@ vm_push_constant(VM *vm, Constant c) {
 
         default:
             die("vm_push_constant: type %d not handled", c.type);
-            return -1;
+            return 0;
     }
 }
 
@@ -452,9 +439,7 @@ build_hash(VM *vm, int start_index, int end_index) {
         val = vm->stack[i + 1];
         if (!hashable(key)) {
             table_free(tbl);
-            error(&vm->errors, "unusable as hash key: %s",
-                    show_object_type(key.type));
-            return (Object){};
+            return ERR("unusable as hash key: %s", show_object_type(key.type));
         }
 
         key = table_set(tbl, key, val);
@@ -464,13 +449,11 @@ build_hash(VM *vm, int start_index, int end_index) {
     return OBJ(o_Hash, .hash = tbl);
 }
 
-static int
+static error
 call_function(VM *vm, Object fn, int num_args) {
     CompiledFunction *func = fn.data.func;
     if (num_args != func->num_parameters) {
-        error_num_args(&vm->errors,
-                "function", func->num_parameters, num_args);
-        return -1;
+        return error_num_args("function", func->num_parameters, num_args);
     }
 
     Frame *f = new_frame(vm);
@@ -479,16 +462,25 @@ call_function(VM *vm, Object fn, int num_args) {
     return 0;
 }
 
-static int
+static error
 call_builtin(VM *vm, Object builtin, int num_args) {
-    int base_pointer = vm->sp - num_args;
-    Object *args = vm->stack + base_pointer;
+    vm->sp -= num_args;
+    Object *args = vm->stack + vm->sp;
 
     Builtin *fn = builtin.data.ptr;
-    return fn(vm, args, num_args);
+    Object result = fn(vm, args, num_args);
+
+    switch (result.type) {
+        case o_Error:
+            return result.data.err;
+        case o_Null:
+            return vm_push(vm, NULL_OBJ);
+        default:
+            return vm_push(vm, result);
+    }
 }
 
-static int
+static error
 execute_call(VM *vm, int num_args) {
     Object callee = vm->stack[vm->sp - 1 - num_args];
     switch (callee.type) {
@@ -497,14 +489,13 @@ execute_call(VM *vm, int num_args) {
         case o_BuiltinFunction:
             return call_builtin(vm, callee, num_args);
         default:
-            error(&vm->errors, "calling non-function and non-builtin");
-            return -1;
+            return new_error("calling non-function and non-builtin");
     }
 }
 
-int vm_run(VM *vm) {
+error vm_run(VM *vm) {
     Opcode op;
-    int err, pos, num;
+    int pos, num;
     Object obj;
 
     int ip;
@@ -512,6 +503,7 @@ int vm_run(VM *vm) {
     Frame *current_frame = vm->frames;
     Instructions ins = instructions(current_frame);
 
+    error err;
     while (current_frame->ip < ins.length - 1) {
         ip = ++current_frame->ip;
         op = ins.data[ip];
@@ -523,7 +515,7 @@ int vm_run(VM *vm) {
                 current_frame->ip += 2;
 
                 err = vm_push_constant(vm, vm->constants.data[num]);
-                if (err == -1) { return -1; };
+                if (err) { return err; };
                 break;
 
             case OpAdd:
@@ -531,7 +523,7 @@ int vm_run(VM *vm) {
             case OpMul:
             case OpDiv:
                 err = execute_binary_operation(vm, op);
-                if (err == -1) { return -1; };
+                if (err) { return err; };
                 break;
 
             case OpPop:
@@ -540,27 +532,27 @@ int vm_run(VM *vm) {
 
             case OpTrue:
                 err = vm_push(vm, _true);
-                if (err == -1) { return -1; };
+                if (err) { return err; };
                 break;
             case OpFalse:
                 err = vm_push(vm, _false);
-                if (err == -1) { return -1; };
+                if (err) { return err; };
                 break;
 
             case OpEqual:
             case OpNotEqual:
             case OpGreaterThan:
                 err = execute_comparison(vm, op);
-                if (err == -1) { return -1; };
+                if (err) { return err; };
                 break;
 
             case OpBang:
                 err = execute_bang_operator(vm);
-                if (err == -1) { return -1; };
+                if (err) { return err; };
                 break;
             case OpMinus:
                 err = execute_minus_operator(vm);
-                if (err == -1) { return -1; };
+                if (err) { return err; };
                 break;
 
             case OpJump:
@@ -578,8 +570,8 @@ int vm_run(VM *vm) {
                 break;
 
             case OpNull:
-                err = vm_push(vm, _null);
-                if (err == -1) { return -1; };
+                err = vm_push(vm, NULL_OBJ);
+                if (err) { return err; };
                 break;
 
             case OpSetGlobal:
@@ -595,7 +587,7 @@ int vm_run(VM *vm) {
                 current_frame->ip += 2;
 
                 err = vm_push(vm, vm->globals[pos]);
-                if (err == -1) { return -1; };
+                if (err) { return err; };
                 break;
 
             case OpArray:
@@ -607,7 +599,7 @@ int vm_run(VM *vm) {
                 vm->sp -= num;
 
                 err = vm_push(vm, obj);
-                if (err == -1) { return -1; };
+                if (err) { return err; };
                 break;
 
             case OpHash:
@@ -616,16 +608,16 @@ int vm_run(VM *vm) {
                 current_frame->ip += 2;
 
                 obj = build_hash(vm, vm->sp - num, vm->sp);
-                if (obj.type == o_Null) { return -1; };
+                if (IS_ERR(obj)) { return obj.data.err; };
                 vm->sp -= num;
 
                 err = vm_push(vm, obj);
-                if (err == -1) { return -1; };
+                if (err) { return err; };
                 break;
 
             case OpIndex:
                 err = execute_index_expression(vm);
-                if (err == -1) { return -1; };
+                if (err) { return err; };
                 break;
 
             case OpCall:
@@ -634,7 +626,7 @@ int vm_run(VM *vm) {
                 current_frame->ip += 1;
 
                 err = execute_call(vm, num);
-                if (err == -1) { return -1; };
+                if (err) { return err; };
 
                 current_frame = vm->frames + vm->frames_index - 1;
                 ins = instructions(current_frame);
@@ -648,7 +640,7 @@ int vm_run(VM *vm) {
                 vm->sp = current_frame->base_pointer - 1;
 
                 err = vm_push(vm, obj);
-                if (err == -1) { return -1; };
+                if (err) { return err; };
 
                 current_frame--;
                 ins = instructions(current_frame);
@@ -658,8 +650,8 @@ int vm_run(VM *vm) {
                 pop_frame(vm);
                 vm->sp = current_frame->base_pointer - 1;
 
-                err = vm_push(vm, _null);
-                if (err == -1) { return -1; };
+                err = vm_push(vm, NULL_OBJ);
+                if (err) { return err; };
 
                 current_frame--;
                 ins = instructions(current_frame);
@@ -678,7 +670,7 @@ int vm_run(VM *vm) {
                 current_frame->ip += 1;
 
                 err = vm_push(vm, vm->stack[current_frame->base_pointer + pos]);
-                if (err == -1) { return -1; };
+                if (err) { return err; };
                 break;
 
             case OpGetBuiltin:
@@ -688,12 +680,11 @@ int vm_run(VM *vm) {
 
                 err = vm_push(vm,
                         OBJ(o_BuiltinFunction, .ptr = builtins[pos].fn));
-                if (err == -1) { return -1; };
+                if (err) { return err; };
                 break;
 
             default:
-                error(&vm->errors, "unknown opcode %d", op);
-                return -1;
+                return new_error("unknown opcode %d", op);
         }
     }
     return 0;
@@ -727,6 +718,8 @@ trace_mark_object(Object obj) {
         case o_Float:
         case o_Boolean:
         case o_CompiledFunction:
+        case o_BuiltinFunction:
+        case o_Error:
             return;
 
         // case o_Error:
@@ -790,10 +783,6 @@ void vm_free(VM *vm) {
         alloc_free(vm->allocs.data[i]);
     }
     free(vm->allocs.data);
-    for (int i = 0; i < vm->errors.length; i++) {
-        free(vm->errors.data[i]);
-    }
-    free(vm->errors.data);
     free(vm->stack);
     free(vm->globals);
     free(vm->frames);

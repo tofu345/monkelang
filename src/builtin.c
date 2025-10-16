@@ -1,127 +1,105 @@
 #include "builtin.h"
 #include "object.h"
-#include "utils.h"
 #include "vm.h"
-#include "table.h"
+#include "table.h" // provides type for "table"
 
 #include <string.h>
 
-int builtin_exit(VM *vm, [[maybe_unused]] Object *args, int num_args) {
+#define ERR_NUM_ARGS(...) OBJ(o_Error, .err = error_num_args(__VA_ARGS__))
+
+Object builtin_exit([[maybe_unused]] VM *vm, [[maybe_unused]] Object *args, int num_args) {
     if (num_args != 0) {
-        error_num_args(&vm->errors, "builtin exit()", 0, num_args);
-        return -1;
+        return ERR_NUM_ARGS("builtin exit()", 0, num_args);
     }
 
     exit(0);
 }
 
-int builtin_copy(VM *vm, Object *args, int num_args) {
+Object builtin_copy(VM *vm, Object *args, int num_args) {
     if (num_args != 1) {
-        error_num_args(&vm->errors, "builtin copy()", 1, num_args);
-        return -1;
+        return ERR_NUM_ARGS("builtin copy()", 1, num_args);
     }
 
-    return vm_push(vm, object_copy(vm, args[0]));
+    return object_copy(vm, args[0]);
 }
 
-int builtin_len(VM *vm, Object *args, int num_args) {
+Object builtin_len([[maybe_unused]] VM *vm, Object *args, int num_args) {
     if (num_args != 1) {
-        error_num_args(&vm->errors, "builtin len()", 1, num_args);
-        return -1;
+        return ERR_NUM_ARGS("builtin len()", 1, num_args);
     }
 
-    Object result;
     switch (args[0].type) {
         case o_String:
             {
                 CharBuffer* str = args[0].data.string;
-                result = OBJ(o_Integer, str->length);
-                break;
+                return OBJ(o_Integer, str->length);
             }
 
         case o_Array:
             {
                 ObjectBuffer* arr = args[0].data.array;
-                result = OBJ(o_Integer, arr->length);
-                break;
+                return OBJ(o_Integer, arr->length);
             }
 
         case o_Hash:
             {
                 table* tbl = args[0].data.hash;
-                result = OBJ(o_Integer, tbl->length);
-                break;
+                return OBJ(o_Integer, tbl->length);
             }
 
         default:
-            error(&vm->errors, "builtin len(): argument of %s not supported",
+            return ERR("builtin len(): argument of %s not supported",
                     show_object_type(args[0].type));
-            return -1;
     }
-
-    return vm_push(vm, result);
 }
 
-int builtin_first(VM *vm, Object *args, int num_args) {
+Object builtin_first([[maybe_unused]] VM *vm, Object *args, int num_args) {
     if (num_args != 1) {
-        error_num_args(&vm->errors, "builtin first()", 1, num_args);
-        return -1;
+        return ERR_NUM_ARGS("builtin first()", 1, num_args);
     }
 
-    Object result;
     switch (args[0].type) {
         case o_Array:
             {
                 ObjectBuffer* arr = args[0].data.array;
                 if (arr->length > 0) {
-                    result = arr->data[0];
-                } else {
-                    result = NULL_OBJ;
+                    return arr->data[0];
                 }
+                return NULL_OBJ;
             }
             break;
 
         default:
-            error(&vm->errors, "builtin first(): argument of %s not supported",
+            return ERR("builtin first(): argument of %s not supported",
                     show_object_type(args[0].type));
-            return -1;
     }
 
-    return vm_push(vm, result);
 }
 
-int builtin_last(VM *vm, Object *args, int num_args) {
+Object builtin_last([[maybe_unused]] VM *vm, Object *args, int num_args) {
     if (num_args != 1) {
-        error_num_args(&vm->errors, "builtin last()", 1, num_args);
-        return -1;
+        return ERR_NUM_ARGS("builtin last()", 1, num_args);
     }
 
-    Object result;
     switch (args[0].type) {
         case o_Array:
             {
                 ObjectBuffer* arr = args[0].data.array;
                 if (arr->length > 0) {
-                    result = arr->data[arr->length - 1];
-                } else {
-                    result = NULL_OBJ;
+                    return arr->data[arr->length - 1];
                 }
-                break;
+                return NULL_OBJ;
             }
 
         default:
-            error(&vm->errors, "builtin last(): argument of %s not supported",
+            return ERR("builtin last(): argument of %s not supported",
                     show_object_type(args[0].type));
-            return -1;
     }
-
-    return vm_push(vm, result);
 }
 
-int builtin_rest(VM *vm, Object *args, int num_args) {
+Object builtin_rest(VM *vm, Object *args, int num_args) {
     if (num_args != 1) {
-        error_num_args(&vm->errors, "builtin rest()", 1, num_args);
-        return -1;
+        return ERR_NUM_ARGS("builtin rest()", 1, num_args);
     }
 
     switch (args[0].type) {
@@ -130,13 +108,12 @@ int builtin_rest(VM *vm, Object *args, int num_args) {
                 ObjectBuffer *old = args[0].data.array;
                 Object new_obj;
                 if (old->length > 1) {
-                    // copy from first element
+                    // to avoid left-shifting
                     old->data++;
                     old->length--;
 
                     new_obj = object_copy(vm, args[0]);
 
-                    // revert
                     old->data--;
                     old->length++;
 
@@ -144,34 +121,30 @@ int builtin_rest(VM *vm, Object *args, int num_args) {
                     new_obj = NULL_OBJ;
                 }
 
-                return vm_push(vm, new_obj);
+                return new_obj;
             }
 
         default:
-            error(&vm->errors, "builtin rest(): argument of %s not supported",
+            return ERR("builtin rest(): argument of %s not supported",
                     show_object_type(args[0].type));
-            return -1;
     }
 }
 
-int builtin_push(VM *vm, Object *args, int num_args) {
+Object builtin_push([[maybe_unused]] VM *vm, Object *args, int num_args) {
     if (num_args != 2) {
-        error_num_args(&vm->errors, "builtin push()", 2, num_args);
-        return -1;
+        return ERR_NUM_ARGS("builtin push()", 2, num_args);
     }
 
     if (args[0].type != o_Array) {
-        error(&vm->errors,
-                "builtin push() expects first argument to be Array got %s",
+        return ERR("builtin push() expects first argument to be Array got %s",
                 show_object_type(args[0].type));
-        return -1;
     }
 
     ObjectBufferPush(args[0].data.array, args[1]);
-    return vm_push(vm, args[0]);
+    return args[0];
 }
 
-int builtin_puts([[maybe_unused]] VM *vm, Object *args, int num_args) {
+Object builtin_puts([[maybe_unused]] VM *vm, Object *args, int num_args) {
     for (int i = 0; i < num_args - 1; i++) {
         object_fprint(args[i], stdout);
         printf(" ");
@@ -180,7 +153,7 @@ int builtin_puts([[maybe_unused]] VM *vm, Object *args, int num_args) {
         object_fprint(args[num_args - 1], stdout);
 
     putc('\n', stdout);
-    return vm_push(vm, NULL_OBJ);
+    return NULL_OBJ;
 }
 
 #define BUILTIN(fn) {#fn, builtin_##fn}

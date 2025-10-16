@@ -10,9 +10,13 @@
 // TODO:
 // - o_Error, `null` token, lexing and parsing
 // - char datatype
+// - show_object_type() lowercase type names
 
 #define OBJ(t, d) (Object){ .type = t, .data = { d } }
+#define ERR(...) OBJ(o_Error, .err = new_error(__VA_ARGS__))
 #define NULL_OBJ (Object){}
+
+#define IS_ERR(obj) (obj.type == o_Error)
 
 typedef struct Object Object;
 BUFFER(Object, Object);
@@ -28,6 +32,7 @@ typedef enum __attribute__ ((__packed__)) {
     o_Boolean,
     o_CompiledFunction,
     o_BuiltinFunction,
+    o_Error,
 
     // Compound data types:
     o_String,
@@ -44,6 +49,7 @@ typedef union {
     ObjectBuffer* array;
     table* hash;
     CompiledFunction *func;
+    error err;
     void *ptr;
 } ObjectData;
 
