@@ -51,5 +51,7 @@ void die(const char *fmt, ...);
 BUFFER(Error, char*);
 void error(ErrorBuffer* buf, char* format, ...);
 
+void error_num_args(ErrorBuffer *buf, const char *name, int expected, int actual);
+
 // From: wrenPowerOf2Ceil: http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2Float
 int power_of_2_ceil(int n);

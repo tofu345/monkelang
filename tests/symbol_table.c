@@ -1,4 +1,5 @@
 #include "unity/unity.h"
+#include "unity/unity_internals.h"
 
 #include "../src/symbol_table.h"
 
@@ -148,11 +149,48 @@ void test_resolve_nested_local(void) {
     symbol_table_free(&second_local);
 }
 
+void test_define_resolve_builtins(void) {
+    SymbolTable global;
+    symbol_table_init(&global);
+
+    SymbolTable first_local;
+    enclosed_symbol_table(&first_local, &global);
+
+    SymbolTable second_local;
+    enclosed_symbol_table(&second_local, &global);
+
+    Symbol expected[] = {
+        {.name = "a", .scope = BuiltinScope, .index = 0},
+        {.name = "c", .scope = BuiltinScope, .index = 1},
+        {.name = "e", .scope = BuiltinScope, .index = 2},
+        {.name = "f", .scope = BuiltinScope, .index = 3},
+    };
+    int len = sizeof(expected) / sizeof(expected[0]);
+
+    for (int i = 0; i < len; i++) {
+        define_builtin(&global, i, expected[i].name);
+    }
+
+    int err = test_sym_resolve(&global, expected, len);
+    if (err != 0) { TEST_FAIL_MESSAGE("test_sym_resolve global"); }
+
+    err = test_sym_resolve(&first_local, expected, len);
+    if (err != 0) { TEST_FAIL_MESSAGE("test_sym_resolve first_local"); }
+
+    err = test_sym_resolve(&second_local, expected, len);
+    if (err != 0) { TEST_FAIL_MESSAGE("test_sym_resolve second_local"); }
+
+    symbol_table_free(&global);
+    symbol_table_free(&first_local);
+    symbol_table_free(&second_local);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_define);
     RUN_TEST(test_resolve_global);
     RUN_TEST(test_resolve_local);
+    RUN_TEST(test_define_resolve_builtins);
     return UNITY_END();
 }
 

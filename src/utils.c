@@ -43,3 +43,9 @@ void error(ErrorBuffer* buf, char* format, ...) {
     ErrorBufferPush(buf, msg);
     va_end(args);
 }
+
+
+void error_num_args(ErrorBuffer *buf, const char *name, int expected, int actual) {
+    error(buf, "%s takes %d argument%s got %d",
+            name, expected, expected != 1 ? "s" : "", actual);
+}

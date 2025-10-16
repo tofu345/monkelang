@@ -49,3 +49,6 @@ void vm_free(VM *vm);
 int vm_run(VM *vm);
 
 Object vm_last_popped(VM *vm);
+Object object_copy(VM* vm, Object obj);
+int vm_push(VM *vm, Object obj);
+Object vm_pop(VM *vm);

@@ -657,8 +657,8 @@ parse_statement(Parser* p) {
         return parse_return_statement(p);
     case t_Illegal:
         parser_error(p,
-                ":%d,%d: illegal character",
-                p->cur_token.line, p->cur_token.col);
+                ":%d,%d: illegal character '%s'",
+                p->cur_token.line, p->cur_token.col, p->cur_token.literal);
         free(p->cur_token.literal);
         return (Node){};
     default:

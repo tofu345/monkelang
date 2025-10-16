@@ -42,6 +42,7 @@ const Definition definitions[] = {
     DEF_EMPTY(OpReturn),
     DEF(OpGetLocal, one), // locals index
     DEF(OpSetLocal, one), // locals index
+    DEF(OpGetBuiltin, one), // builtin fn index
 };
 
 const Definition *

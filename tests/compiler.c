@@ -683,6 +683,42 @@ void test_let_statements_scopes(void) {
     );
 }
 
+void test_builtins(void) {
+    c_test(
+        "\
+            len([]);\
+            push([], 1);\
+        ",
+        _C( INT(1) ),
+        _I(
+            make(OpGetBuiltin, 0),
+            make(OpArray, 0),
+            make(OpCall, 1),
+            make(OpPop),
+            make(OpGetBuiltin, 5),
+            make(OpArray, 0),
+            make(OpConstant, 0),
+            make(OpCall, 2),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "fn() { len([]) }",
+        _C(
+            INS(
+                make(OpGetBuiltin, 0),
+                make(OpArray, 0),
+                make(OpCall, 1),
+                make(OpReturnValue)
+            )
+        ),
+        _I(
+            make(OpConstant, 0),
+            make(OpPop)
+        )
+    );
+}
+
 static int test_instructions(Instructions *expected, Instructions *actual);
 static int test_constants(ExpectedConstants expected, ConstantBuffer *actual);
 
@@ -816,7 +852,7 @@ test_constants(ExpectedConstants expected, ConstantBuffer *actual) {
                 break;
 
             case test_ins:
-                if (!expect_constant_is(c_Instructions, cur)) {
+                if (!expect_constant_is(c_Function, cur)) {
                     printf("constant %d - not a function\n", i);
                     return -1;
                 }
@@ -850,5 +886,6 @@ int main(void) {
     RUN_TEST(test_compiler_scopes);
     RUN_TEST(test_function_calls);
     RUN_TEST(test_let_statements_scopes);
+    RUN_TEST(test_builtins);
     return UNITY_END();
 }

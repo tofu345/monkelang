@@ -93,22 +93,23 @@ test_string_expressions(void) {
 
 // create *NULL-terminated* array of integers.
 static TestArray *make_test_array(int n, ...);
-#define ARR(...) TEST(arr, make_test_array(__VA_ARGS__))
+#define ARR(...) TEST(arr, make_test_array(__VA_ARGS__, 0))
 
 static void
 test_array_literals(void) {
     vm_test("[]", ARR(0));
-    vm_test("[1, 2, 3]", ARR(1, 2, 3, 0));
-    vm_test("[1 + 2, 3 * 4, 5 + 6]", ARR(3, 12, 11, 0));
+    vm_test("[1, 2, 3]", ARR(1, 2, 3));
+    vm_test("[1 + 2, 3 * 4, 5 + 6]", ARR(3, 12, 11));
 }
 
-#define HASH(...) &(Test){ test_hash, { ._arr = make_test_array(__VA_ARGS__) } }
+#define HASH(...) \
+    &(Test){ test_hash, { ._arr = make_test_array(__VA_ARGS__, 0) }}
 
 static void
 test_hash_literals(void) {
     vm_test("{}", HASH(0));
-    vm_test("{1: 2, 2: 3}", HASH(1, 2, 2, 3, 0));
-    vm_test("{1 + 1: 2 * 2, 3 + 3: 4 * 4}", HASH(2, 4, 6, 16, 0));
+    vm_test("{1: 2, 2: 3}", HASH(1, 2, 2, 3));
+    vm_test("{1 + 1: 2 * 2, 3 + 3: 4 * 4}", HASH(2, 4, 6, 16));
 }
 
 static void
@@ -330,6 +331,29 @@ test_calling_functions_with_wrong_arguments(void) {
     vm_test_error("fn(a, b) { a + b; }(1)", "function takes 2 arguments got 1");
 }
 
+static void
+test_builtin_functions(void) {
+    vm_test("len(\"\")", TEST(int, 0));
+    vm_test("len(\"four\")", TEST(int, 4));
+    vm_test("len(\"hello world\")", TEST(int, 11));
+    vm_test("len([1, 2, 3])", TEST(int, 3));
+    vm_test("len([])", TEST(int, 0));
+    vm_test("puts(\"hello\", \"world!\")", TEST_NULL);
+    vm_test("first([1, 2, 3])", TEST(int, 1));
+    vm_test("first([])", TEST_NULL);
+    vm_test("last([1, 2, 3])", TEST(int, 3));
+    vm_test("last([])", TEST_NULL);
+    vm_test("rest([1, 2, 3])", ARR(2, 3));
+    vm_test("rest([])", TEST_NULL);
+    vm_test("push([], 1)", ARR(1));
+
+    vm_test_error("len(1)", "builtin len(): argument of Integer not supported");
+    vm_test_error("len(\"one\", \"two\")", "builtin len() takes 1 argument got 2");
+    vm_test_error("first(1)", "builtin first(): argument of Integer not supported");
+    vm_test_error("last(1)", "builtin last(): argument of Integer not supported");
+    vm_test_error("push(1, 1)", "builtin push() expects first argument to be Array got Integer");
+}
+
 static TestArray *
 make_test_array(int n, ...) {
     va_list ap;
@@ -428,54 +452,38 @@ test_string_object(char *expected, Object actual) {
     return 0;
 }
 
-static void
+static int
 test_expected_object(Test expected, Object actual) {
-    int err;
     switch (expected.typ) {
         case test_int:
-            err = test_integer_object(expected.val._int, actual);
-            if (err != 0) {
-                TEST_FAIL_MESSAGE("test_integer_object failed");
-            }
-            break;
+            return test_integer_object(expected.val._int, actual);
 
         case test_float:
-            err = test_float_object(expected.val._float, actual);
-            if (err != 0) {
-                TEST_FAIL_MESSAGE("test_integer_object failed");
-            }
-            break;
+            return test_float_object(expected.val._float, actual);
 
         case test_bool:
-            err = test_boolean_object(expected.val._bool, actual);
-            if (err != 0) {
-                TEST_FAIL_MESSAGE("test_boolean_object failed");
-            }
-            break;
+            return test_boolean_object(expected.val._bool, actual);
 
         case test_str:
-            err = test_string_object(expected.val._str, actual);
-            if (err != 0) {
-                TEST_FAIL_MESSAGE("test_string_object failed");
-            }
-            break;
+            return test_string_object(expected.val._str, actual);
 
         case test_null:
-            if (!expect_object_is(o_Null, actual))
-                TEST_FAIL();
-            break;
+            if (!expect_object_is(o_Null, actual)) {
+                return -1;
+            }
+            return 0;
 
         case test_arr:
             {
                 if (!expect_object_is(o_Array, actual)) {
-                    TEST_FAIL();
+                    return -1;
                 }
 
                 ObjectBuffer *arr = actual.data.ptr;
                 if (expected.val._arr->length != arr->length) {
                     printf("wrong number of elements. want=%d, got=%d\n",
                             expected.val._arr->length, arr->length);
-                    TEST_FAIL();
+                    return -1;
                 }
 
                 int err;
@@ -484,18 +492,18 @@ test_expected_object(Test expected, Object actual) {
                                 arr->data[i]);
                     if (err != 0) {
                         printf("test array element %d: test_integer_object failed", i);
-                        TEST_FAIL();
+                        return -1;
                     }
                 }
                 free(expected.val._arr->data);
                 free(expected.val._arr);
-                break;
+                return 0;
             }
 
         case test_hash:
             {
                 if (!expect_object_is(o_Hash, actual)) {
-                    TEST_FAIL();
+                    return -1;
                 }
 
                 table *tbl = actual.data.hash;
@@ -504,7 +512,7 @@ test_expected_object(Test expected, Object actual) {
                 if (num_pairs != tbl->length) {
                     printf("wrong number of elements. want=%zu, got=%zu\n",
                             num_pairs, tbl->length);
-                    TEST_FAIL();
+                    return -1;
                 }
 
                 // test `tbl[expected key]` == `expected value`
@@ -513,24 +521,25 @@ test_expected_object(Test expected, Object actual) {
                     Object value = table_get(tbl, OBJ(o_Integer, exp->data[i]));
                     if (value.type == o_Null) {
                         printf("no pair for key %d", i);
-                        TEST_FAIL();
+                        return -1;
                     }
 
                     err = test_integer_object(exp->data[i + 1], value);
                     if (err != 0) {
                         printf("test hash element %d failed", i);
-                        TEST_FAIL();
+                        return -1;
                     }
                 }
 
                 free(exp->data);
                 free(exp);
-                break;
+                return 0;
             }
 
         default:
             die("test_expected_object: Test of type %d not handled",
                     expected.typ);
+            return -1;
     }
 }
 
@@ -543,6 +552,7 @@ vm_test(char *input, Test *expected) {
     Compiler c;
     compiler_init(&c);
     if (compile(&c, &prog) != 0) {
+        printf("test: %s\n", input);
         printf("compiler had %d errors\n", c.errors.length);
         print_errors(&c.errors);
         program_free(&prog);
@@ -552,6 +562,7 @@ vm_test(char *input, Test *expected) {
 
     vm_with(&vm, bytecode(&c));
     if (vm_run(&vm) == -1) {
+        printf("test: %s\n", input);
         printf("vm had %d errors\n", vm.errors.length);
         print_errors(&vm.errors);
         program_free(&prog);
@@ -560,7 +571,7 @@ vm_test(char *input, Test *expected) {
     }
 
     Object stack_elem = vm_last_popped(&vm);
-    test_expected_object(*expected, stack_elem);
+    int err = test_expected_object(*expected, stack_elem);
 
     // cleanup after ourselves (should mostly work)
     for (int i = 0;
@@ -571,6 +582,10 @@ vm_test(char *input, Test *expected) {
 
     program_free(&prog);
     compiler_free(&c);
+
+    if (err != 0) {
+        printf("test_expected_object failed for test: %s\n", input);
+    }
 }
 
 static void
@@ -597,8 +612,8 @@ vm_test_error(char *input, char *expected_error) {
     }
 
     if (strcmp(vm.errors.data[0], expected_error) != 0) {
-        printf("wrong VM error: want='%s', got='%s'\n",
-                expected_error, vm.errors.data[0]);
+        printf("wrong VM error for test: %s\nwant= %s\ngot = %s\n",
+                input, expected_error, vm.errors.data[0]);
         program_free(&prog);
         compiler_free(&c);
         TEST_FAIL();
@@ -628,6 +643,7 @@ int main(void) {
     RUN_TEST(test_calling_functions_without_bindings);
     RUN_TEST(test_calling_functions_with_bindings);
     RUN_TEST(test_calling_functions_with_wrong_arguments);
+    RUN_TEST(test_builtin_functions);
 
     vm_free(&vm);
     return UNITY_END();

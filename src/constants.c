@@ -4,7 +4,7 @@ DEFINE_BUFFER(Constant, Constant);
 
 void free_constant(Constant c) {
     switch (c.type) {
-        case c_Instructions:
+        case c_Function:
             {
                 CompiledFunction *ins = c.data.function;
                 free(ins->instructions.data);

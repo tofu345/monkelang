@@ -7,9 +7,12 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-// TODO o_Error, `null` token, lexing and parsing
+// TODO:
+// - o_Error, `null` token, lexing and parsing
+// - char datatype
 
 #define OBJ(t, d) (Object){ .type = t, .data = { d } }
+#define NULL_OBJ (Object){}
 
 typedef struct Object Object;
 BUFFER(Object, Object);
@@ -24,6 +27,7 @@ typedef enum __attribute__ ((__packed__)) {
     o_Float,
     o_Boolean,
     o_CompiledFunction,
+    o_BuiltinFunction,
 
     // Compound data types:
     o_String,

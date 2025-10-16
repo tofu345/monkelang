@@ -1,5 +1,6 @@
 #include "compiler.h"
 #include "ast.h"
+#include "builtin.h"
 #include "code.h"
 #include "constants.h"
 #include "symbol_table.h"
@@ -21,6 +22,14 @@ void compiler_init(Compiler *c) {
     SymbolTable *global_symbol_table = allocate_symbol_table(c);
     symbol_table_init(global_symbol_table);
     c->cur_symbol_table = global_symbol_table;
+
+    const Builtins *builtin = get_builtins();
+    int i = 0;
+    while (builtin->name != NULL) {
+        define_builtin(global_symbol_table, i, builtin->name);
+        builtin++;
+        i++;
+    }
 
     CompilationScope main_scope = {};
     ScopeBufferPush(&c->scopes, main_scope);
@@ -89,6 +98,23 @@ change_operand(Compiler *c, int op_pos, int operand) {
     free(new.data);
 }
 
+static void
+load_symbol(Compiler *c, Symbol *s) {
+    switch (s->scope) {
+        case GlobalScope:
+            emit(c, OpGetGlobal, s->index);
+            return;
+
+        case LocalScope:
+            emit(c, OpGetLocal, s->index);
+            return;
+
+        case BuiltinScope:
+            emit(c, OpGetBuiltin, s->index);
+            return;
+    }
+}
+
 static int
 _compile(Compiler *c, Node n) {
     switch (n.typ) {
@@ -152,11 +178,7 @@ _compile(Compiler *c, Node n) {
                     return -1;
                 }
 
-                if (symbol->scope == GlobalScope) {
-                    emit(c, OpGetGlobal, symbol->index);
-                } else {
-                    emit(c, OpGetLocal, symbol->index);
-                }
+                load_symbol(c, symbol);
                 return 0;
             }
 
@@ -415,7 +437,7 @@ _compile(Compiler *c, Node n) {
                     .num_parameters = params.length,
                 };
                 Constant compiled_fn = {
-                    .type = c_Instructions,
+                    .type = c_Function,
                     .data = { .function = fn }
                 };
                 emit(c, OpConstant, add_constant(c, compiled_fn));

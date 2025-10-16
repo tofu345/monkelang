@@ -1,4 +1,5 @@
 #include "vm.h"
+#include "builtin.h"
 #include "code.h"
 #include "compiler.h"
 #include "constants.h"
@@ -58,18 +59,78 @@ void vm_with(VM *vm, Bytecode bytecode) {
     vm->constants = *bytecode.constants;
 }
 
+Object object_copy(VM* vm, Object obj) {
+    switch (obj.type) {
+        case o_Null:
+        case o_Integer:
+        case o_Float:
+        case o_Boolean:
+        case o_CompiledFunction:
+        case o_BuiltinFunction:
+            return obj;
+        case o_String:
+            {
+                CharBuffer old_str = *obj.data.string;
+                CharBuffer* new_str;
+                if (old_str.length > 1) {
+                    // copy string contents
+                    char *new_buf = allocate(vm, old_str.capacity * sizeof(char));
+                    memcpy(new_buf, old_str.data, old_str.length * sizeof(char));
+                    new_buf[old_str.length] = '\0';
+
+                    // copy allocated [Object]
+                    new_str = vm_allocate(vm, o_String, sizeof(CharBuffer));
+                    *new_str = (CharBuffer) {
+                        .data = new_buf,
+                            .length = old_str.length,
+                            .capacity = old_str.capacity
+                    };
+                    return OBJ(o_String, .string = new_str);
+                } else {
+                    new_str = vm_allocate(vm, o_String, sizeof(CharBuffer));
+                    memset(new_str, 0, sizeof(CharBuffer));
+                }
+                return OBJ(o_String, .string = new_str);
+            }
+        case o_Array:
+            {
+                ObjectBuffer old_arr = *obj.data.array;
+                ObjectBuffer* new_arr;
+                if (old_arr.length > 1) {
+                    // copy array and contents individually
+                    Object *new_buf = allocate(vm, old_arr.capacity * sizeof(Object));
+                    new_arr = vm_allocate(vm, o_Array, sizeof(ObjectBuffer));
+                    *new_arr = (ObjectBuffer) {
+                        .data = new_buf,
+                            .length = old_arr.length,
+                            .capacity = old_arr.capacity
+                    };
+                    for (int i = 0; i < old_arr.length; i++) {
+                        new_buf[i] = object_copy(vm, old_arr.data[i]);
+                    }
+                } else {
+                    new_arr = vm_allocate(vm, o_Array, sizeof(ObjectBuffer));
+                    memset(new_arr, 0, sizeof(ObjectBuffer));
+                }
+                return OBJ(o_Array, .array = new_arr);
+            }
+        default:
+            die("object_copy: object type not handled %d\n", obj.type);
+            return NULL_OBJ;
+    }
+}
+
 Frame *pop_frame(VM *vm) {
     vm->frames_index--;
-    return vm->frames + vm->frames_index;
+    return vm->frames + vm->frames_index - 1;
 }
 
-void push_frame(VM *vm, Frame *f) {
-    vm->frames[vm->frames_index] = *f;
+Frame *new_frame(VM *vm) {
     vm->frames_index++;
+    return vm->frames + vm->frames_index - 1;
 }
 
-static int
-vm_push(VM *vm, Object obj) {
+int vm_push(VM *vm, Object obj) {
     if (vm->sp >= StackSize) {
         error(&vm->errors, "stack overflow");
         return -1;
@@ -79,8 +140,7 @@ vm_push(VM *vm, Object obj) {
     return 0;
 }
 
-static Object
-vm_pop(VM *vm) {
+Object vm_pop(VM *vm) {
     return vm->stack[--vm->sp];
 }
 
@@ -351,7 +411,7 @@ vm_push_constant(VM *vm, Constant c) {
                 return vm_push(vm, OBJ(o_String, .string = str_buf));
             }
 
-        case c_Instructions:
+        case c_Function:
             return vm_push(vm, OBJ(o_CompiledFunction, .func = c.data.function));
 
         default:
@@ -405,28 +465,41 @@ build_hash(VM *vm, int start_index, int end_index) {
 }
 
 static int
-call_function(VM *vm, int num_args) {
-    Object fn = vm->stack[vm->sp - 1 - num_args];
-    if (fn.type != o_CompiledFunction) {
-        error(&vm->errors, "calling non-function");
-        return -1;
-    }
-
+call_function(VM *vm, Object fn, int num_args) {
     CompiledFunction *func = fn.data.func;
     if (num_args != func->num_parameters) {
-        error(&vm->errors,
-                "function takes %d argument%s got %d",
-                func->num_parameters,
-                func->num_parameters != 1 ? "s" : "",
-                num_args);
+        error_num_args(&vm->errors,
+                "function", func->num_parameters, num_args);
         return -1;
     }
 
-    Frame f;
-    frame_init(&f, *func, vm->sp - num_args);
-    push_frame(vm, &f);
-    vm->sp = f.base_pointer + func->num_locals;
+    Frame *f = new_frame(vm);
+    frame_init(f, *func, vm->sp - num_args);
+    vm->sp = f->base_pointer + func->num_locals;
     return 0;
+}
+
+static int
+call_builtin(VM *vm, Object builtin, int num_args) {
+    int base_pointer = vm->sp - num_args;
+    Object *args = vm->stack + base_pointer;
+
+    Builtin *fn = builtin.data.ptr;
+    return fn(vm, args, num_args);
+}
+
+static int
+execute_call(VM *vm, int num_args) {
+    Object callee = vm->stack[vm->sp - 1 - num_args];
+    switch (callee.type) {
+        case o_CompiledFunction:
+            return call_function(vm, callee, num_args);
+        case o_BuiltinFunction:
+            return call_builtin(vm, callee, num_args);
+        default:
+            error(&vm->errors, "calling non-function and non-builtin");
+            return -1;
+    }
 }
 
 int vm_run(VM *vm) {
@@ -435,6 +508,7 @@ int vm_run(VM *vm) {
     Object obj;
 
     int ip;
+    const Builtins *builtins = get_builtins();
     Frame *current_frame = vm->frames;
     Instructions ins = instructions(current_frame);
 
@@ -559,10 +633,10 @@ int vm_run(VM *vm) {
                 num = read_big_endian_uint8(ins.data + ip + 1);
                 current_frame->ip += 1;
 
-                err = call_function(vm, num);
+                err = execute_call(vm, num);
                 if (err == -1) { return -1; };
 
-                current_frame++;
+                current_frame = vm->frames + vm->frames_index - 1;
                 ins = instructions(current_frame);
                 break;
 
@@ -604,6 +678,16 @@ int vm_run(VM *vm) {
                 current_frame->ip += 1;
 
                 err = vm_push(vm, vm->stack[current_frame->base_pointer + pos]);
+                if (err == -1) { return -1; };
+                break;
+
+            case OpGetBuiltin:
+                // builtin fn index
+                pos = read_big_endian_uint8(ins.data + ip + 1);
+                current_frame->ip += 1;
+
+                err = vm_push(vm,
+                        OBJ(o_BuiltinFunction, .ptr = builtins[pos].fn));
                 if (err == -1) { return -1; };
                 break;
 

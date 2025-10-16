@@ -19,7 +19,7 @@ typedef enum {
     c_Float,
 
     c_String, // points to literal in AST.
-    c_Instructions,
+    c_Function,
 } ConstantType;
 
 // TODO: remove duplicate constants

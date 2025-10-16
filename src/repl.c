@@ -50,6 +50,7 @@ void repl(FILE* in, FILE* out) {
         if (p.errors.length > 0) {
             fprintf(out, "Woops! We ran into some monkey business here!\n");
             print_errors(out, &p.errors);
+            program_free(&prog);
             goto cleanup;
         } else if (prog.stmts.length >= 1) {
             ProgramBufferPush(&programs, prog);

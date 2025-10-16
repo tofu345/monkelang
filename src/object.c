@@ -158,10 +158,11 @@ const char* object_types[] = {
     "Integer",
     "Float",
     "Boolean",
+    "CompiledFunction",
+    "BuiltinFunction",
     "String",
     "Array",
     "Hash",
-    "CompiledFunction",
 };
 
 const char* show_object_type(ObjectType t) {
