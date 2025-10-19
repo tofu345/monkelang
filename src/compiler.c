@@ -141,7 +141,9 @@ _compile(Compiler *c, Node n) {
                 if (err) { return err; }
 
                 Symbol *symbol = sym_define(c->cur_symbol_table, ls->name->tok.literal);
-                if (symbol->index >= GlobalsSize) { die("too many globals"); }
+                if (symbol->index >= GlobalsSize) {
+                    return new_error("too many globals variables");
+                }
 
                 if (symbol->scope == GlobalScope) {
                     emit(c, OpSetGlobal, symbol->index);
@@ -153,6 +155,10 @@ _compile(Compiler *c, Node n) {
 
         case n_ReturnStatement:
             {
+                if (c->scope_index == 0) {
+                    return new_error("return statement outside function");
+                }
+
                 ReturnStatement *rs = n.obj;
                 err = _compile(c, rs->return_value);
                 if (err) { return err; }

@@ -10,18 +10,12 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 
 const Object _true = BOOL(true);
 const Object _false = BOOL(false);
 
 DEFINE_BUFFER(Alloc, Alloc *);
-
-// track [Alloc]ation of Compound Data Type of [size], decrement
-// [vm.bytesTillGC] and garbage collect if necessary.
-static void *compound_object(VM *vm, ObjectType type, size_t size);
-
-// allocate [size] and decrement [vm.bytesTillGC]
-static void *allocate(VM *vm, size_t size);
 
 void vm_init(VM *vm, Object *stack, Object *globals, Frame *frames) {
     memset(vm, 0, sizeof(VM));
@@ -52,7 +46,6 @@ void vm_with(VM *vm, Bytecode bytecode) {
         .instructions = *bytecode.instructions
     };
     frame_init(vm->frames, main_fn, 0);
-    vm->frames_index = 1;
 
     vm->constants = *bytecode.constants;
 }
@@ -71,22 +64,22 @@ Object object_copy(VM* vm, Object obj) {
             {
                 CharBuffer old_str = *obj.data.string;
                 CharBuffer* new_str;
-                if (old_str.length > 1) {
+                if (old_str.length > 0) {
                     // copy string contents
                     char *new_buf = allocate(vm, old_str.capacity * sizeof(char));
                     memcpy(new_buf, old_str.data, old_str.length * sizeof(char));
                     new_buf[old_str.length] = '\0';
 
                     // copy allocated [Object]
-                    new_str = compound_object(vm, o_String, sizeof(CharBuffer));
-                    *new_str = (CharBuffer) {
+                    new_str = COMPOUND_OBJ(o_String, CharBuffer, {
                         .data = new_buf,
-                            .length = old_str.length,
-                            .capacity = old_str.capacity
-                    };
+                        .length = old_str.length,
+                        .capacity = old_str.capacity,
+                    });
                     return OBJ(o_String, .string = new_str);
+
                 } else {
-                    new_str = compound_object(vm, o_String, sizeof(CharBuffer));
+                    new_str = compound_obj(vm, o_String, sizeof(CharBuffer), NULL);
                     memset(new_str, 0, sizeof(CharBuffer));
                 }
                 return OBJ(o_String, .string = new_str);
@@ -96,21 +89,20 @@ Object object_copy(VM* vm, Object obj) {
             {
                 ObjectBuffer old_arr = *obj.data.array;
                 ObjectBuffer* new_arr;
-                if (old_arr.length >= 1) {
-                    // copy array and contents
+                if (old_arr.length > 0) {
                     Object *new_buf = allocate(vm, old_arr.capacity * sizeof(Object));
+                    // copy contents
                     for (int i = 0; i < old_arr.length; i++) {
                         new_buf[i] = object_copy(vm, old_arr.data[i]);
                     }
 
-                    new_arr = compound_object(vm, o_Array, sizeof(ObjectBuffer));
-                    *new_arr = (ObjectBuffer) {
+                    new_arr = COMPOUND_OBJ(o_Array, ObjectBuffer, {
                         .data = new_buf,
-                            .length = old_arr.length,
-                            .capacity = old_arr.capacity
-                    };
+                        .length = old_arr.length,
+                        .capacity = old_arr.capacity
+                    });
                 } else {
-                    new_arr = compound_object(vm, o_Array, sizeof(ObjectBuffer));
+                    new_arr = compound_obj(vm, o_Array, sizeof(ObjectBuffer), NULL);
                     memset(new_arr, 0, sizeof(ObjectBuffer));
                 }
                 return OBJ(o_Array, .array = new_arr);
@@ -126,14 +118,21 @@ Object object_copy(VM* vm, Object obj) {
     }
 }
 
-Frame *pop_frame(VM *vm) {
+// return to previous [Frame]
+static Frame *
+pop_frame(VM *vm) {
     vm->frames_index--;
-    return vm->frames + vm->frames_index - 1;
+    return vm->frames + vm->frames_index;
 }
 
-Frame *new_frame(VM *vm) {
+// create new frame if less than [MaxFraxes]
+static error
+new_frame(VM *vm) {
+    if (vm->frames_index >= MaxFraxes) {
+        return new_error("too many frames");
+    }
     vm->frames_index++;
-    return vm->frames + vm->frames_index - 1;
+    return 0;
 }
 
 error vm_push(VM *vm, Object obj) {
@@ -204,7 +203,8 @@ execute_binary_string_operation(VM *vm, Opcode op, Object left, Object right) {
     }
 
     // copy [left] and [right] into new string
-    // NOTE: must occur before [vm_allocate], if not, potential use after free.
+    // NOTE: must occur before [compound_object()],
+    // if not, potential garbage collection and use after free.
     int length = left.data.string->length + right.data.string->length,
         capacity = power_of_2_ceil(length + 1);
     char *result = allocate(vm, capacity * sizeof(char));
@@ -217,13 +217,11 @@ execute_binary_string_operation(VM *vm, Opcode op, Object left, Object right) {
             right.data.string->length * sizeof(char));
     result[length] = '\0';
 
-    CharBuffer* obj_data = compound_object(vm, o_String, sizeof(CharBuffer));
-    *obj_data = (CharBuffer){
+    CharBuffer* obj_data = COMPOUND_OBJ(o_String, CharBuffer, {
         .data = result,
         .length = length,
         .capacity = capacity
-    };
-
+    });
     return vm_push(vm, OBJ(o_String, .string = obj_data));
 }
 
@@ -423,12 +421,11 @@ vm_push_constant(VM *vm, Constant c) {
                     buf[str.length] = '\0';
                 }
 
-                CharBuffer* str_buf = compound_object(vm, o_String, sizeof(CharBuffer));
-                *str_buf = (CharBuffer){
+                CharBuffer* str_buf = COMPOUND_OBJ(o_String, CharBuffer, {
                     .data = buf,
                     .length = str.length,
                     .capacity = capacity
-                };
+                });
                 return vm_push(vm, OBJ(o_String, .string = str_buf));
             }
 
@@ -444,7 +441,7 @@ vm_push_constant(VM *vm, Constant c) {
 static Object
 build_array(VM *vm, int start_index, int end_index) {
     int length = end_index - start_index;
-    ObjectBuffer *elems = compound_object(vm, o_Array, sizeof(ObjectBuffer));
+    ObjectBuffer *elems = compound_obj(vm, o_Array, sizeof(ObjectBuffer), NULL);
 
     if (length <= 0) {
         memset(elems, 0, sizeof(ObjectBuffer));
@@ -453,10 +450,7 @@ build_array(VM *vm, int start_index, int end_index) {
         elems->capacity = power_of_2_ceil(length);
         int size = elems->capacity * sizeof(Object);
         elems->data = allocate(vm, size);
-
-        for (int i = start_index; i < end_index; i++) {
-            elems->data[i - start_index] = vm->stack[i];
-        }
+        memcpy(elems->data, vm->stack + start_index, length * sizeof(Object));
     }
 
     return OBJ(o_Array, .array = elems);
@@ -464,7 +458,7 @@ build_array(VM *vm, int start_index, int end_index) {
 
 static Object
 build_hash(VM *vm, int start_index, int end_index) {
-    table *tbl = compound_object(vm, o_Hash, sizeof(table));
+    table *tbl = compound_obj(vm, o_Hash, sizeof(table), NULL);
     if (table_init(tbl) == NULL) { die("build_hash"); }
 
     Object key, val, res;
@@ -494,20 +488,24 @@ call_function(VM *vm, Object fn, int num_args) {
         return error_num_args("function", func->num_parameters, num_args);
     }
 
-    Frame *f = new_frame(vm);
-    frame_init(f, *func, vm->sp - num_args);
-    vm->sp = f->base_pointer + func->num_locals;
+    error err = new_frame(vm);
+    if (err) { return err; }
+
+    Frame *f = vm->frames + vm->frames_index;
+    int base_pointer = vm->sp - num_args; // points to first argument
+    frame_init(f, *func, base_pointer);
+    vm->sp = base_pointer + func->num_locals;
     return 0;
 }
 
 static error
 call_builtin(VM *vm, Object builtin, int num_args) {
-    vm->sp -= num_args;
-    Object *args = vm->stack + vm->sp;
-    vm->sp--;
-
+    Object *args = vm->stack + vm->sp - num_args;
     Builtin *fn = builtin.data.ptr;
     Object result = fn(vm, args, num_args);
+
+    // remove arguments and [Builtin] from stack.
+    vm->sp = vm->sp - num_args - 1;
 
     switch (result.type) {
         case o_Error:
@@ -667,7 +665,7 @@ error vm_run(VM *vm) {
                 err = execute_call(vm, num);
                 if (err) { return err; };
 
-                current_frame = vm->frames + vm->frames_index - 1;
+                current_frame = vm->frames + vm->frames_index;
                 ins = instructions(current_frame);
                 break;
 
@@ -675,25 +673,23 @@ error vm_run(VM *vm) {
                 // return value
                 obj = vm_pop(vm);
 
-                pop_frame(vm);
+                // remove arguments and [Function] from stack.
                 vm->sp = current_frame->base_pointer - 1;
+                current_frame = pop_frame(vm);
+                ins = instructions(current_frame);
 
                 err = vm_push(vm, obj);
                 if (err) { return err; };
-
-                current_frame--;
-                ins = instructions(current_frame);
                 break;
 
             case OpReturn:
-                pop_frame(vm);
+                // remove arguments and [Function] from stack.
                 vm->sp = current_frame->base_pointer - 1;
+                current_frame = pop_frame(vm);
+                ins = instructions(current_frame);
 
                 err = vm_push(vm, NULL_OBJ);
                 if (err) { return err; };
-
-                current_frame--;
-                ins = instructions(current_frame);
                 break;
 
             case OpSetLocal:
@@ -761,7 +757,6 @@ trace_mark_object(Object obj) {
         case o_Error:
             return;
 
-        // case o_Error:
         case o_String:
             mark_alloc(obj);
             return;
@@ -797,6 +792,8 @@ trace_mark_object(Object obj) {
 // free [Alloc]ation
 static void
 alloc_free(Alloc *alloc) {
+    assert(alloc->type >= o_String);
+
     void *obj_data = alloc + 1;
     switch (alloc->type) {
         case o_String:
@@ -828,22 +825,27 @@ void vm_free(VM *vm) {
     free(vm->frames);
 }
 
-void mark_and_sweep(VM *vm) {
-    // mark
-    int i;
-    Object *stack = vm->stack;
-    for (i = vm->sp; i >= 0; i--) {
-        if (stack[i].type >= o_String) {
-            trace_mark_object(stack[i]);
+void mark_objs(Object *objs, int len) {
+    for (int i = 0; i < len; i++) {
+        if (objs[i].type >= o_String) {
+            trace_mark_object(objs[i]);
         }
     }
+}
+
+void mark_and_sweep(VM *vm) {
+    mark_objs(vm->stack, vm->sp);
+
+    // mark entire [vm->globals] to be safe.
+    // FIXME TODO: store max number of global variables.
+    mark_objs(vm->globals, GlobalsSize);
 
     // sweep
     Alloc *cur;
     Alloc **allocs = vm->allocs.data;
     int length = vm->allocs.length,
         new_length = length;
-    for (i = 0; i < length; i++) {
+    for (int i = 0; i < length; i++) {
         cur = allocs[i];
         if (cur->is_marked) {
             cur->is_marked = false;
@@ -856,30 +858,31 @@ void mark_and_sweep(VM *vm) {
     vm->allocs.length = new_length;
 }
 
-static void *
-allocate(VM *vm, size_t size) {
+void *allocate(VM *vm, size_t size) {
     vm->bytesTillGC -= size;
     void *ptr = malloc(size);
     if (ptr == NULL) { die("allocate"); }
     return ptr;
 }
 
-static void *
-compound_object(VM *vm, ObjectType type, size_t size) {
+void *compound_obj(VM *vm, ObjectType type, size_t size, void *data) {
     // prepend [Alloc] object.
-    size += sizeof(Alloc);
+    size_t actual_size = size + sizeof(Alloc);
 
-    vm->bytesTillGC -= size;
+    vm->bytesTillGC -= actual_size;
     if (vm->bytesTillGC <= 0) {
         mark_and_sweep(vm);
         vm->bytesTillGC = NextGC;
     }
 
-    Alloc *ptr = malloc(size);
-    if (ptr == NULL) { die("vm_allocate"); }
-    ptr->is_marked = false;
-    ptr->type = type;
+    Alloc *ptr = malloc(actual_size);
+    if (ptr == NULL) { die("malloc"); }
+    *ptr = (Alloc){ .is_marked = false, .type = type };
     AllocBufferPush(&vm->allocs, ptr);
 
-    return (Alloc *)(ptr + 1);
+    void *obj_data = (Alloc *)(ptr + 1);
+    if (data) {
+        memcpy(obj_data, data, size);
+    }
+    return obj_data;
 }

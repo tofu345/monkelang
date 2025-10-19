@@ -13,7 +13,8 @@ static Node parse_statement(Parser* p);
 static Node parse_expression(Parser* p, enum Precedence precedence);
 static NodeBuffer parse_expression_list(Parser* p, TokenType end);
 
-void* allocate(size_t size) {
+static void *
+allocate(size_t size) {
     void* ptr = malloc(size);
     if (ptr == NULL) die("parser: malloc");
     return ptr;

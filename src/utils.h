@@ -51,7 +51,7 @@ void die(const char *fmt, ...);
 typedef char *error;
 BUFFER(Error, error);
 
-error new_error(char* format, ...);
+error new_error(const char* format, ...);
 error error_num_args(const char *name, int expected, int actual);
 
 // From: wrenPowerOf2Ceil: http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2Float

@@ -23,14 +23,16 @@ void symbol_table_free(SymbolTable *st) {
     Symbol *cur;
     while (ht_next(&it)) {
         cur = it.current->value;
-        free(cur->name);
+        if (cur->scope != BuiltinScope) {
+            free(cur->name);
+        }
         free(cur);
     }
     ht_destroy(st->store);
 }
 
 static Symbol *
-new_symbol(SymbolTable *st, char *name, int index, SymbolScope scope) {
+new_symbol(SymbolTable *st, char *name, int index, SymbolScope scope, bool copy_name) {
     Symbol *symbol = malloc(sizeof(Symbol));
     if (symbol == NULL) { die("new_symbol: malloc"); }
 
@@ -45,8 +47,10 @@ new_symbol(SymbolTable *st, char *name, int index, SymbolScope scope) {
         return symbol;
     }
 
-    name = strdup(name);
-    if (name == NULL) { die("new_symbol: strdup"); }
+    if (copy_name) {
+        name = strdup(name);
+        if (name == NULL) { die("new_symbol: strdup"); }
+    }
 
     *symbol = (Symbol) {
         .name = name,
@@ -65,7 +69,7 @@ Symbol *sym_define(SymbolTable *st, char *name) {
         scope = LocalScope;
     }
 
-    return new_symbol(st, name, st->num_definitions++, scope);
+    return new_symbol(st, name, st->num_definitions++, scope, true);
 }
 
 Symbol *sym_resolve(SymbolTable *st, char *name) {
@@ -77,5 +81,5 @@ Symbol *sym_resolve(SymbolTable *st, char *name) {
 }
 
 Symbol *define_builtin(SymbolTable *st, int index, const char *name) {
-    return new_symbol(st, (char *)name, index, BuiltinScope);
+    return new_symbol(st, (char *)name, index, BuiltinScope, false);
 }

@@ -96,23 +96,23 @@ test_string_expressions(void) {
 
 // create *NULL-terminated* array of integers.
 static TestArray *make_test_array(int n, ...);
-#define ARR(...) TEST(arr, make_test_array(__VA_ARGS__, 0))
+#define TEST_ARR(...) TEST(arr, make_test_array(__VA_ARGS__, 0))
 
 static void
 test_array_literals(void) {
-    vm_test("[]", ARR(0));
-    vm_test("[1, 2, 3]", ARR(1, 2, 3));
-    vm_test("[1 + 2, 3 * 4, 5 + 6]", ARR(3, 12, 11));
+    vm_test("[]", TEST_ARR(0));
+    vm_test("[1, 2, 3]", TEST_ARR(1, 2, 3));
+    vm_test("[1 + 2, 3 * 4, 5 + 6]", TEST_ARR(3, 12, 11));
 }
 
-#define HASH(...) \
+#define TEST_HASH(...) \
     &(Test){ test_hash, { ._arr = make_test_array(__VA_ARGS__, 0) }}
 
 static void
 test_hash_literals(void) {
-    vm_test("{}", HASH(0));
-    vm_test("{1: 2, 2: 3}", HASH(1, 2, 2, 3));
-    vm_test("{1 + 1: 2 * 2, 3 + 3: 4 * 4}", HASH(2, 4, 6, 16));
+    vm_test("{}", TEST_HASH(0));
+    vm_test("{1: 2, 2: 3}", TEST_HASH(1, 2, 2, 3));
+    vm_test("{1 + 1: 2 * 2, 3 + 3: 4 * 4}", TEST_HASH(2, 4, 6, 16));
 }
 
 static void
@@ -346,9 +346,9 @@ test_builtin_functions(void) {
     vm_test("first([])", TEST_NULL);
     vm_test("last([1, 2, 3])", TEST(int, 3));
     vm_test("last([])", TEST_NULL);
-    vm_test("rest([1, 2, 3])", ARR(2, 3));
+    vm_test("rest([1, 2, 3])", TEST_ARR(2, 3));
     vm_test("rest([])", TEST_NULL);
-    vm_test("push([], 1)", ARR(1));
+    vm_test("push([], 1)", TEST_ARR(1));
 
     vm_test_error("len(1)", "builtin len(): argument of Integer not supported");
     vm_test_error("len(\"one\", \"two\")", "builtin len() takes 1 argument got 2");
@@ -546,7 +546,7 @@ test_expected_object(Test expected, Object actual) {
     }
 }
 
-// shared across all vm_test() calls, managed in main().
+// shared across all vm_tests, managed in main().
 VM vm;
 
 static void
@@ -575,6 +575,11 @@ vm_test(char *input, Test *expected) {
         TEST_FAIL();
     }
 
+    if (vm.sp != 0) {
+        printf("stack pointer not 0, got %d for test: %s\n", vm.sp, input);
+        TEST_FAIL();
+    }
+
     Object stack_elem = vm_last_popped(&vm);
     int _err = test_expected_object(*expected, stack_elem);
 
@@ -590,6 +595,7 @@ vm_test(char *input, Test *expected) {
 
     if (_err != 0) {
         printf("test_expected_object failed for test: %s\n\n", input);
+        TEST_FAIL();
     }
 }
 
@@ -611,6 +617,7 @@ vm_test_error(char *input, char *expected_error) {
 
     vm_with(&vm, bytecode(&c));
     err = vm_run(&vm);
+    vm.sp = 0; // because VM is shared across tests.
     if (!err) {
         program_free(&prog);
         compiler_free(&c);
@@ -624,6 +631,13 @@ vm_test_error(char *input, char *expected_error) {
         program_free(&prog);
         compiler_free(&c);
         TEST_FAIL();
+    }
+
+    // cleanup after ourselves (should mostly work)
+    for (int i = 0;
+            i < StackSize && vm.stack[i].type != o_Null;
+            i++) {
+        vm.stack[i] = (Object){};
     }
 
     free(err);

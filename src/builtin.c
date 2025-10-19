@@ -105,23 +105,26 @@ Object builtin_rest(VM *vm, Object *args, int num_args) {
     switch (args[0].type) {
         case o_Array:
             {
-                ObjectBuffer *old = args[0].data.array;
-                Object new_obj;
-                if (old->length > 1) {
-                    // to avoid left-shifting
-                    old->data++;
-                    old->length--;
+                // create shallow copy of array.
+                ObjectBuffer old_arr = *args[0].data.array;
+                int new_length = old_arr.length - 1;
+                ObjectBuffer *new_arr;
+                if (old_arr.length > 1) {
+                    Object *new_buf = allocate(vm, old_arr.capacity * sizeof(Object));
 
-                    new_obj = object_copy(vm, args[0]);
+                    // copy from second element.
+                    memcpy(new_buf, old_arr.data + 1, new_length * sizeof(Object));
 
-                    old->data--;
-                    old->length++;
+                    new_arr = COMPOUND_OBJ(o_Array, ObjectBuffer, {
+                        .data = new_buf,
+                        .length = new_length,
+                        .capacity = old_arr.capacity
+                    });
+                    return OBJ(o_Array, .array = new_arr);
 
                 } else {
-                    new_obj = NULL_OBJ;
+                    return NULL_OBJ;
                 }
-
-                return new_obj;
             }
 
         default:

@@ -5,12 +5,14 @@
 #include "object.h"
 #include "utils.h"
 
+#include <stdint.h>
+
 static const int StackSize = 2048;
 static const int GlobalsSize = 2048;
 static const int MaxFraxes = 1024;
 
 // Number of bytes allocated before GC is run.
-static const int NextGC = 2048;
+static const int NextGC = 1;
 
 typedef struct {
     ObjectType type;
@@ -23,17 +25,19 @@ BUFFER(Frame, Frame);
 typedef struct {
     ConstantBuffer constants;
 
+    // contains all local variables and intermediate objects in scope
     Object *stack;
-    int sp;
+    int sp; // Top of stack is `stack[sp-1]`
 
+    // contains global variables
     Object *globals;
 
-    Frame *frames;
-    int frames_index;
+    Frame *frames; // function call stack
+    uint16_t frames_index; // index of current frame
 
-    // The current number to allocate till before GC is run.
+    // The current number of bytes to allocate till before GC is run.
     int bytesTillGC;
-    AllocBuffer allocs;
+    AllocBuffer allocs; // tracks all Compound Data Types
 } VM;
 
 // if [stack], [globals] or [frames] are NULL, allocate.
@@ -49,5 +53,15 @@ Object vm_last_popped(VM *vm);
 error vm_push(VM *vm, Object obj);
 Object vm_pop(VM *vm);
 
-// perform deep copy of [obj], can return error
+// perform deep copy of [obj]
 Object object_copy(VM* vm, Object obj);
+
+// when is too much?
+#define COMPOUND_OBJ(typ, data, ...) \
+    compound_obj(vm, typ, sizeof(data), &(data)__VA_ARGS__ );
+
+// create Compound Data Type of [size] and initialiaze with [data] if not NULL.
+void *compound_obj(VM *vm, ObjectType type, size_t size, void *data);
+
+// allocate [size] and decrement [vm.bytesTillGC]
+void *allocate(VM *vm, size_t size);
