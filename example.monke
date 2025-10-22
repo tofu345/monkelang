@@ -1,3 +1,15 @@
+let fibonacci = fn(x) {
+    if (x == 0) {
+        0
+    } else {
+        if (x == 1) {
+            return 1;
+        } else {
+            fibonacci(x - 1) + fibonacci(x - 2);
+        }
+    }
+};
+
 let map = fn(arr, f) {
     let iter = fn(arr, accumulated) {
         if (len(arr) == 0) {
@@ -8,23 +20,9 @@ let map = fn(arr, f) {
     };
     iter(arr, []);
 };
-let a = [1, 2, 3, 4];
-let double = fn(x) { x * 2 };
-let res = map(a, double);
-puts(res);
 
-let reduce = fn(arr, initial, f) {
-    let iter = fn(arr, result) {
-        if (len(arr) == 0) {
-            result
-        } else {
-            iter(rest(arr), f(result, first(arr)));
-        };
-    }
-    iter(arr, initial);
-};
-let sum = fn(arr) {
-    reduce(arr, 0, fn(initial, el) { initial + el });
-};
-let res = sum([1, 2, 3, 4, 5]);
-puts(res);
+let numbers = [1, 1 + 1, 4 - 1, 2 * 2, 2 + 3, 12 / 2];
+puts("numbers:", numbers);
+puts("fibonacci of numbers:", map(numbers, fibonacci));
+
+puts(fibonacci(35));

@@ -1,13 +1,13 @@
 #include "frame.h"
 
-void frame_init(Frame *f, CompiledFunction fn, int base_pointer) {
+void frame_init(Frame *f, Closure *cl, int base_pointer) {
     *f = (Frame) {
-        .fn = fn,
+        .cl = cl,
         .ip = -1,
         .base_pointer = base_pointer,
     };
 }
 
 Instructions instructions(Frame *f) {
-    return f->fn.instructions;
+    return f->cl->func->instructions;
 }

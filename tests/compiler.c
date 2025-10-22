@@ -404,7 +404,7 @@ void test_functions(void) {
             )
         ),
         _I(
-            make(OpConstant, 2),
+            make(OpClosure, 2, 0),
             make(OpPop)
         )
     );
@@ -420,7 +420,7 @@ void test_functions(void) {
             )
         ),
         _I(
-            make(OpConstant, 2),
+            make(OpClosure, 2, 0),
             make(OpPop)
         )
     );
@@ -436,15 +436,18 @@ void test_functions(void) {
             )
         ),
         _I(
-            make(OpConstant, 2),
+            make(OpClosure, 2, 0),
             make(OpPop)
         )
     );
+}
+
+void test_functions_without_return_value(void) {
     c_test(
         "fn() { }",
         _C( INS(make(OpReturn)) ),
         _I(
-            make(OpConstant, 0),
+            make(OpClosure, 0, 0),
             make(OpPop)
         )
     );
@@ -540,7 +543,7 @@ void test_function_calls(void) {
             )
         ),
         _I(
-            make(OpConstant, 1), // The compiled function
+            make(OpClosure, 1, 0),
             make(OpCall, 0),
             make(OpPop)
         )
@@ -557,7 +560,7 @@ void test_function_calls(void) {
             )
         ),
         _I(
-            make(OpConstant, 1), // The compiled function
+            make(OpClosure, 1, 0),
             make(OpSetGlobal, 0),
             make(OpGetGlobal, 0),
             make(OpCall, 0),
@@ -576,7 +579,7 @@ void test_function_calls(void) {
             INT(24)
         ),
         _I(
-            make(OpConstant, 0),
+            make(OpClosure, 0, 0),
             make(OpSetGlobal, 0),
             make(OpGetGlobal, 0),
             make(OpConstant, 1),
@@ -602,7 +605,7 @@ void test_function_calls(void) {
             INT(26)
         ),
         _I(
-            make(OpConstant, 0),
+            make(OpClosure, 0, 0),
             make(OpSetGlobal, 0),
             make(OpGetGlobal, 0),
             make(OpConstant, 1),
@@ -630,7 +633,7 @@ void test_let_statements_scopes(void) {
         _I(
             make(OpConstant, 0),
             make(OpSetGlobal, 0),
-            make(OpConstant, 1),
+            make(OpClosure, 1, 0),
             make(OpPop)
         )
     );
@@ -651,7 +654,7 @@ void test_let_statements_scopes(void) {
             )
         ),
         _I(
-            make(OpConstant, 1),
+            make(OpClosure, 1, 0),
             make(OpPop)
         )
     );
@@ -677,7 +680,7 @@ void test_let_statements_scopes(void) {
             )
         ),
         _I(
-            make(OpConstant, 2),
+            make(OpClosure, 2, 0),
             make(OpPop)
         )
     );
@@ -713,7 +716,190 @@ void test_builtins(void) {
             )
         ),
         _I(
+            make(OpClosure, 0, 0),
+            make(OpPop)
+        )
+    );
+}
+
+void test_closures(void) {
+    c_test(
+        "\
+        fn(a) {\
+            fn(b) {\
+                a + b\
+            }\
+        }\
+        ",
+        _C(
+            INS(
+                make(OpGetFree, 0),
+                make(OpGetLocal, 0),
+                make(OpAdd),
+                make(OpReturnValue)
+            ),
+            INS(
+                make(OpGetLocal, 0),
+                make(OpClosure, 0, 1),
+                make(OpReturnValue)
+           )
+        ),
+        _I(
+            make(OpClosure, 1, 0),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "\
+        fn(a) {\
+            fn(b) {\
+                fn(c) {\
+                    a + b + c\
+                }\
+            }\
+        };\
+        ",
+        _C(
+            INS(
+                make(OpGetFree, 0),
+                make(OpGetFree, 1),
+                make(OpAdd),
+                make(OpGetLocal, 0),
+                make(OpAdd),
+                make(OpReturnValue)
+            ),
+            INS(
+                make(OpGetFree, 0),
+                make(OpGetLocal, 0),
+                make(OpClosure, 0, 2),
+                make(OpReturnValue)
+           ),
+           INS(
+                make(OpGetLocal, 0),
+                make(OpClosure, 1, 1),
+                make(OpReturnValue)
+           )
+        ),
+        _I(
+            make(OpClosure, 2, 0),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "\
+        let global = 55;\
+\
+        fn() {\
+            let a = 66;\
+\
+            fn() {\
+                let b = 77;\
+                fn() {\
+                    let c = 88;\
+                    global + a + b + c;\
+                }\
+            }\
+        }\
+        ",
+        _C(
+            INT(55), INT(66), INT(77), INT(88),
+            INS(
+                make(OpConstant, 3),
+                make(OpSetLocal, 0),
+                make(OpGetGlobal, 0),
+                make(OpGetFree, 0),
+                make(OpAdd),
+                make(OpGetFree, 1),
+                make(OpAdd),
+                make(OpGetLocal, 0),
+                make(OpAdd),
+                make(OpReturnValue)
+            ),
+            INS(
+                make(OpConstant, 2),
+                make(OpSetLocal, 0),
+                make(OpGetFree, 0),
+                make(OpGetLocal, 0),
+                make(OpClosure, 4, 2),
+                make(OpReturnValue)
+           ),
+           INS(
+                make(OpConstant, 1),
+                make(OpSetLocal, 0),
+                make(OpGetLocal, 0),
+                make(OpClosure, 5, 1),
+                make(OpReturnValue)
+           )
+        ),
+        _I(
             make(OpConstant, 0),
+            make(OpSetGlobal, 0),
+            make(OpClosure, 6, 0),
+            make(OpPop)
+        )
+    );
+}
+
+void test_recursive_functions(void) {
+    c_test(
+        "\
+            let countDown = fn(x) { countDown(x - 1); };\
+            countDown(1);\
+        ",
+        _C(
+            INT(1),
+            INS(
+                make(OpCurrentClosure),
+                make(OpGetLocal, 0),
+                make(OpConstant, 0),
+                make(OpSub),
+                make(OpCall, 1),
+                make(OpReturnValue)
+            ),
+            INT(1)
+        ),
+        _I(
+            make(OpClosure, 1, 0),
+            make(OpSetGlobal, 0),
+            make(OpGetGlobal, 0),
+            make(OpConstant, 2),
+            make(OpCall, 1),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "\
+            let wrapper = fn() {\
+                let countDown = fn(x) { countDown(x - 1); };\
+                countDown(1);\
+            };\
+            wrapper();\
+        ",
+        _C(
+            INT(1),
+            INS(
+                make(OpCurrentClosure),
+                make(OpGetLocal, 0),
+                make(OpConstant, 0),
+                make(OpSub),
+                make(OpCall, 1),
+                make(OpReturnValue)
+            ),
+            INT(1),
+            INS(
+                make(OpClosure, 1, 0),
+                make(OpSetLocal, 0),
+                make(OpGetLocal, 0),
+                make(OpConstant, 2),
+                make(OpCall, 1),
+                make(OpReturnValue)
+            )
+        ),
+        _I(
+            make(OpClosure, 3, 0),
+            make(OpSetGlobal, 0),
+            make(OpGetGlobal, 0),
+            make(OpCall, 0),
             make(OpPop)
         )
     );
@@ -883,9 +1069,12 @@ int main(void) {
     RUN_TEST(test_hash_literals);
     RUN_TEST(test_index_expressions);
     RUN_TEST(test_functions);
+    RUN_TEST(test_functions_without_return_value);
     RUN_TEST(test_compiler_scopes);
     RUN_TEST(test_function_calls);
     RUN_TEST(test_let_statements_scopes);
     RUN_TEST(test_builtins);
+    RUN_TEST(test_closures);
+    RUN_TEST(test_recursive_functions);
     return UNITY_END();
 }

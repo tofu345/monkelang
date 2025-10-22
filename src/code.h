@@ -41,6 +41,10 @@ typedef enum {
     OpSetLocal,
 
     OpGetBuiltin,
+
+    OpClosure,
+    OpGetFree,
+    OpCurrentClosure,
 } Opcode;
 
 // Operands widths in bytes and number.

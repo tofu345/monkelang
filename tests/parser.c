@@ -706,6 +706,39 @@ void test_function_literal_parsing(void) {
     parser_free(&p);
 }
 
+void test_function_literal_with_name(void) {
+    char* input = "let myFunction = fn() { };";
+
+    Parser p;
+    parser_init(&p);
+    Program prog = parse(&p, input);
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
+
+    check_parser_errors(&p);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.length,
+            "wrong prog.statements length");
+
+    Node n = prog.stmts.data[0];
+    TEST_ASSERT_MESSAGE(n_LetStatement == n.typ,
+            "type not LetStatement");
+
+    LetStatement* ls = n.obj;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_FunctionLiteral, ls->value.typ,
+            "LetStatement Value is not FunctionLiteral");
+
+    FunctionLiteral* fl = ls->value.obj;
+
+    if (strcmp("myFunction", fl->name) != 0) {
+        printf("function literal name wrong. want 'myFunction', got='%s'\n",
+                fl->name);
+        TEST_FAIL();
+    }
+
+    program_free(&prog);
+    parser_free(&p);
+}
+
 void test_function_parameter_parsing(void) {
     struct Test {
         char* input;
@@ -983,6 +1016,7 @@ int main(void) {
     RUN_TEST(test_if_expression);
     RUN_TEST(test_if_else_expression);
     RUN_TEST(test_function_literal_parsing);
+    RUN_TEST(test_function_literal_with_name);
     RUN_TEST(test_function_parameter_parsing);
     RUN_TEST(test_call_expression_parsing);
     RUN_TEST(test_string_literal_expression);

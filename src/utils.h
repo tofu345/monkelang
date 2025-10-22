@@ -18,7 +18,7 @@
     } name##Buffer;                                                           \
                                                                               \
     void name##BufferInit(name##Buffer* buf);                                 \
-    void name##BufferFill(name##Buffer* buf, typ val, int length);            \
+    void name##BufferAllocate(name##Buffer* buf, int length);                 \
     void name##BufferPush(name##Buffer* buf, typ val);                        \
 
 // From: wren DEFINE_BUFFER
@@ -27,22 +27,22 @@
         *buf = (name##Buffer){};                                              \
     }                                                                         \
                                                                               \
-    void name##BufferFill(name##Buffer* buf, typ val, int length) {           \
-        if (buf->length + length >= buf->capacity) {                          \
-            int capacity = power_of_2_ceil(buf->length + length);             \
+    void name##BufferAllocate(name##Buffer* buf, int length) {                \
+        buf->length += length;                                                \
+        if (buf->length > buf->capacity) {                                    \
+            int capacity = power_of_2_ceil(buf->length);                      \
             buf->data = realloc(buf->data, capacity * sizeof(typ));           \
             if (buf->data == NULL) {                                          \
                 die("realloc %sBufferFill", #name);                           \
             }                                                                 \
             buf->capacity = capacity;                                         \
         }                                                                     \
-        for (int i = 0; i < length; i++) {                                    \
-            buf->data[(buf->length)++] = val;                                 \
-        }                                                                     \
     }                                                                         \
                                                                               \
     void name##BufferPush(name##Buffer* buf, typ val) {                       \
-        name##BufferFill(buf, val, 1);                                        \
+        int i = buf->length;                                                  \
+        name##BufferAllocate(buf, 1);                                         \
+        buf->data[i] = val;                                                   \
     }                                                                         \
 
 // from dwm :p

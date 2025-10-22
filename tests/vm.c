@@ -347,7 +347,7 @@ test_builtin_functions(void) {
     vm_test("last([1, 2, 3])", TEST(int, 3));
     vm_test("last([])", TEST_NULL);
     vm_test("rest([1, 2, 3])", TEST_ARR(2, 3));
-    vm_test("rest([])", TEST_NULL);
+    vm_test("rest([])", TEST_ARR(0));
     vm_test("push([], 1)", TEST_ARR(1));
 
     vm_test_error("len(1)", "builtin len(): argument of Integer not supported");
@@ -355,6 +355,152 @@ test_builtin_functions(void) {
     vm_test_error("first(1)", "builtin first(): argument of Integer not supported");
     vm_test_error("last(1)", "builtin last(): argument of Integer not supported");
     vm_test_error("push(1, 1)", "builtin push() expects first argument to be Array got Integer");
+}
+
+static void
+test_closures(void) {
+    vm_test(
+        "\
+        let newClosure = fn(a) {\
+            fn() { a; };\
+        };\
+        let closure = newClosure(99);\
+        closure();\
+        ",
+        TEST(int, 99)
+    );
+    vm_test(
+        "\
+        let newAdder = fn(a, b) {\
+            fn(c) { a + b + c };\
+        };\
+        let adder = newAdder(1, 2);\
+        adder(8);\
+        ",
+        TEST(int, 11)
+    );
+    vm_test(
+        "\
+        let newAdder = fn(a, b) {\
+            let c = a + b;\
+            fn(d) { c + d };\
+        };\
+        let adder = newAdder(1, 2);\
+        adder(8);\
+        ",
+        TEST(int, 11)
+    );
+    vm_test(
+        "\
+        let newAdderOuter = fn(a, b) {\
+            let c = a + b;\
+            fn(d) {\
+                let e = d + c;\
+                fn(f) { e + f; };\
+            };\
+        };\
+        let newAdderInner = newAdderOuter(1, 2)\
+        let adder = newAdderInner(3);\
+        adder(8);\
+        ",
+        TEST(int, 14)
+    );
+    vm_test(
+        "\
+        let a = 1;\
+        let newAdderOuter = fn(b) {\
+            fn(c) {\
+                fn(d) { a + b + c + d };\
+            };\
+        };\
+        let newAdderInner = newAdderOuter(2)\
+        let adder = newAdderInner(3);\
+        adder(8);\
+        ",
+        TEST(int, 14)
+    );
+    vm_test(
+        "\
+        let newClosure = fn(a, b) {\
+            let one = fn() { a; };\
+            let two = fn() { b; };\
+            fn() { one() + two(); };\
+        };\
+        let closure = newClosure(9, 90);\
+        closure();\
+        ",
+        TEST(int, 99)
+    );
+}
+
+static void
+test_recursive_functions(void) {
+    vm_test(
+        "\
+        let countDown = fn(x) {\
+            if (x == 0) {\
+                return 0;\
+            } else {\
+                countDown(x - 1);\
+            }\
+        };\
+        countDown(1);\
+        ",
+        TEST(int, 0)
+    );
+    vm_test(
+        "\
+        let countDown = fn(x) {\
+            if (x == 0) {\
+                return 0;\
+            } else {\
+                countDown(x - 1);\
+            }\
+        };\
+        let wrapper = fn() {\
+            countDown(1);\
+        };\
+        wrapper();\
+        ",
+        TEST(int, 0)
+    );
+    vm_test(
+        "\
+        let wrapper = fn() {\
+            let countDown = fn(x) {\
+                if (x == 0) {\
+                    return 0;\
+                } else {\
+                    countDown(x - 1);\
+                }\
+            };\
+            countDown(1);\
+        };\
+        wrapper();\
+        ",
+        TEST(int, 0)
+    );
+}
+
+static void
+test_recursive_fibonacci(void) {
+    vm_test(
+        "\
+        let fibonacci = fn(x) {\
+            if (x == 0) {\
+                return 0;\
+            } else {\
+                if (x == 1) {\
+                    return 1;\
+                } else {\
+                    fibonacci(x - 1) + fibonacci(x - 2);\
+                }\
+            }\
+        };\
+        fibonacci(15);\
+        ",
+        TEST(int, 610)
+    );
 }
 
 static TestArray *
@@ -492,7 +638,7 @@ test_expected_object(Test expected, Object actual) {
                 int err;
                 for (int i = 0; i < expected.val._arr->length; i++) {
                     err = test_integer_object(expected.val._arr->data[i],
-                                arr->data[i]);
+                            arr->data[i]);
                     if (err != 0) {
                         printf("test array element %d: test_integer_object failed", i);
                         return -1;
@@ -564,8 +710,30 @@ vm_test(char *input, Test *expected) {
         TEST_FAIL();
     };
 
-    vm_with(&vm, bytecode(&c));
-    err = vm_run(&vm);
+    // // display constants
+    // Constant cn;
+    // for (int i = 0; i < c.constants.length; i++) {
+    //     cn = c.constants.data[i];
+    //     printf("CONSTANT %d ", i);
+    //     switch (cn.type) {
+    //         case c_Function:
+    //             printf("Instructions:\n");
+    //             fprint_instructions(stdout, cn.data.function->instructions);
+    //             break;
+    //         case c_Integer:
+    //             printf("Value: %ld\n", cn.data.integer);
+    //             break;
+    //         case c_Float:
+    //             printf("Value: %f\n", cn.data.floating);
+    //             break;
+    //         case c_String:
+    //             printf("Value: %s\n", cn.data.string->data);
+    //             break;
+    //     }
+    // }
+    // putc('\n', stdout);
+
+    err = vm_run(&vm, bytecode(&c));
     if (err) {
         printf("test: %s\n", input);
         printf("vm error: %s\n\n", err);
@@ -589,6 +757,7 @@ vm_test(char *input, Test *expected) {
             i++) {
         vm.stack[i] = (Object){};
     }
+    memset(vm.globals, 0, vm.num_globals * sizeof(Object));
 
     program_free(&prog);
     compiler_free(&c);
@@ -615,9 +784,8 @@ vm_test_error(char *input, char *expected_error) {
         TEST_FAIL();
     };
 
-    vm_with(&vm, bytecode(&c));
-    err = vm_run(&vm);
-    vm.sp = 0; // because VM is shared across tests.
+    err = vm_run(&vm, bytecode(&c));
+    vm.sp = 0; // because of error
     if (!err) {
         program_free(&prog);
         compiler_free(&c);
@@ -639,6 +807,7 @@ vm_test_error(char *input, char *expected_error) {
             i++) {
         vm.stack[i] = (Object){};
     }
+    memset(vm.globals, 0, vm.num_globals * sizeof(Object));
 
     free(err);
     program_free(&prog);
@@ -664,6 +833,9 @@ int main(void) {
     RUN_TEST(test_calling_functions_with_bindings);
     RUN_TEST(test_calling_functions_with_wrong_arguments);
     RUN_TEST(test_builtin_functions);
+    RUN_TEST(test_closures);
+    RUN_TEST(test_recursive_functions);
+    RUN_TEST(test_recursive_fibonacci);
 
     vm_free(&vm);
     return UNITY_END();

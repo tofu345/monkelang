@@ -344,6 +344,8 @@ static Node
 parse_function_literal(Parser* p) {
     FunctionLiteral* fl = allocate(sizeof(FunctionLiteral));
     fl->tok = p->cur_token;
+    fl->name = NULL;
+
     if (!expect_peek(p, t_Lparen)) {
         free(fl->tok.literal);
         free(fl);
@@ -599,6 +601,11 @@ parse_let_statement(Parser* p) {
     if (stmt->value.obj == NULL) {
         node_free(NODE(n_LetStatement, stmt));
         return (Node){};
+    }
+
+    if (stmt->value.typ == n_FunctionLiteral) {
+        FunctionLiteral *fl = stmt->value.obj;
+        fl->name = stmt->name->tok.literal;
     }
 
     if (peek_token_is(p, t_Semicolon)) {

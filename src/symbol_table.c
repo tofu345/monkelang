@@ -4,52 +4,58 @@
 
 #include <stdbool.h>
 
+DEFINE_BUFFER(Symbol, Symbol *);
+
 void symbol_table_init(SymbolTable *st) {
-    st->num_definitions = 0;
-    st->outer = NULL;
+    memset(st, 0, sizeof(SymbolTable));
     st->store = ht_create();
     if (st->store == NULL) { die("symbol_table_init"); }
 }
 
 void enclosed_symbol_table(SymbolTable *st, SymbolTable *outer) {
-    st->num_definitions = 0;
+    symbol_table_init(st);
     st->outer = outer;
-    st->store = ht_create();
-    if (st->store == NULL) { die("enclosed_symbol_table"); }
+}
+
+static void
+free_symbol(Symbol *s) {
+    // name is not copied for [FreeScope] and [BuiltinScope]
+    if (s->scope < FreeScope) {
+        free(s->name);
+    }
+
+    free(s);
 }
 
 void symbol_table_free(SymbolTable *st) {
     hti it = ht_iterator(st->store);
-    Symbol *cur;
     while (ht_next(&it)) {
-        cur = it.current->value;
-        if (cur->scope != BuiltinScope) {
-            free(cur->name);
-        }
-        free(cur);
+        free_symbol(it.current->value);
     }
     ht_destroy(st->store);
+    free(st->free_symbols.data);
 }
 
 static Symbol *
-new_symbol(SymbolTable *st, char *name, int index, SymbolScope scope, bool copy_name) {
+new_symbol(SymbolTable *st, char *name, int index, SymbolScope scope,
+        bool copy_name) {
     Symbol *symbol = malloc(sizeof(Symbol));
     if (symbol == NULL) { die("new_symbol: malloc"); }
-
-    void *ptr = ht_set(st->store, name, symbol);
-    if (ptr == NULL) {
-        die("new_symbol: ht_set");
-
-    // previous symbol with same [name]
-    } else if (ptr != symbol) {
-        memcpy(symbol, ptr, sizeof(Symbol));
-        free(ptr);
-        return symbol;
-    }
 
     if (copy_name) {
         name = strdup(name);
         if (name == NULL) { die("new_symbol: strdup"); }
+    }
+
+    Symbol *ptr = ht_set(st->store, name, symbol);
+    if (ptr == NULL) {
+        die("new_symbol: ht_set");
+
+    // replace previous symbol with same [name]
+    } else if (ptr != symbol) {
+        if (copy_name) { free(name); }
+        name = ptr->name;
+        free(ptr);
     }
 
     *symbol = (Symbol) {
@@ -59,6 +65,13 @@ new_symbol(SymbolTable *st, char *name, int index, SymbolScope scope, bool copy_
     };
 
     return symbol;
+}
+
+static Symbol *
+define_free(SymbolTable *st, Symbol *original) {
+    SymbolBufferPush(&st->free_symbols, original);
+    return new_symbol(st, original->name, st->free_symbols.length - 1,
+            FreeScope, false);
 }
 
 Symbol *sym_define(SymbolTable *st, char *name) {
@@ -75,11 +88,24 @@ Symbol *sym_define(SymbolTable *st, char *name) {
 Symbol *sym_resolve(SymbolTable *st, char *name) {
     Symbol* sym = ht_get(st->store, name);
     if (sym == NULL && st->outer != NULL) {
-        return sym_resolve(st->outer, name);
+        sym = sym_resolve(st->outer, name);
+        if (sym == NULL) { return sym; }
+
+        switch (sym->scope) {
+            case GlobalScope:
+            case BuiltinScope:
+                return sym;
+            default:
+                return define_free(st, sym);
+        }
     }
     return sym;
 }
 
-Symbol *define_builtin(SymbolTable *st, int index, const char *name) {
+Symbol *sym_function_name(SymbolTable *st, char *name) {
+    return new_symbol(st, name, 0, FunctionScope, true);
+}
+
+Symbol *sym_builtin(SymbolTable *st, int index, const char *name) {
     return new_symbol(st, (char *)name, index, BuiltinScope, false);
 }

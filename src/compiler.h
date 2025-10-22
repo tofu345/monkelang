@@ -18,17 +18,13 @@ typedef struct {
 } CompilationScope;
 
 BUFFER(Scope, CompilationScope);
-
-typedef struct {
-    SymbolTable *data;
-    int length, capacity;
-} SymbolTables;
+BUFFER(SymbolTable, SymbolTable *);
 
 typedef struct {
     ConstantBuffer constants;
 
     SymbolTable *cur_symbol_table;
-    SymbolTables symbol_tables;
+    SymbolTableBuffer symbol_tables;
 
     Instructions *current_instructions;
     ScopeBuffer scopes;
@@ -49,6 +45,9 @@ Instructions *leave_scope(Compiler *c);
 typedef struct {
     Instructions *instructions;
     ConstantBuffer *constants;
+
+    // NOTE: does not account for reassigning variables to same name.
+    int num_globals;
 } Bytecode;
 
 Bytecode bytecode(Compiler *c);

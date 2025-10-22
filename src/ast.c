@@ -78,7 +78,11 @@ fprint_if_expression(IfExpression* ie, FILE* fp) {
 
 static int
 fprint_function_literal(FunctionLiteral* fl, FILE* fp) {
-    FPRINTF(fp, "%s(", fl->tok.literal);
+    FPRINTF(fp, "%s", fl->tok.literal);
+    if (fl->name != NULL) {
+        FPRINTF(fp, "<%s>", fl->name);
+    }
+    FPRINTF(fp, "(");
     for (int i = 0; i < fl->params.length - 1; i++) {
         fprint_identifier(fl->params.data[i], fp);
         FPRINTF(fp, ", ");

@@ -6,7 +6,7 @@ void free_constant(Constant c) {
     switch (c.type) {
         case c_Function:
             {
-                CompiledFunction *ins = c.data.function;
+                Function *ins = c.data.function;
                 free(ins->instructions.data);
                 free(ins);
                 break;

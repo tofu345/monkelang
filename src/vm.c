@@ -10,6 +10,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 const Object _true = BOOL(true);
@@ -41,22 +42,12 @@ void vm_init(VM *vm, Object *stack, Object *globals, Frame *frames) {
     vm->frames = frames;
 }
 
-void vm_with(VM *vm, Bytecode bytecode) {
-    CompiledFunction main_fn = {
-        .instructions = *bytecode.instructions
-    };
-    frame_init(vm->frames, main_fn, 0);
-
-    vm->constants = *bytecode.constants;
-}
-
 Object object_copy(VM* vm, Object obj) {
     switch (obj.type) {
         case o_Null:
         case o_Integer:
         case o_Float:
         case o_Boolean:
-        case o_CompiledFunction:
         case o_BuiltinFunction:
             return obj;
 
@@ -128,10 +119,11 @@ pop_frame(VM *vm) {
 // create new frame if less than [MaxFraxes]
 static error
 new_frame(VM *vm) {
-    if (vm->frames_index >= MaxFraxes) {
-        return new_error("too many frames");
-    }
     vm->frames_index++;
+    if (vm->frames_index >= MaxFraxes) {
+        vm->frames_index = 0;
+        return new_error("exceeded maximum function call stack");
+    }
     return 0;
 }
 
@@ -429,8 +421,8 @@ vm_push_constant(VM *vm, Constant c) {
                 return vm_push(vm, OBJ(o_String, .string = str_buf));
             }
 
-        case c_Function:
-            return vm_push(vm, OBJ(o_CompiledFunction, .func = c.data.function));
+        // case c_Function:
+        //     return vm_push(vm, OBJ(o_Function, .func = c.data.function));
 
         default:
             die("vm_push_constant: type %d not handled", c.type);
@@ -482,30 +474,33 @@ build_hash(VM *vm, int start_index, int end_index) {
 }
 
 static error
-call_function(VM *vm, Object fn, int num_args) {
-    CompiledFunction *func = fn.data.func;
-    if (num_args != func->num_parameters) {
-        return error_num_args("function", func->num_parameters, num_args);
+call_closure(VM *vm, Closure *cl, int num_args) {
+    Function *fn = cl->func;
+    if (num_args != fn->num_parameters) {
+        return error_num_args("function", fn->num_parameters, num_args);
     }
 
     error err = new_frame(vm);
     if (err) { return err; }
 
+    int base_pointer = vm->sp - num_args;
+
+    // get new frame
     Frame *f = vm->frames + vm->frames_index;
-    int base_pointer = vm->sp - num_args; // points to first argument
-    frame_init(f, *func, base_pointer);
-    vm->sp = base_pointer + func->num_locals;
+    frame_init(f, cl, base_pointer);
+
+    vm->sp = base_pointer + fn->num_locals;
+
     return 0;
 }
 
 static error
-call_builtin(VM *vm, Object builtin, int num_args) {
+call_builtin(VM *vm, Builtin *builtin, int num_args) {
     Object *args = vm->stack + vm->sp - num_args;
-    Builtin *fn = builtin.data.ptr;
-    Object result = fn(vm, args, num_args);
+    Object result = builtin(vm, args, num_args);
 
     // remove arguments and [Builtin] from stack.
-    vm->sp = vm->sp - num_args - 1;
+    vm->sp -= num_args + 1;
 
     switch (result.type) {
         case o_Error:
@@ -521,25 +516,55 @@ static error
 execute_call(VM *vm, int num_args) {
     Object callee = vm->stack[vm->sp - 1 - num_args];
     switch (callee.type) {
-        case o_CompiledFunction:
-            return call_function(vm, callee, num_args);
+        case o_Closure:
+            return call_closure(vm, callee.data.closure, num_args);
         case o_BuiltinFunction:
-            return call_builtin(vm, callee, num_args);
+            return call_builtin(vm, callee.data.ptr, num_args);
         default:
             return new_error("calling non-function and non-builtin");
     }
 }
 
-error vm_run(VM *vm) {
-    Opcode op;
-    int pos, num;
-    Object obj;
+static error
+vm_push_closure(VM *vm, int const_index, int num_free) {
+    Constant constant = vm->constants.data[const_index];
 
-    int ip;
-    const Builtins *builtins = get_builtins();
+    if (constant.type != c_Function) {
+        return new_error("not a function: constant %d", const_index);
+    }
+
+    size_t free_size = num_free * sizeof(Object),
+           size = sizeof(Closure) + free_size;
+    Closure *closure = compound_obj(vm, o_Closure, size, NULL);
+    closure->num_free = num_free;
+    closure->func = constant.data.function;
+
+    if (num_free > 0) {
+        vm->sp -= num_free;
+        memcpy(closure->free, vm->stack + vm->sp, free_size);
+    }
+    return vm_push(vm, OBJ(o_Closure, .closure = closure));
+}
+
+error vm_run(VM *vm, Bytecode bytecode) {
+    // setup
+    Function main_fn = {
+        .instructions = *bytecode.instructions,
+        .num_locals = 0,
+        .num_parameters = 0,
+    };
+    Closure main_closure = { .func = &main_fn, .num_free = 0 };
+    frame_init(vm->frames, &main_closure, 0);
+    vm->num_globals = bytecode.num_globals;
+    vm->constants = *bytecode.constants;
+
     Frame *current_frame = vm->frames;
     Instructions ins = instructions(current_frame);
 
+    const Builtins *builtins = get_builtins();
+    Opcode op;
+    int ip, pos, num;
+    Object obj;
     error err;
     while (current_frame->ip < ins.length - 1) {
         ip = ++current_frame->ip;
@@ -547,11 +572,11 @@ error vm_run(VM *vm) {
 
         switch (op) {
             case OpConstant:
-                // constants index
-                num = read_big_endian_uint16(ins.data + ip + 1);
+                // constant index
+                pos = read_big_endian_uint16(ins.data + ip + 1);
                 current_frame->ip += 2;
 
-                err = vm_push_constant(vm, vm->constants.data[num]);
+                err = vm_push_constant(vm, vm->constants.data[pos]);
                 if (err) { return err; };
                 break;
 
@@ -718,6 +743,32 @@ error vm_run(VM *vm) {
                 if (err) { return err; };
                 break;
 
+            case OpClosure:
+                // constant index
+                pos = read_big_endian_uint16(ins.data + ip + 1);
+                // num free variables
+                num = read_big_endian_uint8(ins.data + ip + 3);
+                current_frame->ip += 3;
+
+                err = vm_push_closure(vm, pos, num);
+                if (err) { return err; };
+                break;
+
+            case OpGetFree:
+                // free variable index
+                pos = read_big_endian_uint8(ins.data + ip + 1);
+                current_frame->ip += 1;
+
+                err = vm_push(vm, current_frame->cl->free[pos]);
+                if (err) { return err; };
+                break;
+
+            case OpCurrentClosure:
+                err = vm_push(vm,
+                        OBJ(o_Closure, .closure = current_frame->cl));
+                if (err) { return err; };
+                break;
+
             default:
                 return new_error("unknown opcode %d", op);
         }
@@ -752,7 +803,6 @@ trace_mark_object(Object obj) {
         case o_Integer:
         case o_Float:
         case o_Boolean:
-        case o_CompiledFunction:
         case o_BuiltinFunction:
         case o_Error:
             return;
@@ -760,6 +810,15 @@ trace_mark_object(Object obj) {
         case o_String:
             mark_alloc(obj);
             return;
+
+        case o_Closure:
+            {
+                mark_alloc(obj);
+
+                for (int i = 0; i < obj.data.closure->num_free; i++)
+                    trace_mark_object(obj.data.closure->free[i]);
+                return;
+            }
 
         case o_Array:
             {
@@ -808,6 +867,9 @@ alloc_free(Alloc *alloc) {
             table_free(obj_data);
             break;
 
+        case o_Closure:
+            break;
+
         default:
             die("alloc_free: %d typ not handled\n", alloc->type);
             return;
@@ -835,10 +897,7 @@ void mark_objs(Object *objs, int len) {
 
 void mark_and_sweep(VM *vm) {
     mark_objs(vm->stack, vm->sp);
-
-    // mark entire [vm->globals] to be safe.
-    // FIXME TODO: store max number of global variables.
-    mark_objs(vm->globals, GlobalsSize);
+    mark_objs(vm->globals, vm->num_globals);
 
     // sweep
     Alloc *cur;

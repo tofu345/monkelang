@@ -19,6 +19,7 @@ void test_make(void) {
         {make(OpConstant, 65534), {OpConstant, 255, 254}},
         {make(OpAdd), {OpAdd}},
         {make(OpGetLocal, 255), {OpGetLocal, 255}},
+        {make(OpClosure, 65534, 255), {OpClosure, 255, 254, 255}},
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
 
@@ -45,13 +46,15 @@ void test_instructions_string(void) {
     Instructions test = {};
     make_into(&test, OpAdd);
     make_into(&test, OpGetLocal, 1);
-    make_into(&test, OpGetLocal, 2);
+    make_into(&test, OpConstant, 2);
     make_into(&test, OpConstant, 65535);
+    make_into(&test, OpClosure, 65535, 255);
 
     char *expected_body = "0000 OpAdd\n\
 0001 OpGetLocal 1\n\
-0003 OpGetLocal 2\n\
-0005 OpConstant 65535\n";
+0003 OpConstant 2\n\
+0006 OpConstant 65535\n\
+0009 OpClosure 65535 255\n";
 
     char *buf = NULL;
     size_t len;
@@ -84,6 +87,7 @@ void test_read_operands(void) {
         Instructions actual;
     } tests[] = {
         _TEST(2, OpConstant, 65535),
+        _TEST(3, OpClosure, 65535, 255),
     };
     int length = sizeof(tests) / sizeof(tests[0]);
 

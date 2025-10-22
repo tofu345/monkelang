@@ -127,6 +127,8 @@ typedef struct {
     Token tok; // the 'fn' token
     ParamBuffer params;
     BlockStatement* body;
+    // points to [LetStatement].name.tok.literal if in [LetStatement]
+    char *name;
 } FunctionLiteral;
 
 void free_function_literal(FunctionLiteral* fl);

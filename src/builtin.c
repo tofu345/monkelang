@@ -3,6 +3,7 @@
 #include "vm.h"
 #include "table.h" // provides type for "table"
 
+#include <stdio.h>
 #include <string.h>
 
 #define ERR_NUM_ARGS(...) OBJ(o_Error, .err = error_num_args(__VA_ARGS__))
@@ -123,7 +124,9 @@ Object builtin_rest(VM *vm, Object *args, int num_args) {
                     return OBJ(o_Array, .array = new_arr);
 
                 } else {
-                    return NULL_OBJ;
+                    new_arr = compound_obj(vm, o_Array, sizeof(ObjectBuffer), NULL);
+                    memset(new_arr, 0, sizeof(ObjectBuffer));
+                    return OBJ(o_Array, .array = new_arr);
                 }
             }
 
@@ -147,13 +150,22 @@ Object builtin_push([[maybe_unused]] VM *vm, Object *args, int num_args) {
     return args[0];
 }
 
+static void
+_puts(Object obj) {
+    if (obj.type == o_String) {
+        printf("%s", obj.data.string->data);
+    } else {
+        object_fprint(obj, stdout);
+    }
+}
+
 Object builtin_puts([[maybe_unused]] VM *vm, Object *args, int num_args) {
     for (int i = 0; i < num_args - 1; i++) {
-        object_fprint(args[i], stdout);
+        _puts(args[i]);
         printf(" ");
     }
     if (num_args >= 1)
-        object_fprint(args[num_args - 1], stdout);
+        _puts(args[num_args - 1]);
 
     putc('\n', stdout);
     return NULL_OBJ;

@@ -12,7 +12,7 @@ typedef struct {
     Instructions instructions;
     int num_locals;
     int num_parameters;
-} CompiledFunction;
+} Function;
 
 typedef enum {
     c_Integer = 1,
@@ -29,7 +29,7 @@ typedef struct {
         long integer;
         double floating;
         StringConstant *string;
-        CompiledFunction *function;
+        Function *function;
     } data;
 } Constant;
 

@@ -12,8 +12,12 @@
 
 const int _two_widths[] = { 2 };
 const Operands _two = { .widths = (int *)_two_widths, .length = 1 };
+
 const int _one_widths[] = { 1 };
 const Operands _one = { .widths = (int *)_one_widths, .length = 1 };
+
+const int _closure_widths[] = { 2, 1 };
+const Operands _closure = { .widths = (int *)_closure_widths, .length = 2 };
 
 const Definition definitions[] = {
     DEF(OpConstant, two), // constant index
@@ -43,6 +47,11 @@ const Definition definitions[] = {
     DEF(OpGetLocal, one), // locals index
     DEF(OpSetLocal, one), // locals index
     DEF(OpGetBuiltin, one), // builtin fn index
+
+    // constant index of Function and number of free variables
+    DEF(OpClosure, closure),
+    DEF(OpGetFree, one), // free variable index
+    DEF_EMPTY(OpCurrentClosure),
 };
 
 const Definition *
@@ -181,9 +190,13 @@ fprint_definition_operands(FILE *out, const Definition *def, Operands operands) 
         case 1:
             FPRINTF(out, "%s %d\n", def->name, operands.widths[0]);
             return 0;
+        case 2:
+            FPRINTF(out, "%s %d %d\n", def->name, operands.widths[0], operands.widths[1]);
+            return 0;
+        default:
+            FPRINTF(out, "ERROR: unhandled operand_count for %s\n", def->name);
+            return 0;
     }
-    FPRINTF(out, "ERROR: unhandled operand_count for %s\n", def->name);
-    return 0;
 }
 
 int fprint_instructions(FILE *out, Instructions ins) {

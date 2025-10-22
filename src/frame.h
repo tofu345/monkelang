@@ -4,9 +4,10 @@
 #include "object.h"
 
 typedef struct {
-    CompiledFunction fn;
+    Closure *cl;
+
     int ip; // instruction pointer
-    // points to bottom of stack for current function 
+    // points to bottom of stack for current function
     // (normally the first argument).
     int base_pointer;
 
@@ -15,5 +16,5 @@ typedef struct {
     ObjectBuffer args;
 } Frame;
 
-void frame_init(Frame *f, CompiledFunction fn, int base_pointer);
+void frame_init(Frame *f, Closure *cl, int base_pointer);
 Instructions instructions(Frame *f);

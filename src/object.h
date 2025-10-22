@@ -9,9 +9,11 @@
 
 // TODO:
 // - char datatype
-// - Hash -> Table, CompiledFunction -> Function
+// - Hash -> Table
 // - show_object_type() lowercase type names
 // - support Unicode and emoji's
+//
+// - stack tracing
 
 #define OBJ(t, d) (Object){ .type = t, .data = { d } }
 #define ERR(...) OBJ(o_Error, .err = new_error(__VA_ARGS__))
@@ -24,6 +26,7 @@ typedef struct Object Object;
 BUFFER(Object, Object);
 BUFFER(Char, char);
 typedef struct table table;
+typedef struct Closure Closure;
 
 typedef enum __attribute__ ((__packed__)) {
     // Primitive data types:
@@ -32,7 +35,6 @@ typedef enum __attribute__ ((__packed__)) {
     o_Integer,
     o_Float,
     o_Boolean,
-    o_CompiledFunction,
     o_BuiltinFunction,
     o_Error,
 
@@ -40,6 +42,7 @@ typedef enum __attribute__ ((__packed__)) {
     o_String,
     o_Array,
     o_Hash,
+    o_Closure,
 } ObjectType;
 
 typedef union {
@@ -50,7 +53,7 @@ typedef union {
     CharBuffer* string;
     ObjectBuffer* array;
     table* hash;
-    CompiledFunction *func;
+    Closure *closure;
     error err;
     void *ptr;
 } ObjectData;
@@ -67,3 +70,10 @@ Object object_eq(Object left, Object right);
 
 // print [Object] to [fp], returns -1 on error
 int object_fprint(Object o, FILE* fp);
+
+struct Closure {
+    Function *func;
+
+    int num_free;
+    Object free[]; // free variables
+};

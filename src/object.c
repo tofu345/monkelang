@@ -76,7 +76,7 @@ fprint_hash(table *tbl, FILE* fp) {
 }
 
 static int
-fprint_compiled_function(CompiledFunction *func, FILE *fp) {
+fprint_function(void *func, FILE *fp) {
     FPRINTF(fp, "Function[%p]", func);
     return 0;
 }
@@ -108,12 +108,12 @@ int object_fprint(Object o, FILE* fp) {
         case o_Hash:
             return fprint_hash(o.data.hash, fp);
 
-        case o_CompiledFunction:
-            return fprint_compiled_function(o.data.func, fp);
-
         case o_BuiltinFunction:
             FPRINTF(fp, "Builtin");
             return 0;
+
+        case o_Closure:
+            return fprint_function(o.data.closure, fp);
 
         default:
             fprintf(stderr, "object_fprint: object type not handled %d\n",

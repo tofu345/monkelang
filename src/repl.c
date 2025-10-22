@@ -14,6 +14,7 @@ print_errors(FILE* out, ErrorBuffer *buf) {
         fprintf(out, "%s\n", buf->data[i]);
         free(buf->data[i]);
     }
+    buf->length = 0;
 }
 
 BUFFER(Program, Program);
@@ -55,16 +56,15 @@ void repl(FILE* in, FILE* out) {
         }
 
         err = compile(&c, &prog);
-        if (err != 0) {
+        if (err) {
             fprintf(out, "Woops! Compilation failed:\n");
             puts(err);
             free(err);
             goto cleanup;
         }
 
-        vm_with(&vm, bytecode(&c));
-        err = vm_run(&vm);
-        if (err != 0) {
+        err = vm_run(&vm, bytecode(&c));
+        if (err) {
             fprintf(out, "Woops! Executing bytecode failed:\n");
             puts(err);
             free(err);
@@ -80,13 +80,53 @@ cleanup:
         free(input);
         free(p.peek_token.literal);
         p.peek_token.literal = NULL;
-        p.errors.length = 0;
         c.scopes.data[0].instructions.length = 0; // reset main scope
     }
 
     for (int i = 0; i < programs.length; i++)
         program_free(&programs.data[i]);
     free(programs.data);
+    parser_free(&p);
+    compiler_free(&c);
+    vm_free(&vm);
+}
+
+void run(char* program) {
+    Parser p;
+    Program prog;
+    Compiler c;
+    VM vm;
+    error err;
+
+    parser_init(&p);
+    compiler_init(&c);
+    vm_init(&vm, NULL, NULL, NULL);
+
+    prog = parse(&p, program);
+    if (p.errors.length > 0) {
+        fprintf(stdout, "Woops! We ran into some monkey business here!\n");
+        print_errors(stdout, &p.errors);
+        goto cleanup;
+    }
+
+    err = compile(&c, &prog);
+    if (err) {
+        fprintf(stdout, "Woops! Compilation failed:\n");
+        puts(err);
+        free(err);
+        goto cleanup;
+    }
+
+    err = vm_run(&vm, bytecode(&c));
+    if (err) {
+        fprintf(stdout, "Woops! Executing bytecode failed:\n");
+        puts(err);
+        free(err);
+        goto cleanup;
+    }
+
+cleanup:
+    program_free(&prog);
     parser_free(&p);
     compiler_free(&c);
     vm_free(&vm);

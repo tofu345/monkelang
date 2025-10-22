@@ -12,7 +12,7 @@ static const int GlobalsSize = 2048;
 static const int MaxFraxes = 1024;
 
 // Number of bytes allocated before GC is run.
-static const int NextGC = 1;
+static const int NextGC = 1024;
 
 typedef struct {
     ObjectType type;
@@ -31,6 +31,7 @@ typedef struct {
 
     // contains global variables
     Object *globals;
+    int num_globals;
 
     Frame *frames; // function call stack
     uint16_t frames_index; // index of current frame
@@ -42,12 +43,9 @@ typedef struct {
 
 // if [stack], [globals] or [frames] are NULL, allocate.
 void vm_init(VM *vm, Object *stack, Object *globals, Frame *frames);
-
-// prepare to run [bytecode]
-void vm_with(VM *vm, Bytecode bytecode);
 void vm_free(VM *vm);
 
-error vm_run(VM *vm);
+error vm_run(VM *vm, Bytecode bytecode);
 
 Object vm_last_popped(VM *vm);
 error vm_push(VM *vm, Object obj);
