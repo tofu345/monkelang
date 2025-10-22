@@ -231,7 +231,7 @@ const char* object_types[] = {
 
 const char* show_object_type(ObjectType t) {
     static size_t len = sizeof(object_types) / sizeof(object_types[0]);
-    if (t < 0 || t >= len) {
+    if (t >= len) {
         fprintf(stderr, "show_object_type: invalid object_type %d\n", t);
         exit(1);
     }
