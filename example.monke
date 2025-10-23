@@ -13,18 +13,6 @@ let fibonacci = fn(num) {
     fib(num);
 };
 
-let fibonacci_slow = fn(x) {
-    if (x == 0) {
-        0
-    } else {
-        if (x == 1) {
-            return 1;
-        } else {
-            fibonacci_slow(x - 1) + fibonacci_slow(x - 2);
-        }
-    }
-};
-
 let map = fn(f, arr) {
     let iter = fn(arr, accumulated) {
         if (len(arr) == 0) {
@@ -56,7 +44,6 @@ puts("numbers:", numbers);
 puts("map(fibonacci, numbers):", map(fibonacci, numbers));
 
 puts("fibonacci of 35:", fibonacci(35));
-// puts("fibonacci of 35:", fibonacci_slow(35));
 
 let a = [1, 2, 3, 4];
 let double = fn(x) { x * 2 };

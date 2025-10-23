@@ -510,19 +510,28 @@ test_assign_expressions(void) {
     vm_test("let a = null; a = 5;", TEST(int, 5));
 
     // definitely intended behaviour.
-    vm_test("\
+    vm_test(
+        "\
             let a = 5;\
             let b = a = 10;\
             b + a\
         ",
         TEST(int, 20)
     );
-    vm_test("\
+    vm_test(
+        "\
             let a = {1: 2};\
             let b = a[1] = null;\
             b;\
         ",
         TEST(int, 2)
+    );
+    vm_test(
+        "\
+            let a = 1;\
+            a = a + 1 + a = 5;\
+        ",
+        TEST(int, 7)
     );
 }
 
