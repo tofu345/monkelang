@@ -23,12 +23,13 @@ BUFFER(SymbolTable, SymbolTable *);
 typedef struct {
     ConstantBuffer constants;
 
-    SymbolTable *cur_symbol_table;
+    SymbolTable *current_symbol_table;
     SymbolTableBuffer symbol_tables;
 
-    Instructions *current_instructions;
     ScopeBuffer scopes;
-    int scope_index;
+    int scope_index; // index of current [CompilationScope]
+    // instructions of current [CompilationScope]
+    Instructions *current_instructions;
 } Compiler;
 
 void compiler_init(Compiler *c);

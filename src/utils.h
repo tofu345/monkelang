@@ -33,7 +33,7 @@
             int capacity = power_of_2_ceil(buf->length);                      \
             buf->data = realloc(buf->data, capacity * sizeof(typ));           \
             if (buf->data == NULL) {                                          \
-                die("realloc %sBufferFill", #name);                           \
+                die("realloc %sBuffer", #name);                               \
             }                                                                 \
             buf->capacity = capacity;                                         \
         }                                                                     \

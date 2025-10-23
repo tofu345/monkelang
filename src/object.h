@@ -27,6 +27,7 @@ BUFFER(Object, Object);
 BUFFER(Char, char);
 typedef struct table table;
 typedef struct Closure Closure;
+typedef struct Builtin Builtin;
 
 typedef enum __attribute__ ((__packed__)) {
     // Primitive data types:
@@ -55,6 +56,8 @@ typedef union {
     table* hash;
     Closure *closure;
     error err;
+    const struct Builtin *builtin;
+
     void *ptr;
 } ObjectData;
 
@@ -75,5 +78,5 @@ struct Closure {
     Function *func;
 
     int num_free;
-    Object free[]; // free variables
+    Object free[]; // free variables, see [symbol_table.h/FreeScope]
 };

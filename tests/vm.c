@@ -711,13 +711,12 @@ vm_test(char *input, Test *expected) {
     };
 
     // // display constants
-    // Constant cn;
     // for (int i = 0; i < c.constants.length; i++) {
-    //     cn = c.constants.data[i];
+    //     Constant cn = c.constants.data[i];
     //     printf("CONSTANT %d ", i);
     //     switch (cn.type) {
     //         case c_Function:
-    //             printf("Instructions:\n");
+    //             printf("Instructions %s:\n", cn.data.function->name);
     //             fprint_instructions(stdout, cn.data.function->instructions);
     //             break;
     //         case c_Integer:

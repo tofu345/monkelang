@@ -7,8 +7,10 @@
 char* read_file(char* filename) {
     FILE *fp = fopen(filename, "r");
     if (fp == NULL) {
-        fprintf(stderr, "error: could not open file %s", filename);
+        fprintf(stderr, "error: could not open file %s\n", filename);
+        return NULL;
     }
+
     fseek(fp, 0, SEEK_END);
     long bufsize = ftell(fp);
     rewind(fp);
@@ -16,7 +18,10 @@ char* read_file(char* filename) {
     char* buf = malloc((bufsize + 1) * sizeof(char));
     size_t new_len = fread(buf, sizeof(char), bufsize, fp);
     if (ferror(fp) != 0) {
-        fprintf(stderr, "error: could not read file %s", filename);
+        fprintf(stderr, "error: could not read file %s\n", filename);
+        fclose(fp);
+        return NULL;
+
     } else {
         buf[new_len++] = '\0';
     }
@@ -26,9 +31,12 @@ char* read_file(char* filename) {
 
 int run_program(char* filename) {
     char* program = read_file(filename);
-    run(program);
-    free(program);
-    return EXIT_SUCCESS;
+    if (program) {
+        run(program);
+        free(program);
+        return EXIT_SUCCESS;
+    }
+    return EXIT_FAILURE;
 }
 
 int main(int argc, char* argv[]) {

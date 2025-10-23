@@ -12,6 +12,7 @@ typedef struct {
     Instructions instructions;
     int num_locals;
     int num_parameters;
+    char *name; // points to [FunctionLiteral.name] 
 } Function;
 
 typedef enum {

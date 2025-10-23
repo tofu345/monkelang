@@ -13,10 +13,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+// #define DEBUG_PRINT
+
 const Object _true = BOOL(true);
 const Object _false = BOOL(false);
-
-DEFINE_BUFFER(Alloc, Alloc *);
 
 void vm_init(VM *vm, Object *stack, Object *globals, Frame *frames) {
     memset(vm, 0, sizeof(VM));
@@ -71,7 +71,6 @@ Object object_copy(VM* vm, Object obj) {
 
                 } else {
                     new_str = compound_obj(vm, o_String, sizeof(CharBuffer), NULL);
-                    memset(new_str, 0, sizeof(CharBuffer));
                 }
                 return OBJ(o_String, .string = new_str);
             }
@@ -94,7 +93,6 @@ Object object_copy(VM* vm, Object obj) {
                     });
                 } else {
                     new_arr = compound_obj(vm, o_Array, sizeof(ObjectBuffer), NULL);
-                    memset(new_arr, 0, sizeof(ObjectBuffer));
                 }
                 return OBJ(o_Array, .array = new_arr);
             }
@@ -116,9 +114,9 @@ pop_frame(VM *vm) {
     return vm->frames + vm->frames_index;
 }
 
-// create new frame if less than [MaxFraxes]
+// add new frame if less than [MaxFraxes]
 static error
-new_frame(VM *vm) {
+push_frame(VM *vm) {
     vm->frames_index++;
     if (vm->frames_index >= MaxFraxes) {
         vm->frames_index = 0;
@@ -421,9 +419,6 @@ vm_push_constant(VM *vm, Constant c) {
                 return vm_push(vm, OBJ(o_String, .string = str_buf));
             }
 
-        // case c_Function:
-        //     return vm_push(vm, OBJ(o_Function, .func = c.data.function));
-
         default:
             die("vm_push_constant: type %d not handled", c.type);
             return 0;
@@ -433,11 +428,10 @@ vm_push_constant(VM *vm, Constant c) {
 static Object
 build_array(VM *vm, int start_index, int end_index) {
     int length = end_index - start_index;
-    ObjectBuffer *elems = compound_obj(vm, o_Array, sizeof(ObjectBuffer), NULL);
+    ObjectBuffer *elems =
+        compound_obj(vm, o_Array, sizeof(ObjectBuffer), NULL);
 
-    if (length <= 0) {
-        memset(elems, 0, sizeof(ObjectBuffer));
-    } else {
+    if (length > 0) {
         elems->length = length;
         elems->capacity = power_of_2_ceil(length);
         int size = elems->capacity * sizeof(Object);
@@ -477,17 +471,24 @@ static error
 call_closure(VM *vm, Closure *cl, int num_args) {
     Function *fn = cl->func;
     if (num_args != fn->num_parameters) {
+        if (fn->name) {
+            return error_num_args(fn->name, fn->num_parameters, num_args);
+        }
         return error_num_args("function", fn->num_parameters, num_args);
     }
 
-    error err = new_frame(vm);
+    error err = push_frame(vm);
     if (err) { return err; }
 
+    // init new frame
     int base_pointer = vm->sp - num_args;
-
-    // get new frame
     Frame *f = vm->frames + vm->frames_index;
     frame_init(f, cl, base_pointer);
+
+    if (fn->num_locals > 0) {
+        // set local variables to [o_Null].
+        memset(vm->stack + vm->sp, 0, fn->num_locals * sizeof(Object));
+    }
 
     vm->sp = base_pointer + fn->num_locals;
 
@@ -497,7 +498,7 @@ call_closure(VM *vm, Closure *cl, int num_args) {
 static error
 call_builtin(VM *vm, Builtin *builtin, int num_args) {
     Object *args = vm->stack + vm->sp - num_args;
-    Object result = builtin(vm, args, num_args);
+    Object result = builtin->fn(vm, args, num_args);
 
     // remove arguments and [Builtin] from stack.
     vm->sp -= num_args + 1;
@@ -515,6 +516,13 @@ call_builtin(VM *vm, Builtin *builtin, int num_args) {
 static error
 execute_call(VM *vm, int num_args) {
     Object callee = vm->stack[vm->sp - 1 - num_args];
+
+#ifdef DEBUG_PRINT
+    printf("call: ");
+    object_fprint(callee, stdout);
+    putc('\n', stdout);
+#endif
+
     switch (callee.type) {
         case o_Closure:
             return call_closure(vm, callee.data.closure, num_args);
@@ -535,6 +543,11 @@ vm_push_closure(VM *vm, int const_index, int num_free) {
 
     size_t free_size = num_free * sizeof(Object),
            size = sizeof(Closure) + free_size;
+
+#ifdef DEBUG_PRINT
+    printf("creating closure: %s\n", constant.data.function->name);
+#endif
+
     Closure *closure = compound_obj(vm, o_Closure, size, NULL);
     closure->num_free = num_free;
     closure->func = constant.data.function;
@@ -547,11 +560,11 @@ vm_push_closure(VM *vm, int const_index, int num_free) {
 }
 
 error vm_run(VM *vm, Bytecode bytecode) {
-    // setup
     Function main_fn = {
         .instructions = *bytecode.instructions,
         .num_locals = 0,
         .num_parameters = 0,
+        .name = "<main>"
     };
     Closure main_closure = { .func = &main_fn, .num_free = 0 };
     frame_init(vm->frames, &main_closure, 0);
@@ -561,7 +574,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
     Frame *current_frame = vm->frames;
     Instructions ins = instructions(current_frame);
 
-    const Builtins *builtins = get_builtins();
+    const Builtin *builtins = get_builtins();
     Opcode op;
     int ip, pos, num;
     Object obj;
@@ -700,6 +713,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
 
                 // remove arguments and [Function] from stack.
                 vm->sp = current_frame->base_pointer - 1;
+
                 current_frame = pop_frame(vm);
                 ins = instructions(current_frame);
 
@@ -710,6 +724,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
             case OpReturn:
                 // remove arguments and [Function] from stack.
                 vm->sp = current_frame->base_pointer - 1;
+
                 current_frame = pop_frame(vm);
                 ins = instructions(current_frame);
 
@@ -739,7 +754,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 current_frame->ip += 1;
 
                 err = vm_push(vm,
-                        OBJ(o_BuiltinFunction, .ptr = builtins[pos].fn));
+                        OBJ(o_BuiltinFunction, .builtin = builtins + pos));
                 if (err) { return err; };
                 break;
 
@@ -791,8 +806,14 @@ static void
 mark_alloc(Object obj) {
     assert(obj.type >= o_String);
 
+#ifdef DEBUG_PRINT
+    printf("mark: ");
+    object_fprint(obj, stdout);
+    putc('\n', stdout);
+#endif
+
     // access [Alloc] prepended to ptr with [vm_allocate]
-    Alloc *alloc = ((Alloc *)obj.data.ptr) - 1;
+    Allocation *alloc = ((Allocation *)obj.data.ptr) - 1;
     alloc->is_marked = true;
 }
 
@@ -812,35 +833,27 @@ trace_mark_object(Object obj) {
             return;
 
         case o_Closure:
-            {
-                mark_alloc(obj);
-
-                for (int i = 0; i < obj.data.closure->num_free; i++)
-                    trace_mark_object(obj.data.closure->free[i]);
-                return;
-            }
+            mark_alloc(obj);
+            for (int i = 0; i < obj.data.closure->num_free; i++)
+                trace_mark_object(obj.data.closure->free[i]);
+            return;
 
         case o_Array:
-            {
-                mark_alloc(obj);
-
-                for (int i = 0; i < obj.data.array->length; i++)
-                    trace_mark_object(obj.data.array->data[i]);
-                return;
-            }
+            mark_alloc(obj);
+            for (int i = 0; i < obj.data.array->length; i++)
+                trace_mark_object(obj.data.array->data[i]);
+            return;
 
         case o_Hash:
-            {
-                mark_alloc(obj);
+            mark_alloc(obj);
 
-                tbl_it it;
-                tbl_iterator(&it, obj.data.hash);
-                while (tbl_next(&it)) {
-                    trace_mark_object(it.cur_key);
-                    trace_mark_object(it.cur_val);
-                }
-                return;
+            tbl_it it;
+            tbl_iterator(&it, obj.data.hash);
+            while (tbl_next(&it)) {
+                trace_mark_object(it.cur_key);
+                trace_mark_object(it.cur_val);
             }
+            return;
 
         default:
             die("trace_mark_object: type %s (%d) not handled",
@@ -848,12 +861,18 @@ trace_mark_object(Object obj) {
     }
 }
 
-// free [Alloc]ation
 static void
-alloc_free(Alloc *alloc) {
+free_allocation(Allocation *alloc) {
     assert(alloc->type >= o_String);
 
-    void *obj_data = alloc + 1;
+    void *obj_data = alloc->object_data;
+
+#ifdef DEBUG_PRINT
+    printf("free: ");
+    object_fprint(OBJ(alloc->type, .ptr = alloc + 1), stdout);
+    putc('\n', stdout);
+#endif
+
     switch (alloc->type) {
         case o_String:
             free(((CharBuffer *)obj_data)->data);
@@ -878,10 +897,12 @@ alloc_free(Alloc *alloc) {
 }
 
 void vm_free(VM *vm) {
-    for (int i = 0; i < vm->allocs.length; i++) {
-        alloc_free(vm->allocs.data[i]);
+    Allocation *next, *cur = vm->last;
+    while (cur) {
+        next = cur->next;
+        free_allocation(cur);
+        cur = next;
     }
-    free(vm->allocs.data);
     free(vm->stack);
     free(vm->globals);
     free(vm->frames);
@@ -899,22 +920,24 @@ void mark_and_sweep(VM *vm) {
     mark_objs(vm->stack, vm->sp);
     mark_objs(vm->globals, vm->num_globals);
 
-    // sweep
-    Alloc *cur;
-    Alloc **allocs = vm->allocs.data;
-    int length = vm->allocs.length,
-        new_length = length;
-    for (int i = 0; i < length; i++) {
-        cur = allocs[i];
+    // sweep and rebuild Linked list of [Allocations].
+    Allocation *cur = vm->last,
+               *prev_marked = NULL;
+    while (cur) {
+        Allocation *next = cur->next;
+
         if (cur->is_marked) {
             cur->is_marked = false;
+            cur->next = prev_marked;
+            prev_marked = cur;
+            cur = next;
             continue;
         }
 
-        alloc_free(cur);
-        allocs[i] = allocs[--new_length];
+        free_allocation(cur);
+        cur = next;
     }
-    vm->allocs.length = new_length;
+    vm->last = prev_marked;
 }
 
 void *allocate(VM *vm, size_t size) {
@@ -926,22 +949,37 @@ void *allocate(VM *vm, size_t size) {
 
 void *compound_obj(VM *vm, ObjectType type, size_t size, void *data) {
     // prepend [Alloc] object.
-    size_t actual_size = size + sizeof(Alloc);
+    size_t actual_size = size + sizeof(Allocation);
 
     vm->bytesTillGC -= actual_size;
     if (vm->bytesTillGC <= 0) {
+#ifdef DEBUG_PRINT
+        printf("create object: %s\n", show_object_type(type));
+        printf("call stack:\n");
+        for (int i = 0; i <= vm->frames_index; i++) {
+            printf("-> function: %s\n", vm->frames[i].cl->func->name);
+        }
+        putc('\n', stdout);
+#endif
+
         mark_and_sweep(vm);
         vm->bytesTillGC = NextGC;
     }
 
-    Alloc *ptr = malloc(actual_size);
+    Allocation *ptr = malloc(actual_size);
     if (ptr == NULL) { die("malloc"); }
-    *ptr = (Alloc){ .is_marked = false, .type = type };
-    AllocBufferPush(&vm->allocs, ptr);
+    *ptr = (Allocation){
+        .is_marked = false,
+        .type = type,
+        .next = vm->last,
+    };
+    vm->last = ptr;
 
-    void *obj_data = (Alloc *)(ptr + 1);
+    void *obj_data = ptr->object_data;
     if (data) {
         memcpy(obj_data, data, size);
+    } else {
+        memset(obj_data, 0, size);
     }
     return obj_data;
 }

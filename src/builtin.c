@@ -125,7 +125,6 @@ Object builtin_rest(VM *vm, Object *args, int num_args) {
 
                 } else {
                     new_arr = compound_obj(vm, o_Array, sizeof(ObjectBuffer), NULL);
-                    memset(new_arr, 0, sizeof(ObjectBuffer));
                     return OBJ(o_Array, .array = new_arr);
                 }
             }
@@ -173,7 +172,7 @@ Object builtin_puts([[maybe_unused]] VM *vm, Object *args, int num_args) {
 
 #define BUILTIN(fn) {#fn, builtin_##fn}
 
-const Builtins builtins[] = {
+const Builtin builtins[] = {
     BUILTIN(len),
     BUILTIN(puts),
     BUILTIN(first),
@@ -185,6 +184,6 @@ const Builtins builtins[] = {
     { NULL, NULL },
 };
 
-const Builtins *get_builtins() {
+const Builtin *get_builtins() {
     return builtins;
 }

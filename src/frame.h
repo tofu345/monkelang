@@ -7,6 +7,7 @@ typedef struct {
     Closure *cl;
 
     int ip; // instruction pointer
+
     // points to bottom of stack for current function
     // (normally the first argument).
     int base_pointer;

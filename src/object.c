@@ -1,4 +1,5 @@
 #include "object.h"
+#include "builtin.h" // provides type for "Builtin"
 #include "utils.h"
 #include "table.h"
 
@@ -76,8 +77,18 @@ fprint_hash(table *tbl, FILE* fp) {
 }
 
 static int
-fprint_function(void *func, FILE *fp) {
-    FPRINTF(fp, "Function[%p]", func);
+fprint_closure(Closure *cl, FILE *fp) {
+    FPRINTF(fp, "Function");
+    if (cl->func->name) {
+        FPRINTF(fp, "<%s>", cl->func->name);
+    }
+    FPRINTF(fp, "[%p]", cl->func);
+    return 0;
+}
+
+static int
+fprint_builtin_function(Builtin *builtin, FILE *fp) {
+    FPRINTF(fp, "Builtin<%s>", builtin->name);
     return 0;
 }
 
@@ -109,11 +120,10 @@ int object_fprint(Object o, FILE* fp) {
             return fprint_hash(o.data.hash, fp);
 
         case o_BuiltinFunction:
-            FPRINTF(fp, "Builtin");
-            return 0;
+            return fprint_builtin_function(o.data.ptr, fp);
 
         case o_Closure:
-            return fprint_function(o.data.closure, fp);
+            return fprint_closure(o.data.closure, fp);
 
         default:
             fprintf(stderr, "object_fprint: object type not handled %d\n",
@@ -171,12 +181,12 @@ const char* object_types[] = {
     "Integer",
     "Float",
     "Boolean",
-    "Function",
     "Builtin",
     "Error",
     "String",
     "Array",
     "Hash",
+    "Function",
 };
 
 const char* show_object_type(ObjectType t) {

@@ -14,7 +14,7 @@ void tearDown(void) {}
 void test_make(void) {
     struct Test {
         Instructions actual;
-        uint8_t expected[4]; // NULL-terminated
+        uint8_t expected[5]; // NULL-terminated
     } tests[] = {
         {make(OpConstant, 65534), {OpConstant, 255, 254}},
         {make(OpAdd), {OpAdd}},

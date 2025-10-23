@@ -12,14 +12,16 @@ static const int GlobalsSize = 2048;
 static const int MaxFraxes = 1024;
 
 // Number of bytes allocated before GC is run.
-static const int NextGC = 1024;
+static const int NextGC = 1; // FIXME change back to 1024.
 
-typedef struct {
+// Prepended to all instances of Compound Data Types, see [object.h].
+typedef struct Allocation {
     ObjectType type;
     bool is_marked;
-} Alloc;
+    struct Allocation *next;
+    void *object_data[]; // not initialiazed, points to data after struct.
+} Allocation;
 
-BUFFER(Alloc, Alloc *);
 BUFFER(Frame, Frame);
 
 typedef struct {
@@ -34,11 +36,13 @@ typedef struct {
     int num_globals;
 
     Frame *frames; // function call stack
-    uint16_t frames_index; // index of current frame
+    int frames_index; // index of current frame
 
     // The current number of bytes to allocate till before GC is run.
     int bytesTillGC;
-    AllocBuffer allocs; // tracks all Compound Data Types
+    // most recent [Allocation] in linked list of all allocated
+    // (Compound Data Type) objects.
+    Allocation *last;
 } VM;
 
 // if [stack], [globals] or [frames] are NULL, allocate.
@@ -58,7 +62,7 @@ Object object_copy(VM* vm, Object obj);
 #define COMPOUND_OBJ(typ, data, ...) \
     compound_obj(vm, typ, sizeof(data), &(data)__VA_ARGS__ );
 
-// create Compound Data Type of [size] and initialiaze with [data] if not NULL.
+// create Compound Data Type of [size] and initialiaze with [data] or 0;
 void *compound_obj(VM *vm, ObjectType type, size_t size, void *data);
 
 // allocate [size] and decrement [vm.bytesTillGC]

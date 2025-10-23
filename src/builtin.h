@@ -4,12 +4,12 @@
 #include "vm.h"
 
 // returns 0 on success
-typedef Object Builtin(VM *vm, Object *args, int num_args);
+typedef Object BuiltinFn(VM *vm, Object *args, int num_args);
 
-typedef struct {
+struct Builtin {
     const char* name;
-    Builtin *fn;
-} Builtins;
+    BuiltinFn *fn;
+};
 
 // NULL-terminated array of builtin functions
-const Builtins *get_builtins();
+const Builtin *get_builtins();

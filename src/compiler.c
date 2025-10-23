@@ -26,10 +26,10 @@ void compiler_init(Compiler *c) {
     // init global symbol table
     SymbolTable *global_symbol_table = new_symbol_table(c);
     symbol_table_init(global_symbol_table);
-    c->cur_symbol_table = global_symbol_table;
+    c->current_symbol_table = global_symbol_table;
 
     // add builtin functions to global symbol table
-    const Builtins *builtin = get_builtins();
+    const Builtin *builtin = get_builtins();
     int i = 0;
     while (builtin->name != NULL) {
         sym_builtin(global_symbol_table, i, builtin->name);
@@ -156,7 +156,8 @@ _compile(Compiler *c, Node n) {
             {
                 LetStatement *ls = n.obj;
 
-                Symbol *symbol = sym_define(c->cur_symbol_table, ls->name->tok.literal);
+                char *name = ls->name->tok.literal;
+                Symbol *symbol = sym_define(c->current_symbol_table, name);
                 if (symbol->index >= GlobalsSize) {
                     return new_error("too many global variables");
                 }
@@ -189,9 +190,10 @@ _compile(Compiler *c, Node n) {
         case n_Identifier:
             {
                 Identifier *id = n.obj;
-                Symbol *symbol = sym_resolve(c->cur_symbol_table, id->tok.literal);
+                char *name = id->tok.literal;
+                Symbol *symbol = sym_resolve(c->current_symbol_table, name);
                 if (symbol == NULL) {
-                    return new_error("undefined variable '%s'", id->tok.literal);
+                    return new_error("undefined variable '%s'", name);
                 }
 
                 load_symbol(c, symbol);
@@ -411,12 +413,12 @@ _compile(Compiler *c, Node n) {
                 enter_scope(c);
 
                 if (fl->name) {
-                    sym_function_name(c->cur_symbol_table, fl->name);
+                    sym_function_name(c->current_symbol_table, fl->name);
                 }
 
                 ParamBuffer params = fl->params;
                 for (int i = 0; i < params.length; i++) {
-                    sym_define(c->cur_symbol_table, params.data[i]->tok.literal);
+                    sym_define(c->current_symbol_table, params.data[i]->tok.literal);
                 }
 
                 err = _compile(c, NODE(n_BlockStatement, fl->body));
@@ -430,12 +432,12 @@ _compile(Compiler *c, Node n) {
                 }
 
                 SymbolBuffer free_symbols =
-                    c->cur_symbol_table->free_symbols;
+                    c->current_symbol_table->free_symbols;
                 int num_locals =
-                    c->cur_symbol_table->num_definitions;
+                    c->current_symbol_table->num_definitions;
                 Instructions *ins = leave_scope(c);
 
-                // load all free_symbols into symbol table of function
+                // push free_symbols onto the stack, go into [Closure]
                 for (int i = 0; i < free_symbols.length; i++) {
                     load_symbol(c, free_symbols.data[i]);
                 }
@@ -446,6 +448,7 @@ _compile(Compiler *c, Node n) {
                     .instructions = *ins,
                     .num_locals = num_locals,
                     .num_parameters = params.length,
+                    .name = fl->name,
                 };
                 Constant fn_const = {
                     .type = c_Function,
@@ -494,13 +497,14 @@ void enter_scope(Compiler *c) {
         &c->scopes.data[new_scope_idx].instructions;
 
     SymbolTable *new = new_symbol_table(c);
-    enclosed_symbol_table(new, c->cur_symbol_table);
-    c->cur_symbol_table = new;
+    enclosed_symbol_table(new, c->current_symbol_table);
+    c->current_symbol_table = new;
 }
 
 // return to previous compilation scope and symbol table
 Instructions *leave_scope(Compiler *c) {
-    // instructions is copied into [c.constants] as [Function]
+    // instructions is copied into [c.constants] as [Function], see
+    // [_compile(n_FunctionLiteral)]
     Instructions *ins = c->current_instructions;
 
     int prev_scope_idx = --c->scope_index;
@@ -509,7 +513,7 @@ Instructions *leave_scope(Compiler *c) {
     c->scopes.length--; // remove from [c.scopes], to be replaced at next
                         // [enter_scope()] call.
 
-    c->cur_symbol_table = c->cur_symbol_table->outer;
+    c->current_symbol_table = c->current_symbol_table->outer;
     return ins;
 }
 

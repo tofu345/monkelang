@@ -462,7 +462,7 @@ void test_compiler_scopes(void) {
         TEST_FAIL();
     }
 
-    SymbolTable *global_symbol_table = c.cur_symbol_table;
+    SymbolTable *global_symbol_table = c.current_symbol_table;
 
     emit(&c, OpMul);
 
@@ -487,7 +487,7 @@ void test_compiler_scopes(void) {
         TEST_FAIL();
     }
 
-    if (c.cur_symbol_table->outer != global_symbol_table) {
+    if (c.current_symbol_table->outer != global_symbol_table) {
         TEST_FAIL_MESSAGE("compiler did not enclose symbol_table");
     }
 
@@ -499,11 +499,11 @@ void test_compiler_scopes(void) {
         TEST_FAIL();
     }
 
-    if (c.cur_symbol_table != global_symbol_table) {
+    if (c.current_symbol_table != global_symbol_table) {
         TEST_FAIL_MESSAGE("compiler did not restore global_symbol_table");
     }
 
-    if (c.cur_symbol_table->outer != NULL) {
+    if (c.current_symbol_table->outer != NULL) {
         TEST_FAIL_MESSAGE("compiler modified global_symbol_table table incorrectly");
     }
 
