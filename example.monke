@@ -1,11 +1,26 @@
-let fibonacci = fn(x) {
+let fibonacci = fn(num) {
+    // memoization is nice
+    let seen = {0: 0, 1: 1};
+    let fib = fn(num) {
+        let res = seen[num];
+        if (res != null) { 
+            return res; 
+        }
+
+        // very sane syntax
+        return seen[num] = fib(num - 1) + fib(num - 2);
+    };
+    fib(num);
+};
+
+let fibonacci_slow = fn(x) {
     if (x == 0) {
         0
     } else {
         if (x == 1) {
             return 1;
         } else {
-            fibonacci(x - 1) + fibonacci(x - 2);
+            fibonacci_slow(x - 1) + fibonacci_slow(x - 2);
         }
     }
 };
@@ -41,6 +56,7 @@ puts("numbers:", numbers);
 puts("map(fibonacci, numbers):", map(fibonacci, numbers));
 
 puts("fibonacci of 35:", fibonacci(35));
+// puts("fibonacci of 35:", fibonacci_slow(35));
 
 let a = [1, 2, 3, 4];
 let double = fn(x) { x * 2 };

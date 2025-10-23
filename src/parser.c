@@ -150,10 +150,34 @@ parse_expression(Parser* p, enum Precedence precedence) {
 }
 
 static Node
+parse_assign_expression(Parser* p, Node left) {
+    AssignExpression *ae = allocate(sizeof(AssignExpression));
+    ae->tok = p->cur_token;
+    ae->left = left;
+
+    next_token(p);
+    ae->right = parse_expression(p, p_Lowest);
+    if (ae->right.obj == NULL) {
+        node_free(left);
+        free(ae->tok.literal);
+        free(ae);
+        return (Node){};
+    }
+
+    return NODE(n_AssignExpression, ae);
+}
+
+static Node
 parse_identifier(Parser* p) {
     Identifier* id = allocate(sizeof(Identifier));
     id->tok = p->cur_token;
-    return NODE(n_Identifier, id);
+
+    Node node = NODE(n_Identifier, id);
+    if (peek_token_is(p, t_Assign)) {
+        next_token(p);
+        return parse_assign_expression(p, node);
+    }
+    return node;
 }
 
 static Node
@@ -468,8 +492,14 @@ parse_index_expression(Parser* p, Node left) {
         free(ie);
         return (Node){};
     }
-    free(p->cur_token.literal); // '}' tok
-    return NODE(n_IndexExpression, ie);
+    free(p->cur_token.literal); // ']' tok
+
+    Node node = NODE(n_IndexExpression, ie);
+    if (peek_token_is(p, t_Assign)) {
+        next_token(p);
+        return parse_assign_expression(p, node);
+    }
+    return node;
 }
 
 static NodeBuffer
@@ -571,6 +601,13 @@ parse_if_expression(Parser* p) {
     }
 
     return NODE(n_IfExpression, ie);
+}
+
+static Node
+parse_null_literal(Parser *p) {
+    NullLiteral* nl = allocate(sizeof(NullLiteral));
+    nl->tok = p->cur_token;
+    return NODE(n_NullLiteral, nl);
 }
 
 static Node
@@ -689,7 +726,9 @@ void parser_init(Parser* p) {
     p->prefix_parse_fns[t_String] = parse_string_literal;
     p->prefix_parse_fns[t_Lbracket] = parse_array_literal;
     p->prefix_parse_fns[t_Lbrace] = parse_hash_literal;
+    p->prefix_parse_fns[t_Null] = parse_null_literal;
 
+    p->infix_parse_fns[t_Assign] = parse_assign_expression;
     p->infix_parse_fns[t_Plus] = parse_infix_expression;
     p->infix_parse_fns[t_Minus] = parse_infix_expression;
     p->infix_parse_fns[t_Slash] = parse_infix_expression;

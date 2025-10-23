@@ -34,6 +34,7 @@ typedef enum __attribute__ ((__packed__)) {
     t_Let,
     t_True,
     t_False,
+    t_Null,
     t_If,
     t_Else,
     t_Return, // this must remain the last enum element, and cannot have a

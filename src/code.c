@@ -36,16 +36,19 @@ const Definition definitions[] = {
     DEF(OpJumpNotTruthy, two), // instruction index
     DEF(OpJump, two),          // instruction index
     DEF_EMPTY(OpNull),
-    DEF(OpGetGlobal, two), // globals index
-    DEF(OpSetGlobal, two), // globals index
+    DEF(OpGetGlobal, two),    // globals index
+    DEF(OpSetGlobal, two),    // globals index
+    DEF(OpAssignGlobal, two), // globals index
     DEF(OpArray, two), // num elements
     DEF(OpHash, two),  // num pairs
     DEF_EMPTY(OpIndex),
+    DEF_EMPTY(OpSetIndex),
     DEF(OpCall, one), // num arguments
     DEF_EMPTY(OpReturnValue),
     DEF_EMPTY(OpReturn),
-    DEF(OpGetLocal, one), // locals index
-    DEF(OpSetLocal, one), // locals index
+    DEF(OpGetLocal, one),    // locals index
+    DEF(OpSetLocal, one),    // locals index
+    DEF(OpAssignLocal, one), // locals index
     DEF(OpGetBuiltin, one), // builtin fn index
 
     // constant index of Function and number of free variables

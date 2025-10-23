@@ -7,7 +7,7 @@
 char* read_file(char* filename) {
     FILE *fp = fopen(filename, "r");
     if (fp == NULL) {
-        fprintf(stderr, "error: could not open file %s\n", filename);
+        fprintf(stderr, "error: could not open file '%s'\n", filename);
         return NULL;
     }
 
@@ -18,7 +18,7 @@ char* read_file(char* filename) {
     char* buf = malloc((bufsize + 1) * sizeof(char));
     size_t new_len = fread(buf, sizeof(char), bufsize, fp);
     if (ferror(fp) != 0) {
-        fprintf(stderr, "error: could not read file %s\n", filename);
+        fprintf(stderr, "error: could not read file '%s'\n", filename);
         fclose(fp);
         return NULL;
 

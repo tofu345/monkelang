@@ -194,6 +194,14 @@ fprint_string_literal(StringLiteral* sl, FILE* fp) {
     return 0;
 }
 
+static int
+fprint_assign_expression(AssignExpression *ae, FILE *fp) {
+    node_fprint(ae->left, fp);
+    FPRINTF(fp, " = ");
+    node_fprint(ae->right, fp);
+    return 0;
+}
+
 int node_fprint(const Node n, FILE* fp) {
     if (n.obj == NULL) return 0;
 
@@ -248,6 +256,13 @@ int node_fprint(const Node n, FILE* fp) {
 
         case n_StringLiteral:
             return fprint_string_literal(n.obj, fp);
+
+        case n_AssignExpression:
+            return fprint_assign_expression(n.obj, fp);
+
+        case n_NullLiteral:
+            FPRINTF(fp, "null");
+            return 0;
 
         default:
             fprintf(stderr, "node_fprint: node type not handled %d\n", n.typ);
@@ -369,6 +384,14 @@ void free_hash_literal(HashLiteral* hl) {
     free(hl);
 }
 
+static void
+free_assign_expression(AssignExpression *ae) {
+    node_free(ae->left);
+    node_free(ae->right);
+    free(ae->tok.literal);
+    free(ae);
+}
+
 void node_free(Node n) {
     if (n.obj == NULL) return;
 
@@ -405,6 +428,9 @@ void node_free(Node n) {
 
         case n_IndexExpression:
             return free_index_expression(n.obj);
+
+        case n_AssignExpression:
+            return free_assign_expression(n.obj);
 
         case n_HashLiteral:
             return free_hash_literal(n.obj);

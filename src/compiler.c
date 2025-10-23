@@ -43,8 +43,9 @@ void compiler_init(Compiler *c) {
 }
 
 void compiler_free(Compiler *c) {
-    free(c->scopes.data[0].instructions.data); // main scope is not copied to
-                                               // [c.constants]
+    for (int i = 0; i < c->scopes.length; i++) {
+        free(c->scopes.data[i].instructions.data);
+    }
     free(c->scopes.data);
 
     SymbolTable *cur;
@@ -200,6 +201,58 @@ _compile(Compiler *c, Node n) {
                 return 0;
             }
 
+        case n_AssignExpression:
+            {
+                AssignExpression *ae = n.obj;
+
+                err = _compile(c, ae->right);
+                if (err) { return err; }
+
+                if (ae->left.typ == n_Identifier) {
+                    Identifier *id = ae->left.obj;
+
+                    char *name = id->tok.literal;
+                    Symbol *symbol = sym_resolve(c->current_symbol_table, name);
+                    if (symbol == NULL) {
+                        return new_error("undefined variable '%s'", name);
+                    }
+
+                    if (symbol->scope == GlobalScope) {
+                        emit(c, OpAssignGlobal, symbol->index);
+                    } else {
+                        emit(c, OpAssignLocal, symbol->index);
+                    }
+                    return 0;
+
+                } else if (ae->left.typ == n_IndexExpression) {
+                    IndexExpression *index_exp = ae->left.obj;
+
+                    if (index_exp->left.typ != n_Identifier) {
+                        return new_error("cannot assign non-variable");
+                    }
+
+                    Identifier *ident = index_exp->left.obj;
+
+                    char *name = ident->tok.literal;
+                    Symbol *symbol = sym_resolve(c->current_symbol_table, name);
+                    if (symbol == NULL) {
+                        return new_error("undefined variable '%s'", name);
+                    }
+
+                    err = _compile(c, index_exp->left);
+                    if (err) { return err; }
+
+                    err = _compile(c, index_exp->index);
+                    if (err) { return err; }
+
+                    emit(c, OpSetIndex);
+                    return 0;
+                }
+
+                return new_error("assign type %d not implemented",
+                        ae->left.typ);
+            }
+
         case n_InfixExpression:
             {
                 InfixExpression *ie = n.obj;
@@ -331,6 +384,10 @@ _compile(Compiler *c, Node n) {
                 emit(c, OpCall, args.length);
                 return 0;
             }
+
+        case n_NullLiteral:
+            emit(c, OpNull);
+            return 0;
 
         case n_ArrayLiteral:
             {

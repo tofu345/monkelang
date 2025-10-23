@@ -79,9 +79,7 @@ static char peek_char(Lexer *l) {
 static char* copy_string(Lexer* l, int from, int len) {
     char* ident = malloc((len + 1) * sizeof(char));
     if (ident == NULL) die("malloc");
-    for (int i = 0; i < len; i++) {
-        ident[i] = l->input[from + i];
-    }
+    memcpy(ident, l->input + from, len);
     ident[len] = '\0';
     return ident;
 }

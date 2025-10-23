@@ -905,6 +905,47 @@ void test_recursive_functions(void) {
     );
 }
 
+void test_assign_expressions(void) {
+    c_test(
+        "let foobar = 1; foobar = 0;",
+        _C( INT(1), INT(0) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpSetGlobal, 0),
+            make(OpConstant, 1),
+            make(OpAssignGlobal, 0),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "let foobar = [0, 1, 2]; foobar[0] = 5;",
+        _C( INT(0), INT(1), INT(2), INT(5), INT(0) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 1),
+            make(OpConstant, 2),
+            make(OpArray, 3),
+            make(OpSetGlobal, 0),
+            make(OpConstant, 3),
+            make(OpGetGlobal, 0),
+            make(OpConstant, 4),
+            make(OpSetIndex),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "let a = null; a = 5;",
+        _C( INT(5) ),
+        _I(
+            make(OpNull, 0),
+            make(OpSetGlobal, 0),
+            make(OpConstant, 0),
+            make(OpAssignGlobal, 0),
+            make(OpPop)
+        )
+    );
+}
+
 static int test_instructions(Instructions *expected, Instructions *actual);
 static int test_constants(ExpectedConstants expected, ConstantBuffer *actual);
 
@@ -927,7 +968,10 @@ c_test(
     Bytecode code = bytecode(&c);
 
     int _err = test_instructions(expectedInstructions, code.instructions);
-    if (_err != 0) { TEST_FAIL(); }
+    if (_err != 0) {
+        printf("test: %s\n", input);
+        TEST_FAIL();
+    }
 
     _err = test_constants(expectedConstants, code.constants);
     if (_err != 0) { TEST_FAIL(); }
@@ -1076,5 +1120,6 @@ int main(void) {
     RUN_TEST(test_builtins);
     RUN_TEST(test_closures);
     RUN_TEST(test_recursive_functions);
+    RUN_TEST(test_assign_expressions);
     return UNITY_END();
 }

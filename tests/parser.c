@@ -1002,6 +1002,141 @@ void test_parsing_hash_literals_with_expressions(void) {
     parser_free(&p);
 }
 
+void test_parsing_assign_expressions(void) {
+    char* input = "foobar = 0;";
+
+    Parser p;
+    parser_init(&p);
+    Program prog = parse(&p, input);
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
+
+    check_parser_errors(&p);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.length,
+            "wrong prog.statements length");
+
+    Node n = prog.stmts.data[0];
+
+    TEST_ASSERT_MESSAGE(
+            n_ExpressionStatement == n.typ, "type not ExpressionStatement");
+
+    ExpressionStatement* es = n.obj;
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_AssignExpression, es->expression.typ,
+            "ExpressionStatement Value is not AssignExpression");
+
+    AssignExpression* ae = es->expression.obj;
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_Identifier, ae->left.typ,
+            "AssignExpression.Left is not Identifier");
+
+    Identifier* ident = ae->left.obj;
+
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            "foobar", ident->tok.literal, "wrong Identifier.Token.value");
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_IntegerLiteral, ae->right.typ,
+            "AssignExpression.Right is not IntegerLiteral");
+
+    IntegerLiteral* int_lit = ae->right.obj;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            0, int_lit->value, "wrong IntegerLiteral.value");
+
+    program_free(&prog);
+    parser_free(&p);
+}
+
+void test_parsing_index_assign_expressions(void) {
+    char* input = "foobar[12] = 69;";
+
+    Parser p;
+    parser_init(&p);
+    Program prog = parse(&p, input);
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
+
+    check_parser_errors(&p);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.length,
+            "wrong prog.statements length");
+
+    Node n = prog.stmts.data[0];
+
+    TEST_ASSERT_MESSAGE(
+            n_ExpressionStatement == n.typ, "type not ExpressionStatement");
+
+    ExpressionStatement* es = n.obj;
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_AssignExpression, es->expression.typ,
+            "ExpressionStatement Value is not AssignExpression");
+
+    AssignExpression* ae = es->expression.obj;
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_IndexExpression, ae->left.typ,
+            "AssignExpression.Left is not IndexExpression");
+
+    IndexExpression* index = ae->left.obj;
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_Identifier, index->left.typ,
+            "IndexExpression.Left is not Identifier");
+
+    Identifier* ident = index->left.obj;
+
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            "foobar", ident->tok.literal, "wrong Identifier.Token.value");
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_IntegerLiteral, index->index.typ,
+            "IndexExpression.Index is not IntegerLiteral");
+
+    IntegerLiteral* index_int = index->index.obj;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            12, index_int->value, "wrong IndexExpression.Index.value");
+
+    IntegerLiteral* int_lit = ae->right.obj;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            69, int_lit->value, "wrong AssignExpression.Right.value");
+
+    program_free(&prog);
+    parser_free(&p);
+}
+
+void test_parsing_null_literals(void) {
+    char* input = "null";
+
+    Parser p;
+    parser_init(&p);
+    Program prog = parse(&p, input);
+    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
+
+    check_parser_errors(&p);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.length,
+            "wrong prog.statements length");
+
+    Node n = prog.stmts.data[0];
+
+    TEST_ASSERT_MESSAGE(
+            n_ExpressionStatement == n.typ, "type not ExpressionStatement");
+
+    ExpressionStatement* es = n.obj;
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            n_NullLiteral, es->expression.typ,
+            "ExpressionStatement Value is not NullLiteral");
+
+    NullLiteral *nl = es->expression.obj;
+
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(
+            "null", nl->tok.literal,
+            "wrong NullLiteral.Token.value");
+
+    program_free(&prog);
+    parser_free(&p);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_let_statements);
@@ -1025,5 +1160,8 @@ int main(void) {
     RUN_TEST(test_parsing_hash_literals_string_keys);
     RUN_TEST(test_parsing_empty_hash_literal);
     RUN_TEST(test_parsing_hash_literals_with_expressions);
+    RUN_TEST(test_parsing_assign_expressions);
+    RUN_TEST(test_parsing_index_assign_expressions);
+    RUN_TEST(test_parsing_null_literals);
     return UNITY_END();
 }

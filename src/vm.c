@@ -371,8 +371,60 @@ execute_index_expression(VM *vm) {
         return execute_hash_index(vm, left, index);
 
     } else {
-        return new_error("index operator not supported: %s",
-                show_object_type(left.type));
+        return new_error("index operator not supported: %s[%s]",
+                show_object_type(left.type), show_object_type(index.type));
+    }
+}
+
+static error
+execute_assign_array_index([[maybe_unused]] VM *vm, Object array, Object index,
+        Object elem) {
+    ObjectBuffer *arr = array.data.array;
+    int i = index.data.integer,
+        max = arr->length - 1;
+    if (i < 0 || i > max) {
+        return new_error("list index out of range");
+    }
+
+    arr->data[i] = elem;
+    return vm_push(vm, elem); // because of [OpPop] from [ExpressionStatement]
+}
+
+static error
+execute_assign_hash_index(VM *vm, Object hash, Object index, Object elem) {
+    table *tbl = hash.data.hash;
+    if (!hashable(index)) {
+        return new_error("unusable as hash key: %s",
+                show_object_type(index.type));
+    }
+
+    // [o_Null] value in table represents a lack of a value.
+    if (elem.type == o_Null) {
+        return vm_push(vm, table_remove(tbl, index));
+    }
+
+    Object result = table_set(tbl, index, elem);
+    if (result.type == o_Null) {
+        return new_error("could not execute hash index assignment");
+    }
+    return vm_push(vm, result);
+}
+
+static error
+execute_assign_index_expression(VM *vm) {
+    Object index = vm_pop(vm);
+    Object left = vm_pop(vm);
+    Object right = vm_pop(vm);
+
+    if (left.type == o_Array && index.type == o_Integer) {
+        return execute_assign_array_index(vm, left, index, right);
+
+    } else if (left.type == o_Hash) {
+        return execute_assign_hash_index(vm, left, index, right);
+
+    } else {
+        return new_error("index assignment operator not supported: %s[%s]",
+                show_object_type(left.type), show_object_type(index.type));
     }
 }
 
@@ -456,6 +508,8 @@ build_hash(VM *vm, int start_index, int end_index) {
             return ERR("unusable as hash key: %s",
                     show_object_type(key.type));
         }
+
+        if (val.type == o_Null) { continue; }
 
         res = table_set(tbl, key, val);
         if (res.type == o_Null) {
@@ -656,6 +710,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
 
                 vm->globals[pos] = vm_pop(vm);
                 break;
+
             case OpGetGlobal:
                 // globals index
                 pos = read_big_endian_uint16(ins.data + ip + 1);
@@ -663,6 +718,14 @@ error vm_run(VM *vm, Bytecode bytecode) {
 
                 err = vm_push(vm, vm->globals[pos]);
                 if (err) { return err; };
+                break;
+
+            case OpAssignGlobal:
+                // globals index
+                pos = read_big_endian_uint16(ins.data + ip + 1);
+                current_frame->ip += 2;
+
+                vm->globals[pos] = vm->stack[vm->sp - 1];
                 break;
 
             case OpArray:
@@ -692,6 +755,11 @@ error vm_run(VM *vm, Bytecode bytecode) {
 
             case OpIndex:
                 err = execute_index_expression(vm);
+                if (err) { return err; };
+                break;
+
+            case OpSetIndex:
+                err = execute_assign_index_expression(vm);
                 if (err) { return err; };
                 break;
 
@@ -739,6 +807,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
 
                 vm->stack[current_frame->base_pointer + pos] = vm_pop(vm);
                 break;
+
             case OpGetLocal:
                 // locals index
                 pos = read_big_endian_uint8(ins.data + ip + 1);
@@ -746,6 +815,15 @@ error vm_run(VM *vm, Bytecode bytecode) {
 
                 err = vm_push(vm, vm->stack[current_frame->base_pointer + pos]);
                 if (err) { return err; };
+                break;
+
+            case OpAssignLocal:
+                // locals index
+                pos = read_big_endian_uint8(ins.data + ip + 1);
+                current_frame->ip += 1;
+
+                obj = vm->stack[vm->sp - 1];
+                vm->stack[current_frame->base_pointer + pos] = obj;
                 break;
 
             case OpGetBuiltin:

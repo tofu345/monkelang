@@ -503,6 +503,29 @@ test_recursive_fibonacci(void) {
     );
 }
 
+static void
+test_assign_expressions(void) {
+    vm_test("let a = 15; a = 5; a", TEST(int, 5));
+    vm_test("let arr = [1, 2, 3]; arr[0] = 5; arr[0]", TEST(int, 5));
+    vm_test("let a = null; a = 5;", TEST(int, 5));
+
+    // definitely intended behaviour.
+    vm_test("\
+            let a = 5;\
+            let b = a = 10;\
+            b + a\
+        ",
+        TEST(int, 20)
+    );
+    vm_test("\
+            let a = {1: 2};\
+            let b = a[1] = null;\
+            b;\
+        ",
+        TEST(int, 2)
+    );
+}
+
 static TestArray *
 make_test_array(int n, ...) {
     va_list ap;
@@ -814,6 +837,7 @@ int main(void) {
     RUN_TEST(test_closures);
     RUN_TEST(test_recursive_functions);
     RUN_TEST(test_recursive_fibonacci);
+    RUN_TEST(test_assign_expressions);
 
     vm_free(&vm);
     return UNITY_END();

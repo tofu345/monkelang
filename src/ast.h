@@ -14,6 +14,7 @@
 enum NodeType {
     // Expressions
     n_Identifier = 1,
+    n_NullLiteral,
     n_IntegerLiteral,
     n_BooleanLiteral,
     n_FloatLiteral,
@@ -26,6 +27,7 @@ enum NodeType {
     n_IfExpression,
     n_CallExpression,
     n_IndexExpression,
+    n_AssignExpression,
 
     // Statements
     n_LetStatement,
@@ -39,7 +41,7 @@ typedef struct {
     void* obj; // if NULL, err
 } Node;
 
-// Retrieve token_literal of `obj.tok.literal` the object must contain a
+// Retrieve token_literal of `n.obj.tok.literal`, [n.obj] must contain a
 // `Token` as its first field
 char* token_literal(Node n);
 
@@ -67,6 +69,12 @@ typedef struct {
     Identifier* name;
     Node value; // Expression
 } LetStatement;
+
+typedef struct {
+    Token tok; // the 't_Assign' token
+    Node left;
+    Node right;
+} AssignExpression;
 
 typedef struct {
     Token tok; // the 't_Return' token
@@ -167,3 +175,7 @@ typedef struct {
 } HashLiteral;
 
 void free_hash_literal(HashLiteral* hl);
+
+typedef struct {
+    Token tok; // the 'null' token
+} NullLiteral;
