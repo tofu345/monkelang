@@ -695,11 +695,20 @@ test_expected_object(Test expected, Object actual) {
 // shared across all vm_tests, managed in main().
 VM vm;
 
-static void
-vm_test(char *input, Test *expected) {
+static error
+__run_vm(char *input) {
+    // cleanup previous run
+    for (int i = 0;
+            i < StackSize && vm.stack[i].type != o_Null;
+            i++) {
+        vm.stack[i] = (Object){};
+    }
+    memset(vm.globals, 0, vm.num_globals * sizeof(Object));
+
     Program prog = test_parse(input);
     Compiler c;
     compiler_init(&c);
+
     error err = compile(&c, &prog);
     if (err) {
         printf("test: %s\n", input);
@@ -733,12 +742,20 @@ vm_test(char *input, Test *expected) {
     // putc('\n', stdout);
 
     err = vm_run(&vm, bytecode(&c));
+
+    program_free(&prog);
+    compiler_free(&c);
+
+    return err;
+}
+
+static void
+vm_test(char *input, Test *expected) {
+    error err = __run_vm(input);
     if (err) {
         printf("test: %s\n", input);
         printf("vm error: %s\n\n", err);
         free(err);
-        program_free(&prog);
-        compiler_free(&c);
         TEST_FAIL();
     }
 
@@ -750,17 +767,6 @@ vm_test(char *input, Test *expected) {
     Object stack_elem = vm_last_popped(&vm);
     int _err = test_expected_object(*expected, stack_elem);
 
-    // cleanup after ourselves (should mostly work)
-    for (int i = 0;
-            i < StackSize && vm.stack[i].type != o_Null;
-            i++) {
-        vm.stack[i] = (Object){};
-    }
-    memset(vm.globals, 0, vm.num_globals * sizeof(Object));
-
-    program_free(&prog);
-    compiler_free(&c);
-
     if (_err != 0) {
         printf("test_expected_object failed for test: %s\n\n", input);
         TEST_FAIL();
@@ -769,25 +775,10 @@ vm_test(char *input, Test *expected) {
 
 static void
 vm_test_error(char *input, char *expected_error) {
-    Program prog = test_parse(input);
-    Compiler c;
-    compiler_init(&c);
+    error err = __run_vm(input);
+    vm.sp = 0;
 
-    error err = compile(&c, &prog);
-    if (err != 0) {
-        printf("test: %s\n", input);
-        printf("compiler error: %s\n\n", err);
-        free(err);
-        program_free(&prog);
-        compiler_free(&c);
-        TEST_FAIL();
-    };
-
-    err = vm_run(&vm, bytecode(&c));
-    vm.sp = 0; // because of error
     if (!err) {
-        program_free(&prog);
-        compiler_free(&c);
         printf("expected VM error for test: %s\n", input);
         TEST_FAIL();
     }
@@ -795,22 +786,10 @@ vm_test_error(char *input, char *expected_error) {
     if (strcmp(err, expected_error) != 0) {
         printf("wrong VM error for test: %s\nwant= %s\ngot = %s\n",
                 input, expected_error, err);
-        program_free(&prog);
-        compiler_free(&c);
         TEST_FAIL();
     }
 
-    // cleanup after ourselves (should mostly work)
-    for (int i = 0;
-            i < StackSize && vm.stack[i].type != o_Null;
-            i++) {
-        vm.stack[i] = (Object){};
-    }
-    memset(vm.globals, 0, vm.num_globals * sizeof(Object));
-
     free(err);
-    program_free(&prog);
-    compiler_free(&c);
 }
 
 int main(void) {
