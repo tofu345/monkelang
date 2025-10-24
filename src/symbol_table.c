@@ -3,6 +3,7 @@
 #include "utils.h"
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 
 DEFINE_BUFFER(Symbol, Symbol *)
@@ -80,10 +81,11 @@ Symbol *sym_define(SymbolTable *st, char *name) {
     return new_symbol(st, name, st->num_definitions++, scope);
 }
 
-Symbol *sym_resolve(SymbolTable *st, char *name) {
-    Symbol* sym = ht_get(st->store, name);
+static Symbol *
+resolve(SymbolTable *st, uint64_t hash) {
+    Symbol* sym = ht_get_hash(st->store, hash);
     if (sym == NULL && st->outer != NULL) {
-        sym = sym_resolve(st->outer, name);
+        sym = resolve(st->outer, hash);
         if (sym == NULL) { return sym; }
 
         switch (sym->scope) {
@@ -95,6 +97,10 @@ Symbol *sym_resolve(SymbolTable *st, char *name) {
         }
     }
     return sym;
+}
+
+Symbol *sym_resolve(SymbolTable *st, char *name) {
+    return resolve(st, hash_fnv1a(name));
 }
 
 Symbol *sym_function_name(SymbolTable *st, char *name) {

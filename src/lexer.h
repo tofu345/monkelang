@@ -4,8 +4,10 @@
 
 #include <stddef.h>
 
+// TODO: read directly from a FILE.
+// TODO: attach length to Token.
+
 typedef struct {
-    // TODO: maybe read from a FILE directly?
     const char* input;
     size_t input_len;
 

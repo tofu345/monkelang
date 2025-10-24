@@ -1,4 +1,5 @@
 #include "builtin.h"
+#include "allocation.h"
 #include "object.h"
 #include "vm.h"
 #include "table.h" // provides type for "table"
@@ -121,25 +122,13 @@ builtin_rest(VM *vm, Object *args, int num_args) {
             {
                 // create shallow copy of array.
                 ObjectBuffer old_arr = *args[0].data.array;
-                int new_length = old_arr.length - 1;
-                ObjectBuffer *new_arr;
                 if (old_arr.length > 1) {
-                    Object *new_buf = allocate(vm, old_arr.capacity * sizeof(Object));
-
-                    // copy from second element.
-                    memcpy(new_buf, old_arr.data + 1, new_length * sizeof(Object));
-
-                    new_arr = COMPOUND_OBJ(o_Array, ObjectBuffer, {
-                        .data = new_buf,
-                        .length = new_length,
-                        .capacity = old_arr.capacity
-                    });
-                    return OBJ(o_Array, .array = new_arr);
-
-                } else {
-                    new_arr = compound_obj(vm, o_Array, sizeof(ObjectBuffer), NULL);
+                    ObjectBuffer *new_arr =
+                        create_array(vm, old_arr.data + 1, old_arr.length - 1);
                     return OBJ(o_Array, .array = new_arr);
                 }
+
+                return OBJ(o_Array, .array = create_array(vm, NULL, 0));
             }
 
         default:

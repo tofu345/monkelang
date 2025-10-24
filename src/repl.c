@@ -84,8 +84,6 @@ cleanup:
         vm.sp = 0;
     }
 
-    // if [vm.c/DEBUG_PRINT] vm_free() must be called before program_free().
-    // Because [Function.name] points to data in AST.
     vm_free(&vm);
     for (int i = 0; i < programs.length; i++)
         program_free(&programs.data[i]);

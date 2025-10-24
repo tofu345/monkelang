@@ -6,6 +6,9 @@ OBJS := $(patsubst src/%.c,build/%.o,$(wildcard src/*.c))
 main: $(OBJS)
 	@ $(CC) $(CFLAGS) -o build/$@ $^ main.c src/hash-table/ht.c
 
+# recompile when changing DEBUG_PRINT
+build/allocation.o: src/vm.h
+
 build/%.o: src/%.c src/%.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 

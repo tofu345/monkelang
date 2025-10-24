@@ -3,7 +3,6 @@
 #include "constants.h"
 #include "parser.h"
 #include "code.h"
-#include "object.h"
 #include "symbol_table.h"
 
 typedef struct {

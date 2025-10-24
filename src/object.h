@@ -11,6 +11,7 @@
 // - char datatype
 // - support Unicode and emoji's
 // - stack tracing
+// - precompute string hashes
 
 #define OBJ(t, d) (Object){ .type = t, .data = { d } }
 #define ERR(...) OBJ(o_Error, .err = new_error(__VA_ARGS__))

@@ -8,6 +8,7 @@ void free_constant(Constant c) {
             {
                 Function *ins = c.data.function;
                 free(ins->instructions.data);
+                free(ins->name);
                 free(ins);
                 break;
             }

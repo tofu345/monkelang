@@ -469,10 +469,18 @@ _compile(Compiler *c, Node n) {
         case n_FunctionLiteral:
             {
                 FunctionLiteral *fl = n.obj;
+
+                // to avoid use after free if [vm_free()] comes after [program_free()].
+                char *name = NULL;
+                if (fl->name) {
+                    name = strdup(fl->name);
+                    if (name == NULL) { die("strdup"); }
+                }
+
                 enter_scope(c);
 
-                if (fl->name) {
-                    sym_function_name(c->current_symbol_table, fl->name);
+                if (name) {
+                    sym_function_name(c->current_symbol_table, name);
                 }
 
                 ParamBuffer params = fl->params;
@@ -507,7 +515,7 @@ _compile(Compiler *c, Node n) {
                     .instructions = *ins,
                     .num_locals = num_locals,
                     .num_parameters = params.length,
-                    .name = fl->name,
+                    .name = name,
                 };
                 Constant fn_const = {
                     .type = c_Function,
