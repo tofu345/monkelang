@@ -49,7 +49,7 @@ typedef struct {
     int frames_index; // index of current frame
 
     // The current number of bytes to allocate till before GC is run.
-    size_t bytesTillGC;
+    int64_t bytesTillGC;
     // most recent [Allocation] in linked list of all allocated
     // `Compound Data Type` objects.
     Allocation *last;
