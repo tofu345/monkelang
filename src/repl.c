@@ -51,13 +51,13 @@ void repl(FILE* in, FILE* out) {
             print_errors(out, &p.errors);
             program_free(&prog);
             goto cleanup;
-        } else if (prog.stmts.length >= 1) {
+        } else if (prog.stmts.length > 0) {
             ProgramBufferPush(&programs, prog);
         }
 
         err = compile(&c, &prog);
         if (err) {
-            fprintf(out, "Woops! Compilation failed:\n");
+            fprintf(out, "Woops! Compilation failed!\n");
             puts(err);
             free(err);
             goto cleanup;
@@ -65,7 +65,7 @@ void repl(FILE* in, FILE* out) {
 
         err = vm_run(&vm, bytecode(&c));
         if (err) {
-            fprintf(out, "Woops! Executing bytecode failed:\n");
+            fprintf(out, "Woops! Executing bytecode failed!\n");
             puts(err);
             free(err);
             goto cleanup;
@@ -74,21 +74,24 @@ void repl(FILE* in, FILE* out) {
         stack_elem = vm_last_popped(&vm);
         object_fprint(stack_elem, out);
         fputc('\n', out);
-        vm.stack[0] = (Object){}; // remove stack_elem
 
 cleanup:
         free(input);
         free(p.peek_token.literal);
         p.peek_token.literal = NULL;
         c.scopes.data[0].instructions.length = 0; // reset main scope
+        vm.stack[0] = (Object){}; // remove stack_elem
+        vm.sp = 0;
     }
 
+    // if [vm.c/DEBUG_PRINT] vm_free() must be called before program_free().
+    // Because [Function.name] points to data in AST.
+    vm_free(&vm);
     for (int i = 0; i < programs.length; i++)
         program_free(&programs.data[i]);
     free(programs.data);
     parser_free(&p);
     compiler_free(&c);
-    vm_free(&vm);
 }
 
 void run(char* program) {
@@ -111,7 +114,7 @@ void run(char* program) {
 
     err = compile(&c, &prog);
     if (err) {
-        fprintf(stdout, "Woops! Compilation failed:\n");
+        fprintf(stdout, "Woops! Compilation failed!\n");
         puts(err);
         free(err);
         goto cleanup;
@@ -119,15 +122,15 @@ void run(char* program) {
 
     err = vm_run(&vm, bytecode(&c));
     if (err) {
-        fprintf(stdout, "Woops! Executing bytecode failed:\n");
+        fprintf(stdout, "Woops! Executing bytecode failed!\n");
         puts(err);
         free(err);
         goto cleanup;
     }
 
 cleanup:
+    vm_free(&vm);
     program_free(&prog);
     parser_free(&p);
     compiler_free(&c);
-    vm_free(&vm);
 }

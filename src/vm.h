@@ -41,7 +41,7 @@ typedef struct {
     // The current number of bytes to allocate till before GC is run.
     int bytesTillGC;
     // most recent [Allocation] in linked list of all allocated
-    // (Compound Data Type) objects.
+    // `Compound Data Type` objects.
     Allocation *last;
 } VM;
 
@@ -51,9 +51,13 @@ void vm_free(VM *vm);
 
 error vm_run(VM *vm, Bytecode bytecode);
 
-Object vm_last_popped(VM *vm);
+// push [obj] onto the stack, returns error if [vm.sp] >= [StackSize].
 error vm_push(VM *vm, Object obj);
+
+// retrieve `vm.stack[vm.sp - 1]` and decrement [vm.sp].
+// NOTE: does not check if [vm.sp] >= 0.
 Object vm_pop(VM *vm);
+Object vm_last_popped(VM *vm);
 
 // perform deep copy of [obj]
 Object object_copy(VM* vm, Object obj);
@@ -62,7 +66,7 @@ Object object_copy(VM* vm, Object obj);
 #define COMPOUND_OBJ(typ, data, ...) \
     compound_obj(vm, typ, sizeof(data), &(data)__VA_ARGS__ );
 
-// create Compound Data Type of [size] and initialiaze with [data] or 0;
+// create `Compound Data Type` of [size] and initialiaze with [data] or 0;
 void *compound_obj(VM *vm, ObjectType type, size_t size, void *data);
 
 // allocate [size] and decrement [vm.bytesTillGC]

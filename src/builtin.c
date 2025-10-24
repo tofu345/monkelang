@@ -9,11 +9,16 @@
 #define ERR_NUM_ARGS(...) OBJ(o_Error, .err = error_num_args(__VA_ARGS__))
 
 Object builtin_exit([[maybe_unused]] VM *vm, [[maybe_unused]] Object *args, int num_args) {
-    if (num_args != 0) {
-        return ERR_NUM_ARGS("builtin exit()", 0, num_args);
+    if (num_args != 1) {
+        return ERR_NUM_ARGS("builtin exit()", 1, num_args);
     }
 
-    exit(0);
+    if (args[0].type != o_Integer) {
+        return ERR("builtin exit() expects argument of %s got %s",
+                show_object_type(o_Integer), show_object_type(args[0].type));
+    }
+
+    exit(args[0].data.integer);
 }
 
 Object builtin_copy(VM *vm, Object *args, int num_args) {
@@ -141,8 +146,8 @@ Object builtin_push([[maybe_unused]] VM *vm, Object *args, int num_args) {
     }
 
     if (args[0].type != o_Array) {
-        return ERR("builtin push() expects first argument to be Array got %s",
-                show_object_type(args[0].type));
+        return ERR("builtin push() expects first argument to be %s got %s",
+                show_object_type(o_Array), show_object_type(args[0].type));
     }
 
     ObjectBufferPush(args[0].data.array, args[1]);

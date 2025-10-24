@@ -18,6 +18,13 @@
 const Object _true = BOOL(true);
 const Object _false = BOOL(false);
 
+static error
+error_unknown_operation(Opcode op, Object left, Object right) {
+    return new_error("unkown operation: %s %s %s",
+            lookup(op)->name, show_object_type(left.type),
+            show_object_type(right.type));
+}
+
 void vm_init(VM *vm, Object *stack, Object *globals, Frame *frames) {
     memset(vm, 0, sizeof(VM));
 
@@ -156,7 +163,8 @@ execute_binary_float_operation(VM *vm, Opcode op, Object left, Object right) {
             result = left.data.floating / right.data.floating;
             break;
         default:
-            return new_error("unkown float operator: (Opcode: %d)", op);
+            die("unknown binary float operator: %s (%d)",
+                    lookup(op)->name, op);
     }
 
     return vm_push(vm, OBJ(o_Float, .floating = result));
@@ -180,7 +188,8 @@ execute_binary_integer_operation(VM *vm, Opcode op, Object left, Object right) {
             result = left.data.integer / right.data.integer;
             break;
         default:
-            return new_error("unkown integer operator: (Opcode: %d)", op);
+            die("unknown binary integer operator: %s (%d)",
+                    lookup(op)->name, op);
     }
 
     return vm_push(vm, OBJ(o_Integer, .integer = result));
@@ -189,22 +198,19 @@ execute_binary_integer_operation(VM *vm, Opcode op, Object left, Object right) {
 static error
 execute_binary_string_operation(VM *vm, Opcode op, Object left, Object right) {
     if (op != OpAdd) {
-        return new_error("unkown string operator: (Opcode: %d)", op);
+        return new_error("unkown binary string operator: %s",
+                lookup(op)->name);
     }
 
     // copy [left] and [right] into new string
-    // NOTE: must occur before [compound_object()],
-    // if not, potential garbage collection and use after free.
     int length = left.data.string->length + right.data.string->length,
         capacity = power_of_2_ceil(length + 1);
+    CharBuffer *l = left.data.string,
+               *r = right.data.string;
     char *result = allocate(vm, capacity * sizeof(char));
 
-    memcpy(result,
-            left.data.string->data,
-            left.data.string->length * sizeof(char));
-    memcpy(result + left.data.string->length,
-            right.data.string->data,
-            right.data.string->length * sizeof(char));
+    memcpy(result, l->data, l->length * sizeof(char));
+    memcpy(result + l->length, r->data, r->length * sizeof(char));
     result[length] = '\0';
 
     CharBuffer* obj_data = COMPOUND_OBJ(o_String, CharBuffer, {
@@ -230,8 +236,7 @@ execute_binary_operation(VM *vm, Opcode op) {
         return execute_binary_string_operation(vm, op, left, right);
     }
 
-    return new_error("unsupported types for binary operation: %s (Opcode: %d) %s",
-            show_object_type(left.type), op, show_object_type(right.type));
+    return error_unknown_operation(op, left, right);
 }
 
 static error
@@ -249,7 +254,8 @@ execute_integer_comparison(VM *vm, Opcode op, Object left, Object right) {
             result = BOOL(left.data.integer > right.data.integer);
             break;
         default:
-            return new_error("unkown integer comparison operator: (Opcode: %d)", op);
+            die("unkown integer comparison operator: %s (%d)",
+                    lookup(op)->name, op);
     }
     return vm_push(vm, result);
 }
@@ -269,7 +275,8 @@ execute_float_comparison(VM *vm, Opcode op, Object left, Object right) {
             result = BOOL(left.data.floating > right.data.floating);
             break;
         default:
-            return new_error("unkown float comparison operator: (Opcode: %d)", op);
+            die("unkown float comparison operator: %s (%d)",
+                    lookup(op)->name, op);
     }
     return vm_push(vm, result);
 }
@@ -286,20 +293,22 @@ execute_comparison(VM *vm, Opcode op) {
         return execute_float_comparison(vm, op, left, right);
     }
 
-    Object eq = object_eq(left, right);
-    if (IS_ERR(eq)) { return eq.data.err; }
-
+    Object eq;
     switch (op) {
         case OpEqual:
+            eq = object_eq(left, right);
+            if (IS_ERR(eq)) { return eq.data.err; }
             return vm_push(vm, eq);
 
         case OpNotEqual:
+            eq = object_eq(left, right);
+            if (IS_ERR(eq)) { return eq.data.err; }
+
             eq.data.boolean = !eq.data.boolean;
             return vm_push(vm, eq);
 
         default:
-            return new_error("unkown comparison operator: (Opcode: %d) (%s %s)",
-                    op, show_object_type(left.type), show_object_type(right.type));
+            return error_unknown_operation(op, left, right);
     }
 }
 
@@ -349,10 +358,10 @@ execute_array_index(VM *vm, Object array, Object index) {
 }
 
 static error
-execute_table_index(VM *vm, Object hash, Object index) {
-    table *tbl = hash.data.table;
+execute_table_index(VM *vm, Object obj, Object index) {
+    table *tbl = obj.data.table;
     if (!hashable(index)) {
-        return new_error("unusable as hash key: %s",
+        return new_error("unusable as table key: %s",
                 show_object_type(index.type));
     }
 
@@ -371,8 +380,9 @@ execute_index_expression(VM *vm) {
         return execute_table_index(vm, left, index);
 
     } else {
-        return new_error("index operator not supported: %s[%s]",
-                show_object_type(left.type), show_object_type(index.type));
+        return new_error("cannot index %s with %s",
+                show_object_type(left.type),
+                show_object_type(index.type));
     }
 }
 
@@ -391,20 +401,20 @@ execute_set_array_index(Object array, Object index,
 }
 
 static error
-execute_set_table_index(Object hash, Object index, Object elem) {
-    table *tbl = hash.data.table;
+execute_set_table_index(Object obj, Object index, Object val) {
+    table *tbl = obj.data.table;
     if (!hashable(index)) {
         return new_error("unusable as table key: %s",
                 show_object_type(index.type));
     }
 
-    // [o_Null] value in table represents a lack of a value.
-    if (elem.type == o_Null) {
+    // [table] cannot have [o_Null] key or value.
+    if (val.type == o_Null) {
         table_remove(tbl, index);
         return 0;
     }
 
-    Object result = table_set(tbl, index, elem);
+    Object result = table_set(tbl, index, val);
     if (result.type == o_Null) {
         return new_error("could not set table index");
     }
@@ -436,8 +446,17 @@ is_truthy(Object obj) {
             return obj.data.boolean;
         case o_Null:
             return false;
+
         case o_Array:
             return obj.data.array->length > 0;
+        case o_Table:
+            return obj.data.table->length > 0;
+
+        case o_Integer:
+            return obj.data.integer != 0;
+        case o_Float:
+            return obj.data.floating != 0;
+
         default:
             return true;
     }
@@ -500,21 +519,21 @@ build_table(VM *vm, int start_index, int end_index) {
     table *tbl = compound_obj(vm, o_Table, sizeof(table), NULL);
     if (table_init(tbl) == NULL) { die("build_table"); }
 
-    Object key, val, res;
+    Object key, val;
     for (int i = start_index; i < end_index; i += 2) {
         key = vm->stack[i];
         val = vm->stack[i + 1];
 
         if (!hashable(key)) {
-            return ERR("unusable as table key: %s",
+            return ERR("cannot use type as table key: %s",
                     show_object_type(key.type));
         }
 
+        // [table] cannot have [o_Null] key or value.
         if (val.type == o_Null) { continue; }
 
-        res = table_set(tbl, key, val);
-        if (res.type == o_Null) {
-            return ERR("could not set as table value: %s",
+        if (IS_NULL(table_set(tbl, key, val))) {
+            return ERR("could not set table value: %s",
                     show_object_type(val.type));
         }
     }
@@ -526,10 +545,12 @@ static error
 call_closure(VM *vm, Closure *cl, int num_args) {
     Function *fn = cl->func;
     if (num_args != fn->num_parameters) {
+        char *name = "<anonymous function>";
         if (fn->name) {
-            return error_num_args(fn->name, fn->num_parameters, num_args);
-        }
-        return error_num_args("function", fn->num_parameters, num_args);
+            name = fn->name;
+        };
+
+        return error_num_args(name, fn->num_parameters, num_args);
     }
 
     error err = push_frame(vm);
@@ -541,7 +562,8 @@ call_closure(VM *vm, Closure *cl, int num_args) {
     frame_init(f, cl, base_pointer);
 
     if (fn->num_locals > 0) {
-        // set local variables to [o_Null].
+        // set local variables to [o_Null] to avoid wierd stuff if GC is
+        // triggered.
         memset(vm->stack + vm->sp, 0, fn->num_locals * sizeof(Object));
     }
 
@@ -959,6 +981,10 @@ free_allocation(Allocation *alloc) {
 }
 
 void vm_free(VM *vm) {
+#ifdef DEBUG_PRINT
+    puts("\ncleaning up:");
+#endif
+
     Allocation *next, *cur = vm->last;
     while (cur) {
         next = cur->next;
@@ -975,13 +1001,31 @@ void mark_objs(Object *objs, int len) {
         if (objs[i].type >= o_String) {
             trace_mark_object(objs[i]);
         }
+
+#ifdef DEBUG_PRINT
+        if (objs[i].type < o_String) {
+            printf("skip: ");
+            object_fprint(objs[i], stdout);
+            putc('\n', stdout);
+        }
+#endif
     }
 }
 
 void mark_and_sweep(VM *vm) {
+#ifdef DEBUG_PRINT
+    puts("stack:");
+#endif
     mark_objs(vm->stack, vm->sp);
+
+#ifdef DEBUG_PRINT
+    puts("\nglobals:");
+#endif
     mark_objs(vm->globals, vm->num_globals);
 
+#ifdef DEBUG_PRINT
+    puts("\nsweep:");
+#endif
     // sweep and rebuild Linked list of [Allocations].
     Allocation *cur = vm->last,
                *prev_marked = NULL;
@@ -1016,8 +1060,9 @@ void *compound_obj(VM *vm, ObjectType type, size_t size, void *data) {
     vm->bytesTillGC -= actual_size;
     if (vm->bytesTillGC <= 0) {
 #ifdef DEBUG_PRINT
-        printf("create object: %s\n", show_object_type(type));
-        printf("call stack:\n");
+        putc('\n', stdout);
+        printf("creating object: '%s' triggered mark_and_sweep from:\n",
+                show_object_type(type));
         for (int i = 0; i <= vm->frames_index; i++) {
             printf("-> function: %s\n", vm->frames[i].cl->func->name);
         }
@@ -1026,6 +1071,10 @@ void *compound_obj(VM *vm, ObjectType type, size_t size, void *data) {
 
         mark_and_sweep(vm);
         vm->bytesTillGC = NextGC;
+
+#ifdef DEBUG_PRINT
+        putc('\n', stdout);
+#endif
     }
 
     Allocation *ptr = malloc(actual_size);

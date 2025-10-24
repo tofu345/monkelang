@@ -6,6 +6,7 @@
 #include "symbol_table.h"
 #include "utils.h"
 
+#include <assert.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -82,25 +83,29 @@ replace_instruction(Compiler *c, int pos, Instructions new) {
     for (int i = 0; i < new.length; i++) {
         ins[pos + i] = new.data[i];
     }
+    free(new.data);
+}
+
+static void
+replace_last_opcode_with(Compiler *c, Opcode old, Opcode new) {
+    CompilationScope *cur_scope = c->scopes.data + c->scope_index;
+    int last_pos = cur_scope->last_instruction.position;
+
+    assert(c->current_instructions->data[last_pos] == old);
+
+    replace_instruction(c, last_pos, make(new));
+    cur_scope->last_instruction.opcode = new;
 }
 
 static void
 replace_last_pop_with_return(Compiler *c) {
-    CompilationScope *cur_scope = c->scopes.data + c->scope_index;
-    int last_pos = cur_scope->last_instruction.position;
-    Instructions new = make(OpReturnValue);
-    replace_instruction(c, last_pos, new);
-    free(new.data);
-
-    cur_scope->last_instruction.opcode = OpReturnValue;
+    replace_last_opcode_with(c, OpPop, OpReturnValue);
 }
 
 static void
 change_operand(Compiler *c, int op_pos, int operand) {
     Opcode op = c->current_instructions->data[op_pos];
-    Instructions new = make(op, operand);
-    replace_instruction(c, op_pos, new);
-    free(new.data);
+    replace_instruction(c, op_pos, make(op, operand));
 }
 
 static void
@@ -202,13 +207,13 @@ _compile(Compiler *c, Node n) {
 
         case n_AssignStatement:
             {
-                AssignStatement *ae = n.obj;
+                AssignStatement *stmt = n.obj;
 
-                err = _compile(c, ae->right);
+                err = _compile(c, stmt->right);
                 if (err) { return err; }
 
-                if (ae->left.typ == n_Identifier) {
-                    Identifier *id = ae->left.obj;
+                if (stmt->left.typ == n_Identifier) {
+                    Identifier *id = stmt->left.obj;
 
                     char *name = id->tok.literal;
                     Symbol *symbol = sym_resolve(c->current_symbol_table, name);
@@ -216,40 +221,38 @@ _compile(Compiler *c, Node n) {
                         return new_error("undefined variable '%s'", name);
                     }
 
-                    if (symbol->scope == GlobalScope) {
-                        emit(c, OpSetGlobal, symbol->index);
-                    } else {
-                        emit(c, OpSetLocal, symbol->index);
+                    char *format;
+                    switch (symbol->scope) {
+                        case GlobalScope:
+                            emit(c, OpSetGlobal, symbol->index);
+                            return 0;
+
+                        case LocalScope:
+                            emit(c, OpSetLocal, symbol->index);
+                            return 0;
+
+                        case FreeScope:
+                            format = "free variable '%s' is not assignable";
+                            return new_error(format, name);
+
+                        case FunctionScope:
+                            format = "function '%s' is not assignable";
+                            return new_error(format, name);
+
+                        case BuiltinScope:
+                            format = "builtin %s() is not assignable";
+                            return new_error(format, name);
                     }
-                    return 0;
 
-                } else if (ae->left.typ == n_IndexExpression) {
-                    IndexExpression *index_exp = ae->left.obj;
-
-                    if (index_exp->left.typ != n_Identifier) {
-                        return new_error("cannot assign non-variable");
-                    }
-
-                    Identifier *ident = index_exp->left.obj;
-
-                    char *name = ident->tok.literal;
-                    Symbol *symbol = sym_resolve(c->current_symbol_table, name);
-                    if (symbol == NULL) {
-                        return new_error("undefined variable '%s'", name);
-                    }
-
-                    err = _compile(c, index_exp->left);
+                } else if (stmt->left.typ == n_IndexExpression) {
+                    err = _compile(c, stmt->left);
                     if (err) { return err; }
 
-                    err = _compile(c, index_exp->index);
-                    if (err) { return err; }
-
-                    emit(c, OpSetIndex);
+                    replace_last_opcode_with(c, OpIndex, OpSetIndex);
                     return 0;
                 }
 
-                return new_error("assign type %d not implemented",
-                        ae->left.typ);
+                return new_error("cannot assign non-variable");
             }
 
         case n_InfixExpression:
