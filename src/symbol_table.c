@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <string.h>
 
-DEFINE_BUFFER(Symbol, Symbol *);
+DEFINE_BUFFER(Symbol, Symbol *)
 
 void symbol_table_init(SymbolTable *st) {
     memset(st, 0, sizeof(SymbolTable));

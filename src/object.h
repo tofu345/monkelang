@@ -15,17 +15,18 @@
 #define OBJ(t, d) (Object){ .type = t, .data = { d } }
 #define ERR(...) OBJ(o_Error, .err = new_error(__VA_ARGS__))
 #define BOOL(b) OBJ(o_Boolean, .boolean = b)
-#define NULL_OBJ (Object){}
+#define NULL_OBJ (Object){ .type = 0 }
 
 #define IS_ERR(obj) (obj.type == o_Error)
 #define IS_NULL(obj) (obj.type == o_Null)
 
 typedef struct Object Object;
-BUFFER(Object, Object);
-BUFFER(Char, char);
 typedef struct table table;
 typedef struct Closure Closure;
 typedef struct Builtin Builtin;
+
+BUFFER(Object, Object)
+BUFFER(Char, char)
 
 typedef enum __attribute__ ((__packed__)) {
     // Primitive data types:

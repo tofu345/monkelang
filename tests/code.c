@@ -43,7 +43,7 @@ void test_make(void) {
 }
 
 void test_instructions_string(void) {
-    Instructions test = {};
+    Instructions test = {0};
     make_into(&test, OpAdd);
     make_into(&test, OpGetLocal, 1);
     make_into(&test, OpConstant, 2);

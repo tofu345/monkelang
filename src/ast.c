@@ -10,9 +10,9 @@
     if (node_fprint( __VA_ARGS__, fp) == -1) \
         return -1;
 
-DEFINE_BUFFER(Param, Identifier*);
-DEFINE_BUFFER(Node, Node);
-DEFINE_BUFFER(Pair, Pair);
+DEFINE_BUFFER(Param, Identifier*)
+DEFINE_BUFFER(Node, Node)
+DEFINE_BUFFER(Pair, Pair)
 
 char* token_literal(const Node n) {
     // since the first element of every `node.obj` is a token.
@@ -398,43 +398,56 @@ void node_free(Node n) {
 
     switch (n.typ) {
         case n_PrefixExpression:
-            return free_prefix_expression(n.obj);
+            free_prefix_expression(n.obj);
+            return;
 
         case n_InfixExpression:
-            return free_infix_expression(n.obj);
+            free_infix_expression(n.obj);
+            return;
 
         case n_IfExpression:
-            return free_if_expression(n.obj);
+            free_if_expression(n.obj);
+            return;
 
         case n_FunctionLiteral:
-            return free_function_literal(n.obj);
+            free_function_literal(n.obj);
+            return;
 
         case n_CallExpression:
-            return free_call_expression(n.obj);
+            free_call_expression(n.obj);
+            return;
 
         case n_LetStatement:
-            return free_let_statement(n.obj);
+            free_let_statement(n.obj);
+            return;
 
         case n_ReturnStatement:
-            return free_return_statement(n.obj);
+            free_return_statement(n.obj);
+            return;
 
         case n_ExpressionStatement:
-            return free_expression_statement(n.obj);
+            free_expression_statement(n.obj);
+            return;
 
         case n_BlockStatement:
-            return free_block_statement(n.obj);
+            free_block_statement(n.obj);
+            return;
 
         case n_ArrayLiteral:
-            return free_array_literal(n.obj);
+            free_array_literal(n.obj);
+            return;
 
         case n_IndexExpression:
-            return free_index_expression(n.obj);
+            free_index_expression(n.obj);
+            return;
 
         case n_AssignStatement:
-            return free_assign_statement(n.obj);
+            free_assign_statement(n.obj);
+            return;
 
         case n_TableLiteral:
-            return free_table_literal(n.obj);
+            free_table_literal(n.obj);
+            return;
 
         default:
             // since first field of `n.obj` is `Token`

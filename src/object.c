@@ -8,8 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-DEFINE_BUFFER(Object, Object);
-DEFINE_BUFFER(Char, char);
+DEFINE_BUFFER(Object, Object)
+DEFINE_BUFFER(Char, char)
 
 static int
 fprintf_integer(long i, FILE* fp) {

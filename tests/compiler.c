@@ -14,7 +14,7 @@ void tearDown(void) {}
 // compiler test
 static void c_test(
     char *input,
-    ExpectedConstants expectedConstants,
+    Constants expectedConstants,
     Instructions *expectedInstructions
 );
 
@@ -87,12 +87,12 @@ void test_integer_arithmetic(void) {
 void test_boolean_expressions(void) {
     c_test(
         "true",
-        (ExpectedConstants){},
+        (Constants){0},
         _I( make(OpTrue), make(OpPop) )
     );
     c_test(
         "false",
-        (ExpectedConstants){},
+        (Constants){0},
         _I( make(OpFalse), make(OpPop) )
     );
     c_test(
@@ -137,7 +137,7 @@ void test_boolean_expressions(void) {
     );
     c_test(
         "true == false",
-        (ExpectedConstants){},
+        (Constants){0},
         _I(
             make(OpTrue),
             make(OpFalse),
@@ -147,7 +147,7 @@ void test_boolean_expressions(void) {
     );
     c_test(
         "true != false",
-        (ExpectedConstants){},
+        (Constants){0},
         _I(
             make(OpTrue),
             make(OpFalse),
@@ -157,7 +157,7 @@ void test_boolean_expressions(void) {
     );
     c_test(
         "!true",
-        (ExpectedConstants){},
+        (Constants){0},
         _I(
             make(OpTrue),
             make(OpBang),
@@ -282,7 +282,7 @@ void test_string_expressions(void) {
 void test_array_literals(void) {
     c_test(
         "[]",
-        (ExpectedConstants){},
+        (Constants){0},
         _I(
             make(OpArray, 0),
             make(OpPop)
@@ -321,7 +321,7 @@ void test_array_literals(void) {
 void test_Table_literals(void) {
     c_test(
         "{}",
-        (ExpectedConstants){},
+        (Constants){0},
         _I(
             make(OpTable, 0),
             make(OpPop)
@@ -970,12 +970,12 @@ void test_assign_expressions(void) {
 }
 
 static int test_instructions(Instructions *expected, Instructions *actual);
-static int test_constants(ExpectedConstants expected, ConstantBuffer *actual);
+static int test_constants(Constants expected, ConstantBuffer *actual);
 
 static void
 c_test(
     char *input,
-    ExpectedConstants expectedConstants,
+    Constants expectedConstants,
     Instructions *expectedInstructions
 ) {
     Program prog = test_parse(input);
@@ -1074,7 +1074,7 @@ test_integer_constant(long expected, Constant actual) {
 }
 
 static int
-test_constants(ExpectedConstants expected, ConstantBuffer *actual) {
+test_constants(Constants expected, ConstantBuffer *actual) {
     if (actual->length != expected.length) {
         printf("wrong constants length.\nwant=%d\ngot =%d\n",
                 expected.length, actual->length);

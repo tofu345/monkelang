@@ -140,7 +140,7 @@ static char* read_digit(Lexer* l, TokenType* t) {
 Token lexer_next_token(Lexer* l) {
     skip_whitespace(l);
 
-    Token tok = {};
+    Token tok = {0};
     tok.line = l->line;
     tok.col = l->col;
     switch (l->ch) {

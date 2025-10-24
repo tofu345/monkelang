@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -g -Wall -Wextra
+CFLAGS = -g -Wall -Werror -Wextra -pedantic-errors
 
 OBJS := $(patsubst src/%.c,build/%.o,$(wildcard src/*.c))
 

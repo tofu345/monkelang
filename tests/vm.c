@@ -725,7 +725,7 @@ __run_vm(char *input) {
     for (int i = 0;
             i < StackSize && vm.stack[i].type != o_Null;
             i++) {
-        vm.stack[i] = (Object){};
+        memset(vm.stack + i, 0, sizeof(Object));
     }
     memset(vm.globals, 0, vm.num_globals * sizeof(Object));
 

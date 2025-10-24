@@ -17,14 +17,14 @@ print_errors(FILE* out, ErrorBuffer *buf) {
     buf->length = 0;
 }
 
-BUFFER(Program, Program);
-DEFINE_BUFFER(Program, Program);
+BUFFER(Program, Program)
+DEFINE_BUFFER(Program, Program)
 
 void repl(FILE* in, FILE* out) {
     Parser p;
     parser_init(&p);
     Program prog;
-    ProgramBuffer programs = {};
+    ProgramBuffer programs = {0};
 
     Compiler c;
     compiler_init(&c);
@@ -80,7 +80,7 @@ cleanup:
         free(p.peek_token.literal);
         p.peek_token.literal = NULL;
         c.scopes.data[0].instructions.length = 0; // reset main scope
-        vm.stack[0] = (Object){}; // remove stack_elem
+        vm.stack[0] = (Object){0}; // remove stack_elem
         vm.sp = 0;
     }
 

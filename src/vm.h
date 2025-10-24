@@ -7,6 +7,9 @@
 
 #include <stdint.h>
 
+// TODO:
+// - check for integer overflow, underflow.
+
 static const int StackSize = 2048;
 static const int GlobalsSize = 2048;
 static const int MaxFraxes = 1024;
@@ -22,7 +25,7 @@ typedef struct Allocation {
     void *object_data[]; // not initialiazed, points to data after struct.
 } Allocation;
 
-BUFFER(Frame, Frame);
+BUFFER(Frame, Frame)
 
 typedef struct {
     ConstantBuffer constants;

@@ -33,7 +33,7 @@ int power_of_2_ceil(int n) {
     return n;
 }
 
-DEFINE_BUFFER(Error, error);
+DEFINE_BUFFER(Error, error)
 
 error new_error(const char* format, ...) {
     va_list args;

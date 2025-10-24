@@ -78,18 +78,18 @@ bucket_get_value(table_bucket *bucket, uint64_t hash, ObjectType type) {
     while (bucket != NULL) {
         for (size_t i = 0; i < N; i++) {
             if (bucket->k_type[i] == o_Null)
-                return (Object){};
+                return NULL_OBJ;
 
             if (bucket->hashes[i] == hash && bucket->k_type[i] == type)
                 return (Object){ bucket->v_type[i], bucket->v_data[i] };
         }
         bucket = bucket->overflow;
     }
-    return (Object){};
+    return NULL_OBJ;
 }
 
 Object table_get(table *tbl, Object key) {
-    if (key.type == o_Null) return (Object){};
+    if (key.type == o_Null) return NULL_OBJ;
     uint64_t hash = object_hash(key);
     size_t index = hash_index(hash, tbl->_buckets_length);
     return bucket_get_value(tbl->buckets + index, hash, key.type);
@@ -126,7 +126,7 @@ bucket_set(table *tbl, table_bucket *bucket, uint64_t hash, Object key,
         return bucket_set(tbl, bucket->overflow, hash, key, val);
     else {
         table_bucket *new_bucket = calloc(1, sizeof(table_bucket));
-        if (new_bucket == NULL) return (Object){};
+        if (new_bucket == NULL) return NULL_OBJ;
         _bucket_set(new_bucket, 0, key, val);
         new_bucket->hashes[0] = hash;
         tbl->length++;
@@ -186,12 +186,12 @@ table_expand(table *tbl) {
 
 Object
 table_set(table *tbl, Object key, Object value) {
-    if (IS_NULL(key) || IS_NULL(value)) return (Object){};
+    if (IS_NULL(key) || IS_NULL(value)) return NULL_OBJ;
 
     size_t half_full = tbl->length >= (tbl->_buckets_length * N) / 2;
     if (half_full) {
         if (!table_expand(tbl)) {
-            return (Object){};
+            return NULL_OBJ;
         }
     }
 
@@ -202,7 +202,7 @@ table_set(table *tbl, Object key, Object value) {
 
 Object
 table_remove(table *tbl, Object key) {
-    if (key.type == o_Null) return (Object){};
+    if (key.type == o_Null) return NULL_OBJ;
 
     uint64_t hash = object_hash(key);
     size_t index = hash_index(hash, tbl->_buckets_length);
@@ -237,7 +237,7 @@ table_remove(table *tbl, Object key) {
         bucket = bucket->overflow;
     }
 
-    return (Object){};
+    return NULL_OBJ;
 }
 
 void

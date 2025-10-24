@@ -24,7 +24,7 @@
 // From: wren DEFINE_BUFFER
 #define DEFINE_BUFFER(name, typ)                                              \
     void name##BufferInit(name##Buffer* buf) {                                \
-        *buf = (name##Buffer){};                                              \
+        memset(buf, 0, sizeof(name##Buffer));                                 \
     }                                                                         \
                                                                               \
     void name##BufferAllocate(name##Buffer* buf, int length) {                \
@@ -49,7 +49,7 @@
 void die(const char *fmt, ...);
 
 typedef char *error;
-BUFFER(Error, error);
+BUFFER(Error, error)
 
 error new_error(const char* format, ...);
 error error_num_args(const char *name, int expected, int actual);

@@ -25,7 +25,7 @@ typedef struct {
     int index;
 } Symbol;
 
-BUFFER(Symbol, Symbol *);
+BUFFER(Symbol, Symbol *)
 
 typedef struct SymbolTable {
     struct SymbolTable *outer;

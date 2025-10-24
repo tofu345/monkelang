@@ -34,4 +34,4 @@ typedef struct {
 } Test;
 
 #define TEST(t, v) &(Test){ test_##t, { ._##t = v } }
-#define TEST_NULL &(Test){}
+#define TEST_NULL &(Test){0}

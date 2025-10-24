@@ -17,8 +17,8 @@ static int add_constant(Compiler *c, Constant obj_const);
 // allocate new [SymbolTable] and add ptr to [c.symbol_tables]
 static SymbolTable *new_symbol_table(Compiler *c);
 
-DEFINE_BUFFER(Scope, CompilationScope);
-DEFINE_BUFFER(SymbolTable, SymbolTable *);
+DEFINE_BUFFER(Scope, CompilationScope)
+DEFINE_BUFFER(SymbolTable, SymbolTable *)
 
 void compiler_init(Compiler *c) {
     memset(c, 0, sizeof(Compiler));
@@ -38,7 +38,7 @@ void compiler_init(Compiler *c) {
     }
 
     // init main scope
-    ScopeBufferPush(&c->scopes, (CompilationScope){});
+    ScopeBufferPush(&c->scopes, (CompilationScope){0});
     c->current_instructions = &c->scopes.data[0].instructions;
 }
 
@@ -551,7 +551,7 @@ void enter_scope(Compiler *c) {
     int new_scope_idx = ++c->scope_index;
 
     // allocate new scope if necessary.
-    ScopeBufferPush(&c->scopes, (CompilationScope){});
+    ScopeBufferPush(&c->scopes, (CompilationScope){0});
     c->current_instructions =
         &c->scopes.data[new_scope_idx].instructions;
 

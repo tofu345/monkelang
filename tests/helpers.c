@@ -48,7 +48,7 @@ concat(Instructions cur, ...) {
     return concatted;
 }
 
-ExpectedConstants
+Constants
 constants(Test *t, ...) {
     va_list ap;
     int length = 0, capacity = 8;
@@ -66,5 +66,5 @@ constants(Test *t, ...) {
         t = va_arg(ap, Test *);
     } while (t);
     va_end(ap);
-    return (ExpectedConstants){ buf, length };
+    return (Constants){ buf, length };
 }

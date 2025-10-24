@@ -159,7 +159,7 @@ Instructions
 make(Opcode op, ...) {
     va_list ap;
     va_start(ap, op);
-    Instructions ins = {};
+    Instructions ins = {0};
     make_valist_into(&ins, op, ap);
     va_end(ap);
     return ins;

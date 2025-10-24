@@ -745,7 +745,7 @@ void test_function_parameter_parsing(void) {
         char* expectedParams[3];
         int len;
     } tests[] = {
-        {"fn() {};", {}, 0},
+        {"fn() {};", {0}, 0},
         {"fn(x) {};", {"x"}, 1},
         {"fn(x, y, z) {};", {"x", "y", "z"}, 3},
     };
@@ -865,7 +865,7 @@ void test_parsing_array_literals(void) {
     test_infix_expression(al->elements.data[2],
             TEST(int, 3), "+", TEST(int, 3));
     _test_integer_literal(al->elements.data[3], 0xdeadbeef, "0xdeadbeef");
-    _test_integer_literal(al->elements.data[4], 0b11011, "0b11011");
+    _test_integer_literal(al->elements.data[4], 27, "0b11011");
 
     program_free(&prog);
     parser_free(&p);

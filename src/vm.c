@@ -15,9 +15,6 @@
 
 // #define DEBUG_PRINT
 
-const Object _true = BOOL(true);
-const Object _false = BOOL(false);
-
 static error
 error_unknown_operation(Opcode op, Object left, Object right) {
     return new_error("unkown operation: %s %s %s",
@@ -320,9 +317,9 @@ execute_bang_operator(VM *vm) {
             operand.data.boolean = !operand.data.boolean;
             return vm_push(vm, operand);
         case o_Null:
-            return vm_push(vm, _true);
+            return vm_push(vm, BOOL(true));
         default:
-            return vm_push(vm, _false);
+            return vm_push(vm, BOOL(false));
     }
 }
 
@@ -683,11 +680,11 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 break;
 
             case OpTrue:
-                err = vm_push(vm, _true);
+                err = vm_push(vm, BOOL(true));
                 if (err) { return err; };
                 break;
             case OpFalse:
-                err = vm_push(vm, _false);
+                err = vm_push(vm, BOOL(false));
                 if (err) { return err; };
                 break;
 
@@ -877,7 +874,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
 
 Object stack_top(VM *vm) {
     if (vm->sp == 0) {
-        return (Object){};
+        return NULL_OBJ;
     }
     return vm->stack[vm->sp - 1];
 }

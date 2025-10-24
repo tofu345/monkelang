@@ -34,6 +34,6 @@ typedef struct {
     } data;
 } Constant;
 
-BUFFER(Constant, Constant);
+BUFFER(Constant, Constant)
 
 void free_constant(Constant c);

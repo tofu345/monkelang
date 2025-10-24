@@ -1,6 +1,6 @@
 #include "constants.h"
 
-DEFINE_BUFFER(Constant, Constant);
+DEFINE_BUFFER(Constant, Constant)
 
 void free_constant(Constant c) {
     switch (c.type) {

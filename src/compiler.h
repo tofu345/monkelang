@@ -17,8 +17,8 @@ typedef struct {
     EmittedInstruction previous_instruction;
 } CompilationScope;
 
-BUFFER(Scope, CompilationScope);
-BUFFER(SymbolTable, SymbolTable *);
+BUFFER(Scope, CompilationScope)
+BUFFER(SymbolTable, SymbolTable *)
 
 typedef struct {
     ConstantBuffer constants;

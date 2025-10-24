@@ -8,7 +8,10 @@
 
 #define ERR_NUM_ARGS(...) OBJ(o_Error, .err = error_num_args(__VA_ARGS__))
 
-Object builtin_exit([[maybe_unused]] VM *vm, [[maybe_unused]] Object *args, int num_args) {
+Object
+builtin_exit(__attribute__ ((unused)) VM *vm, __attribute__ ((unused)) Object
+        *args, int num_args) {
+
     if (num_args != 1) {
         return ERR_NUM_ARGS("builtin exit()", 1, num_args);
     }
@@ -21,7 +24,8 @@ Object builtin_exit([[maybe_unused]] VM *vm, [[maybe_unused]] Object *args, int 
     exit(args[0].data.integer);
 }
 
-Object builtin_copy(VM *vm, Object *args, int num_args) {
+Object
+builtin_copy(VM *vm, Object *args, int num_args) {
     if (num_args != 1) {
         return ERR_NUM_ARGS("builtin copy()", 1, num_args);
     }
@@ -29,7 +33,8 @@ Object builtin_copy(VM *vm, Object *args, int num_args) {
     return object_copy(vm, args[0]);
 }
 
-Object builtin_len([[maybe_unused]] VM *vm, Object *args, int num_args) {
+Object
+builtin_len(__attribute__ ((unused)) VM *vm, Object *args, int num_args) {
     if (num_args != 1) {
         return ERR_NUM_ARGS("builtin len()", 1, num_args);
     }
@@ -59,7 +64,8 @@ Object builtin_len([[maybe_unused]] VM *vm, Object *args, int num_args) {
     }
 }
 
-Object builtin_first([[maybe_unused]] VM *vm, Object *args, int num_args) {
+Object
+builtin_first(__attribute__ ((unused)) VM *vm, Object *args, int num_args) {
     if (num_args != 1) {
         return ERR_NUM_ARGS("builtin first()", 1, num_args);
     }
@@ -82,7 +88,8 @@ Object builtin_first([[maybe_unused]] VM *vm, Object *args, int num_args) {
 
 }
 
-Object builtin_last([[maybe_unused]] VM *vm, Object *args, int num_args) {
+Object
+builtin_last(__attribute__ ((unused)) VM *vm, Object *args, int num_args) {
     if (num_args != 1) {
         return ERR_NUM_ARGS("builtin last()", 1, num_args);
     }
@@ -103,7 +110,8 @@ Object builtin_last([[maybe_unused]] VM *vm, Object *args, int num_args) {
     }
 }
 
-Object builtin_rest(VM *vm, Object *args, int num_args) {
+Object
+builtin_rest(VM *vm, Object *args, int num_args) {
     if (num_args != 1) {
         return ERR_NUM_ARGS("builtin rest()", 1, num_args);
     }
@@ -140,7 +148,8 @@ Object builtin_rest(VM *vm, Object *args, int num_args) {
     }
 }
 
-Object builtin_push([[maybe_unused]] VM *vm, Object *args, int num_args) {
+Object
+builtin_push(__attribute__ ((unused)) VM *vm, Object *args, int num_args) {
     if (num_args != 2) {
         return ERR_NUM_ARGS("builtin push()", 2, num_args);
     }
@@ -163,7 +172,8 @@ _puts(Object obj) {
     }
 }
 
-Object builtin_puts([[maybe_unused]] VM *vm, Object *args, int num_args) {
+Object
+builtin_puts(__attribute__ ((unused)) VM *vm, Object *args, int num_args) {
     for (int i = 0; i < num_args - 1; i++) {
         _puts(args[i]);
         printf(" ");

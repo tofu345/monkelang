@@ -78,7 +78,9 @@ test_table_iterator(void) {
         table_set(&tbl, OBJ(o_Integer, i), OBJ(o_Integer, i));
     }
 
-    bool is_found[num] = {};
+    bool is_found[num];
+    memset(is_found, 0, num);
+
     tbl_it it;
     tbl_iterator(&it, &tbl);
     while (tbl_next(&it)) {

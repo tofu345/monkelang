@@ -51,7 +51,7 @@ int node_fprint(const Node n, FILE* fp);
 // free `n.obj`
 void node_free(Node n);
 
-BUFFER(Node, Node);
+BUFFER(Node, Node)
 
 typedef struct {
     NodeBuffer stmts;
@@ -129,7 +129,7 @@ typedef struct {
     BlockStatement* alternative;
 } IfExpression;
 
-BUFFER(Param, Identifier*);
+BUFFER(Param, Identifier*)
 
 typedef struct {
     Token tok; // the 'fn' token
@@ -167,7 +167,7 @@ typedef struct {
     Node val;
 } Pair;
 
-BUFFER(Pair, Pair);
+BUFFER(Pair, Pair)
 
 typedef struct {
     Token tok; // the '{' token

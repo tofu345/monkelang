@@ -11,13 +11,13 @@
 typedef struct {
     Test *data;
     int length;
-} ExpectedConstants;
+} Constants;
 
 #define _C(...) constants(__VA_ARGS__, NULL)
 #define _I(...) concat(__VA_ARGS__, NULL)
 
 Instructions *concat(Instructions cur, ...);
-ExpectedConstants constants(Test *t, ...);
+Constants constants(Test *t, ...);
 
 Program test_parse(char *input);
 
