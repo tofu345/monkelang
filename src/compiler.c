@@ -400,9 +400,9 @@ _compile(Compiler *c, Node n) {
                 return 0;
             }
 
-        case n_HashLiteral:
+        case n_TableLiteral:
             {
-                PairBuffer pairs = ((HashLiteral *)n.obj)->pairs;
+                PairBuffer pairs = ((TableLiteral *)n.obj)->pairs;
                 for (int i = 0; i < pairs.length; i++) {
                     err = _compile(c, pairs.data[i].key);
                     if (err) { return err; }
@@ -410,7 +410,7 @@ _compile(Compiler *c, Node n) {
                     err = _compile(c, pairs.data[i].val);
                     if (err) { return err; }
                 }
-                emit(c, OpHash, pairs.length * 2);
+                emit(c, OpTable, pairs.length * 2);
                 return 0;
             }
 

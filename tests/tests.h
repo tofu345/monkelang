@@ -15,7 +15,7 @@ typedef enum {
     test_str,
     test_bool,
     test_arr,
-    test_hash,
+    test_table,
     test_ins,
 } Type;
 

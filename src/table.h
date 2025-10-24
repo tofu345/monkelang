@@ -40,10 +40,10 @@ void table_free(table *tbl);
 // Return value, or [Object] with type [o_Null] if not found.
 Object table_get(table *tbl, Object key);
 
-// Returns:
-// - previous value of [key] if present.
-// - [value] on success, otherwise
-// - [Object] with [o_Null] type.
+// Returns previous value of [key] if present or [value] on success.
+// [o_Null Object] if:
+// - [key] or [value] is [o_Null Object].
+// - allocation of [table_bucket] overflow failed.
 Object table_set(table *tbl, Object key, Object value);
 
 // Remove item with [key] and return its value or [o_Null] if not found.

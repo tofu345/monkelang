@@ -42,9 +42,9 @@ Object builtin_len([[maybe_unused]] VM *vm, Object *args, int num_args) {
                 return OBJ(o_Integer, arr->length);
             }
 
-        case o_Hash:
+        case o_Table:
             {
-                table* tbl = args[0].data.hash;
+                table* tbl = args[0].data.table;
                 return OBJ(o_Integer, tbl->length);
             }
 

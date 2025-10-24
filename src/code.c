@@ -39,7 +39,7 @@ const Definition definitions[] = {
     DEF(OpGetGlobal, two),    // globals index
     DEF(OpSetGlobal, two),    // globals index
     DEF(OpArray, two), // num elements
-    DEF(OpHash, two),  // num pairs
+    DEF(OpTable, two),  // num pairs
     DEF_EMPTY(OpIndex),
     DEF_EMPTY(OpSetIndex),
     DEF(OpCall, one), // num arguments

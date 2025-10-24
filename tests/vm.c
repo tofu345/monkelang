@@ -105,14 +105,14 @@ test_array_literals(void) {
     vm_test("[1 + 2, 3 * 4, 5 + 6]", TEST_ARR(3, 12, 11));
 }
 
-#define TEST_HASH(...) \
-    &(Test){ test_hash, { ._arr = make_test_array(__VA_ARGS__, 0) }}
+#define TEST_TABLE(...) \
+    &(Test){ test_table, { ._arr = make_test_array(__VA_ARGS__, 0) }}
 
 static void
-test_hash_literals(void) {
-    vm_test("{}", TEST_HASH(0));
-    vm_test("{1: 2, 2: 3}", TEST_HASH(1, 2, 2, 3));
-    vm_test("{1 + 1: 2 * 2, 3 + 3: 4 * 4}", TEST_HASH(2, 4, 6, 16));
+test_table_literals(void) {
+    vm_test("{}", TEST_TABLE(0));
+    vm_test("{1: 2, 2: 3}", TEST_TABLE(1, 2, 2, 3));
+    vm_test("{1 + 1: 2 * 2, 3 + 3: 4 * 4}", TEST_TABLE(2, 4, 6, 16));
 }
 
 static void
@@ -329,9 +329,18 @@ test_calling_functions_with_bindings(void) {
 
 static void
 test_calling_functions_with_wrong_arguments(void) {
-    vm_test_error("fn() { 1; }(1)", "function takes 0 arguments got 1");
-    vm_test_error("fn(a) { a; }()", "function takes 1 argument got 0");
-    vm_test_error("fn(a, b) { a + b; }(1)", "function takes 2 arguments got 1");
+    vm_test_error(
+        "fn() { 1; }(1)",
+        "<anonymous function> takes 0 arguments got 1"
+    );
+    vm_test_error(
+        "fn(a) { a; }()",
+        "<anonymous function> takes 1 argument got 0"
+    );
+    vm_test_error(
+        "fn(a, b) { a + b; }(1)",
+        "<anonymous function> takes 2 arguments got 1"
+    );
 }
 
 static void
@@ -350,11 +359,11 @@ test_builtin_functions(void) {
     vm_test("rest([])", TEST_ARR(0));
     vm_test("push([], 1)", TEST_ARR(1));
 
-    vm_test_error("len(1)", "builtin len(): argument of Integer not supported");
+    vm_test_error("len(1)", "builtin len(): argument of integer not supported");
     vm_test_error("len(\"one\", \"two\")", "builtin len() takes 1 argument got 2");
-    vm_test_error("first(1)", "builtin first(): argument of Integer not supported");
-    vm_test_error("last(1)", "builtin last(): argument of Integer not supported");
-    vm_test_error("push(1, 1)", "builtin push() expects first argument to be Array got Integer");
+    vm_test_error("first(1)", "builtin first(): argument of integer not supported");
+    vm_test_error("last(1)", "builtin last(): argument of integer not supported");
+    vm_test_error("push(1, 1)", "builtin push() expects first argument to be array got integer");
 }
 
 static void
@@ -664,13 +673,13 @@ test_expected_object(Test expected, Object actual) {
                 return 0;
             }
 
-        case test_hash:
+        case test_table:
             {
-                if (!expect_object_is(o_Hash, actual)) {
+                if (!expect_object_is(o_Table, actual)) {
                     return -1;
                 }
 
-                table *tbl = actual.data.hash;
+                table *tbl = actual.data.table;
                 TestArray *exp = expected.val._arr;
                 size_t num_pairs = exp->length / 2;
                 if (num_pairs != tbl->length) {
@@ -690,7 +699,7 @@ test_expected_object(Test expected, Object actual) {
 
                     err = test_integer_object(exp->data[i + 1], value);
                     if (err != 0) {
-                        printf("test hash element %d failed", i);
+                        printf("test table element %d failed", i);
                         return -1;
                     }
                 }
@@ -740,7 +749,7 @@ __run_vm(char *input) {
     //     printf("CONSTANT %d ", i);
     //     switch (cn.type) {
     //         case c_Function:
-    //             printf("Instructions %s:\n", cn.data.function->name);
+    //             printf("%s() Instructions:\n", cn.data.function->name);
     //             fprint_instructions(stdout, cn.data.function->instructions);
     //             break;
     //         case c_Integer:
@@ -750,7 +759,7 @@ __run_vm(char *input) {
     //             printf("Value: %f\n", cn.data.floating);
     //             break;
     //         case c_String:
-    //             printf("Value: %s\n", cn.data.string->data);
+    //             printf("Value: \"%s\"\n", cn.data.string->data);
     //             break;
     //     }
     // }
@@ -817,7 +826,7 @@ int main(void) {
     RUN_TEST(test_global_let_statements);
     RUN_TEST(test_string_expressions);
     RUN_TEST(test_array_literals);
-    RUN_TEST(test_hash_literals);
+    RUN_TEST(test_table_literals);
     RUN_TEST(test_index_expressions);
     RUN_TEST(test_calling_functions_without_arguments);
     RUN_TEST(test_functions_without_return_value);

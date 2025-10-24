@@ -97,7 +97,7 @@ Object object_copy(VM* vm, Object obj) {
                 return OBJ(o_Array, .array = new_arr);
             }
 
-        case o_Hash:
+        case o_Table:
             die("object_copy hash: not implemented");
             return NULL_OBJ;
 
@@ -349,8 +349,8 @@ execute_array_index(VM *vm, Object array, Object index) {
 }
 
 static error
-execute_hash_index(VM *vm, Object hash, Object index) {
-    table *tbl = hash.data.hash;
+execute_table_index(VM *vm, Object hash, Object index) {
+    table *tbl = hash.data.table;
     if (!hashable(index)) {
         return new_error("unusable as hash key: %s",
                 show_object_type(index.type));
@@ -367,8 +367,8 @@ execute_index_expression(VM *vm) {
     if (left.type == o_Array && index.type == o_Integer) {
         return execute_array_index(vm, left, index);
 
-    } else if (left.type == o_Hash) {
-        return execute_hash_index(vm, left, index);
+    } else if (left.type == o_Table) {
+        return execute_table_index(vm, left, index);
 
     } else {
         return new_error("index operator not supported: %s[%s]",
@@ -391,10 +391,10 @@ execute_set_array_index(Object array, Object index,
 }
 
 static error
-execute_set_hash_index(Object hash, Object index, Object elem) {
-    table *tbl = hash.data.hash;
+execute_set_table_index(Object hash, Object index, Object elem) {
+    table *tbl = hash.data.table;
     if (!hashable(index)) {
-        return new_error("unusable as hash key: %s",
+        return new_error("unusable as table key: %s",
                 show_object_type(index.type));
     }
 
@@ -406,7 +406,7 @@ execute_set_hash_index(Object hash, Object index, Object elem) {
 
     Object result = table_set(tbl, index, elem);
     if (result.type == o_Null) {
-        return new_error("could not set hash index");
+        return new_error("could not set table index");
     }
     return 0;
 }
@@ -420,8 +420,8 @@ execute_set_index(VM *vm) {
     if (left.type == o_Array && index.type == o_Integer) {
         return execute_set_array_index(left, index, right);
 
-    } else if (left.type == o_Hash) {
-        return execute_set_hash_index(left, index, right);
+    } else if (left.type == o_Table) {
+        return execute_set_table_index(left, index, right);
 
     } else {
         return new_error("index assignment operator not supported: %s[%s]",
@@ -496,9 +496,9 @@ build_array(VM *vm, int start_index, int end_index) {
 }
 
 static Object
-build_hash(VM *vm, int start_index, int end_index) {
-    table *tbl = compound_obj(vm, o_Hash, sizeof(table), NULL);
-    if (table_init(tbl) == NULL) { die("build_hash"); }
+build_table(VM *vm, int start_index, int end_index) {
+    table *tbl = compound_obj(vm, o_Table, sizeof(table), NULL);
+    if (table_init(tbl) == NULL) { die("build_table"); }
 
     Object key, val, res;
     for (int i = start_index; i < end_index; i += 2) {
@@ -506,7 +506,7 @@ build_hash(VM *vm, int start_index, int end_index) {
         val = vm->stack[i + 1];
 
         if (!hashable(key)) {
-            return ERR("unusable as hash key: %s",
+            return ERR("unusable as table key: %s",
                     show_object_type(key.type));
         }
 
@@ -514,12 +514,12 @@ build_hash(VM *vm, int start_index, int end_index) {
 
         res = table_set(tbl, key, val);
         if (res.type == o_Null) {
-            return ERR("could not set as hash value: %s",
+            return ERR("could not set as table value: %s",
                     show_object_type(val.type));
         }
     }
 
-    return OBJ(o_Hash, .hash = tbl);
+    return OBJ(o_Table, .table = tbl);
 }
 
 static error
@@ -733,12 +733,12 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 if (err) { return err; };
                 break;
 
-            case OpHash:
+            case OpTable:
                 // number of elements
                 num = read_big_endian_uint16(ins.data + ip + 1);
                 current_frame->ip += 2;
 
-                obj = build_hash(vm, vm->sp - num, vm->sp);
+                obj = build_table(vm, vm->sp - num, vm->sp);
                 if (IS_ERR(obj)) { return obj.data.err; };
                 vm->sp -= num;
 
@@ -906,11 +906,11 @@ trace_mark_object(Object obj) {
                 trace_mark_object(obj.data.array->data[i]);
             return;
 
-        case o_Hash:
+        case o_Table:
             mark_alloc(obj);
 
             tbl_it it;
-            tbl_iterator(&it, obj.data.hash);
+            tbl_iterator(&it, obj.data.table);
             while (tbl_next(&it)) {
                 trace_mark_object(it.cur_key);
                 trace_mark_object(it.cur_val);
@@ -944,7 +944,7 @@ free_allocation(Allocation *alloc) {
             free(((ObjectBuffer *)obj_data)->data);
             break;
 
-        case o_Hash:
+        case o_Table:
             table_free(obj_data);
             break;
 

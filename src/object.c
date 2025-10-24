@@ -59,7 +59,7 @@ fprint_array(ObjectBuffer *array, FILE* fp) {
 }
 
 static int
-fprint_hash(table *tbl, FILE* fp) {
+fprint_table(table *tbl, FILE* fp) {
     FPRINTF(fp, "{");
     tbl_it it;
     tbl_iterator(&it, tbl);
@@ -78,17 +78,17 @@ fprint_hash(table *tbl, FILE* fp) {
 
 static int
 fprint_closure(Closure *cl, FILE *fp) {
-    FPRINTF(fp, "Function");
     if (cl->func->name) {
-        FPRINTF(fp, "<%s>", cl->func->name);
+        FPRINTF(fp, "<function: %s>", cl->func->name);
+    } else {
+        FPRINTF(fp, "<anonymous function>");
     }
-    FPRINTF(fp, "[%p]", cl->func);
     return 0;
 }
 
 static int
 fprint_builtin_function(Builtin *builtin, FILE *fp) {
-    FPRINTF(fp, "Builtin<%s>", builtin->name);
+    FPRINTF(fp, "<builtin function: %s>", builtin->name);
     return 0;
 }
 
@@ -116,8 +116,8 @@ int object_fprint(Object o, FILE* fp) {
         case o_Array:
             return fprint_array(o.data.array, fp);
 
-        case o_Hash:
-            return fprint_hash(o.data.hash, fp);
+        case o_Table:
+            return fprint_table(o.data.table, fp);
 
         case o_BuiltinFunction:
             return fprint_builtin_function(o.data.ptr, fp);
@@ -172,21 +172,21 @@ Object object_eq(Object left, Object right) {
             }
 
         default:
-            return ERR("cannot compare %s\n", show_object_type(left.type));
+            return ERR("cannot compare %s", show_object_type(left.type));
     }
 }
 
 const char* object_types[] = {
-    "Null",
-    "Integer",
-    "Float",
-    "Boolean",
-    "Builtin",
-    "Error",
-    "String",
-    "Array",
-    "Hash",
-    "Function",
+    "null",
+    "integer",
+    "float",
+    "boolean",
+    "builtin",
+    "error",
+    "string",
+    "array",
+    "table",
+    "function",
 };
 
 const char* show_object_type(ObjectType t) {

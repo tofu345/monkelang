@@ -389,8 +389,8 @@ parse_array_literal(Parser* p) {
 }
 
 static Node
-parse_hash_literal(Parser* p) {
-    HashLiteral* hl = allocate(sizeof(HashLiteral));
+parse_table_literal(Parser* p) {
+    TableLiteral* hl = allocate(sizeof(TableLiteral));
     hl->tok = p->cur_token;
     PairBufferInit(&hl->pairs);
 
@@ -399,13 +399,13 @@ parse_hash_literal(Parser* p) {
 
         Node key = parse_expression(p, p_Lowest);
         if (key.obj == NULL) {
-            free_hash_literal(hl);
+            free_table_literal(hl);
             return (Node){};
         }
 
         if (!expect_peek(p, t_Colon)) {
             node_free(key);
-            free_hash_literal(hl);
+            free_table_literal(hl);
             return (Node){};
         }
 
@@ -416,7 +416,7 @@ parse_hash_literal(Parser* p) {
         if (value.obj == NULL) {
             free(p->cur_token.literal);
             node_free(key);
-            free_hash_literal(hl);
+            free_table_literal(hl);
             return (Node){};
         }
 
@@ -425,19 +425,19 @@ parse_hash_literal(Parser* p) {
         if (peek_token_is(p, t_Rbrace)) break;
 
         if (!expect_peek(p, t_Comma)) {
-            free_hash_literal(hl);
+            free_table_literal(hl);
             return (Node){};
         }
         free(p->cur_token.literal);
     }
 
     if (!expect_peek(p, t_Rbrace)) {
-        free_hash_literal(hl);
+        free_table_literal(hl);
         return (Node){};
     }
     free(p->cur_token.literal);
 
-    return NODE(n_HashLiteral, hl);
+    return NODE(n_TableLiteral, hl);
 }
 
 static Node
@@ -645,7 +645,7 @@ parse_return_statement(Parser* p) {
 }
 
 static Node
-parse_expression_statement(Parser* p) {
+parse_expression_or_assign_statement(Parser* p) {
     Token tok = p->cur_token; // the same token as left.tok
     Node left = parse_expression(p, p_Lowest);
     if (left.obj == NULL) {
@@ -700,7 +700,7 @@ parse_statement(Parser* p) {
         free(p->cur_token.literal);
         return (Node){};
     default:
-        return parse_expression_statement(p);
+        return parse_expression_or_assign_statement(p);
     }
 }
 
@@ -719,7 +719,7 @@ void parser_init(Parser* p) {
     p->prefix_parse_fns[t_Function] = parse_function_literal;
     p->prefix_parse_fns[t_String] = parse_string_literal;
     p->prefix_parse_fns[t_Lbracket] = parse_array_literal;
-    p->prefix_parse_fns[t_Lbrace] = parse_hash_literal;
+    p->prefix_parse_fns[t_Lbrace] = parse_table_literal;
     p->prefix_parse_fns[t_Null] = parse_null_literal;
 
     p->infix_parse_fns[t_Plus] = parse_infix_expression;

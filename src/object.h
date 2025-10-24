@@ -9,10 +9,7 @@
 
 // TODO:
 // - char datatype
-// - Hash -> Table
-// - show_object_type() lowercase type names
 // - support Unicode and emoji's
-//
 // - stack tracing
 
 #define OBJ(t, d) (Object){ .type = t, .data = { d } }
@@ -21,6 +18,7 @@
 #define NULL_OBJ (Object){}
 
 #define IS_ERR(obj) (obj.type == o_Error)
+#define IS_NULL(obj) (obj.type == o_Null)
 
 typedef struct Object Object;
 BUFFER(Object, Object);
@@ -42,7 +40,7 @@ typedef enum __attribute__ ((__packed__)) {
     // Compound data types:
     o_String,
     o_Array,
-    o_Hash,
+    o_Table,
     o_Closure,
 } ObjectType;
 
@@ -53,7 +51,7 @@ typedef union {
 
     CharBuffer* string;
     ObjectBuffer* array;
-    table* hash;
+    table* table;
     Closure *closure;
     error err;
     const struct Builtin *builtin;
@@ -68,7 +66,7 @@ struct Object {
 
 const char* show_object_type(ObjectType t);
 
-// can return error
+// compare [left] and [right]. returns error otherwise
 Object object_eq(Object left, Object right);
 
 // print [Object] to [fp], returns -1 on error

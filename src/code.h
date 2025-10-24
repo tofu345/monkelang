@@ -30,7 +30,7 @@ typedef enum {
     OpSetGlobal,
 
     OpArray,
-    OpHash,
+    OpTable,
     OpIndex,
     OpSetIndex,
 

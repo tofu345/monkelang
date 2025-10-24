@@ -21,7 +21,7 @@ enum NodeType {
     n_FunctionLiteral,
     n_StringLiteral,
     n_ArrayLiteral,
-    n_HashLiteral,
+    n_TableLiteral,
     n_PrefixExpression,
     n_InfixExpression,
     n_IfExpression,
@@ -172,9 +172,9 @@ BUFFER(Pair, Pair);
 typedef struct {
     Token tok; // the '{' token
     PairBuffer pairs;
-} HashLiteral;
+} TableLiteral;
 
-void free_hash_literal(HashLiteral* hl);
+void free_table_literal(TableLiteral* hl);
 
 typedef struct {
     Token tok; // the 'null' token

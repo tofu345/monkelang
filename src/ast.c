@@ -165,7 +165,7 @@ fprint_index_expression(IndexExpression* ie, FILE* fp) {
 }
 
 static int
-fprint_hash_literal_entry(Node key, Node value, FILE* fp) {
+fprint_table_literal_entry(Node key, Node value, FILE* fp) {
     NODE_FPRINT(fp, key);
     FPRINTF(fp, ": ");
     NODE_FPRINT(fp, value);
@@ -173,16 +173,16 @@ fprint_hash_literal_entry(Node key, Node value, FILE* fp) {
 }
 
 static int
-fprint_hash_literal(HashLiteral* hl, FILE* fp) {
+fprint_table_literal(TableLiteral* hl, FILE* fp) {
     FPRINTF(fp, "{");
     for (int i = 0; i < hl->pairs.length - 1; i++) {
         Pair* pair = &hl->pairs.data[i];
-        fprint_hash_literal_entry(pair->key, pair->val, fp);
+        fprint_table_literal_entry(pair->key, pair->val, fp);
         FPRINTF(fp, ", ");
     }
     if (hl->pairs.length > 1) {
         Pair* pair = &hl->pairs.data[hl->pairs.length - 1];
-        fprint_hash_literal_entry(pair->key, pair->val, fp);
+        fprint_table_literal_entry(pair->key, pair->val, fp);
     }
     FPRINTF(fp, "}");
     return 0;
@@ -252,8 +252,8 @@ int node_fprint(const Node n, FILE* fp) {
         case n_IndexExpression:
             return fprint_index_expression(n.obj, fp);
 
-        case n_HashLiteral:
-            return fprint_hash_literal(n.obj, fp);
+        case n_TableLiteral:
+            return fprint_table_literal(n.obj, fp);
 
         case n_StringLiteral:
             return fprint_string_literal(n.obj, fp);
@@ -374,7 +374,7 @@ free_index_expression(IndexExpression* ie) {
     free(ie);
 }
 
-void free_hash_literal(HashLiteral* hl) {
+void free_table_literal(TableLiteral* hl) {
     free(hl->tok.literal);
     for (int i = 0; i < hl->pairs.length; i++) {
         Pair* pair = &hl->pairs.data[i];
@@ -433,8 +433,8 @@ void node_free(Node n) {
         case n_AssignStatement:
             return free_assign_statement(n.obj);
 
-        case n_HashLiteral:
-            return free_hash_literal(n.obj);
+        case n_TableLiteral:
+            return free_table_literal(n.obj);
 
         default:
             // since first field of `n.obj` is `Token`

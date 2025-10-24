@@ -318,12 +318,12 @@ void test_array_literals(void) {
     );
 }
 
-void test_hash_literals(void) {
+void test_Table_literals(void) {
     c_test(
         "{}",
         (ExpectedConstants){},
         _I(
-            make(OpHash, 0),
+            make(OpTable, 0),
             make(OpPop)
         )
     );
@@ -337,7 +337,7 @@ void test_hash_literals(void) {
             make(OpConstant, 3),
             make(OpConstant, 4),
             make(OpConstant, 5),
-            make(OpHash, 6),
+            make(OpTable, 6),
             make(OpPop)
         )
     );
@@ -353,7 +353,7 @@ void test_hash_literals(void) {
             make(OpConstant, 4),
             make(OpConstant, 5),
             make(OpMul),
-            make(OpHash, 4),
+            make(OpTable, 4),
             make(OpPop)
         )
     );
@@ -381,7 +381,7 @@ void test_index_expressions(void) {
         _I(
             make(OpConstant, 0),
             make(OpConstant, 1),
-            make(OpHash, 2),
+            make(OpTable, 2),
             make(OpConstant, 2),
             make(OpConstant, 3),
             make(OpSub),
@@ -949,7 +949,7 @@ void test_assign_expressions(void) {
                 return a;\
             };\
         ",
-        _C( 
+        _C(
             INT(25), INT(2),
             INS(
                 make(OpConstant, 0),
@@ -1133,7 +1133,7 @@ int main(void) {
     RUN_TEST(test_global_let_statements);
     RUN_TEST(test_string_expressions);
     RUN_TEST(test_array_literals);
-    RUN_TEST(test_hash_literals);
+    RUN_TEST(test_Table_literals);
     RUN_TEST(test_index_expressions);
     RUN_TEST(test_functions);
     RUN_TEST(test_functions_without_return_value);

@@ -186,7 +186,7 @@ table_expand(table *tbl) {
 
 Object
 table_set(table *tbl, Object key, Object value) {
-    if (key.type == o_Null) return (Object){};
+    if (IS_NULL(key) || IS_NULL(value)) return (Object){};
 
     size_t half_full = tbl->length >= (tbl->_buckets_length * N) / 2;
     if (half_full) {

@@ -895,7 +895,7 @@ void test_parsing_index_expressions(void) {
     parser_free(&p);
 }
 
-void test_parsing_hash_literals_string_keys(void) {
+void test_parsing_table_literals_string_keys(void) {
     char* input = "{\"one\": 1, \"two\": 2, \"three\": 3}";
 
     Parser p;
@@ -908,12 +908,12 @@ void test_parsing_hash_literals_string_keys(void) {
 
     ExpressionStatement* es = prog.stmts.data[0].obj;
     TEST_ASSERT_MESSAGE(
-            n_HashLiteral == es->expression.typ,
-            "type not HashLiteral");
-    HashLiteral* hl = es->expression.obj;
+            n_TableLiteral == es->expression.typ,
+            "type not TableLiteral");
+    TableLiteral* hl = es->expression.obj;
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            3, hl->pairs.length, "wrong HashLiteral.pairs length");
+            3, hl->pairs.length, "wrong TableLiteral.pairs length");
 
     struct {
         char* key;
@@ -934,7 +934,7 @@ void test_parsing_hash_literals_string_keys(void) {
     parser_free(&p);
 }
 
-void test_parsing_empty_hash_literal(void) {
+void test_parsing_empty_table_literal(void) {
     char* input = "{}";
 
     Parser p;
@@ -947,18 +947,18 @@ void test_parsing_empty_hash_literal(void) {
 
     ExpressionStatement* es = prog.stmts.data[0].obj;
     TEST_ASSERT_MESSAGE(
-            n_HashLiteral == es->expression.typ,
-            "type not HashLiteral");
-    HashLiteral* hl = es->expression.obj;
+            n_TableLiteral == es->expression.typ,
+            "type not TableLiteral");
+    TableLiteral* hl = es->expression.obj;
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            0, hl->pairs.length, "wrong HashLiteral.pairs length");
+            0, hl->pairs.length, "wrong TableLiteral.pairs length");
 
     program_free(&prog);
     parser_free(&p);
 }
 
-void test_parsing_hash_literals_with_expressions(void) {
+void test_parsing_table_literals_with_expressions(void) {
     char* input = "{\"one\": 0 + 1, \"two\": 10 - 8, \"three\": 15 / 5}";
 
     Parser p;
@@ -971,12 +971,12 @@ void test_parsing_hash_literals_with_expressions(void) {
 
     ExpressionStatement* es = prog.stmts.data[0].obj;
     TEST_ASSERT_MESSAGE(
-            n_HashLiteral == es->expression.typ,
-            "type not HashLiteral");
-    HashLiteral* hl = es->expression.obj;
+            n_TableLiteral == es->expression.typ,
+            "type not TableLiteral");
+    TableLiteral* hl = es->expression.obj;
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            3, hl->pairs.length, "wrong HashLiteral.pairs length");
+            3, hl->pairs.length, "wrong TableLiteral.pairs length");
 
     struct Test {
         char* key;
@@ -1145,9 +1145,9 @@ int main(void) {
     RUN_TEST(test_string_literal_expression);
     RUN_TEST(test_parsing_array_literals);
     RUN_TEST(test_parsing_index_expressions);
-    RUN_TEST(test_parsing_hash_literals_string_keys);
-    RUN_TEST(test_parsing_empty_hash_literal);
-    RUN_TEST(test_parsing_hash_literals_with_expressions);
+    RUN_TEST(test_parsing_table_literals_string_keys);
+    RUN_TEST(test_parsing_empty_table_literal);
+    RUN_TEST(test_parsing_table_literals_with_expressions);
     RUN_TEST(test_parsing_assign_expressions);
     RUN_TEST(test_parsing_index_assign_expressions);
     RUN_TEST(test_parsing_null_literals);
