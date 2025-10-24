@@ -23,5 +23,3 @@ Program test_parse(char *input);
 
 // print and free any errors, set [errs.length] to 0
 void print_errors(ErrorBuffer* errs);
-void check_parser_errors(Parser* p);
-void check_compiler_errors(Compiler* c);

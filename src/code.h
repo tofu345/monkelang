@@ -28,7 +28,6 @@ typedef enum {
 
     OpGetGlobal,
     OpSetGlobal,
-    OpAssignGlobal, // [OpSetGlobal] but leave value on stack.
 
     OpArray,
     OpHash,
@@ -41,7 +40,6 @@ typedef enum {
 
     OpGetLocal,
     OpSetLocal,
-    OpAssignLocal, // [OpSetLocal] but leave value on stack.
 
     OpGetBuiltin,
 

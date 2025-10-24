@@ -5,7 +5,6 @@
 #include "constants.h"
 #include "symbol_table.h"
 #include "utils.h"
-#include "vm.h"
 
 #include <stdarg.h>
 #include <stdint.h>
@@ -201,9 +200,9 @@ _compile(Compiler *c, Node n) {
                 return 0;
             }
 
-        case n_AssignExpression:
+        case n_AssignStatement:
             {
-                AssignExpression *ae = n.obj;
+                AssignStatement *ae = n.obj;
 
                 err = _compile(c, ae->right);
                 if (err) { return err; }
@@ -218,9 +217,9 @@ _compile(Compiler *c, Node n) {
                     }
 
                     if (symbol->scope == GlobalScope) {
-                        emit(c, OpAssignGlobal, symbol->index);
+                        emit(c, OpSetGlobal, symbol->index);
                     } else {
-                        emit(c, OpAssignLocal, symbol->index);
+                        emit(c, OpSetLocal, symbol->index);
                     }
                     return 0;
 

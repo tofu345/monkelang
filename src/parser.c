@@ -150,34 +150,10 @@ parse_expression(Parser* p, enum Precedence precedence) {
 }
 
 static Node
-parse_assign_expression(Parser* p, Node left) {
-    AssignExpression *ae = allocate(sizeof(AssignExpression));
-    ae->tok = p->cur_token;
-    ae->left = left;
-
-    next_token(p);
-    ae->right = parse_expression(p, p_Lowest);
-    if (ae->right.obj == NULL) {
-        node_free(left);
-        free(ae->tok.literal);
-        free(ae);
-        return (Node){};
-    }
-
-    return NODE(n_AssignExpression, ae);
-}
-
-static Node
 parse_identifier(Parser* p) {
     Identifier* id = allocate(sizeof(Identifier));
     id->tok = p->cur_token;
-
-    Node node = NODE(n_Identifier, id);
-    if (peek_token_is(p, t_Assign)) {
-        next_token(p);
-        return parse_assign_expression(p, node);
-    }
-    return node;
+    return NODE(n_Identifier, id);
 }
 
 static Node
@@ -494,12 +470,7 @@ parse_index_expression(Parser* p, Node left) {
     }
     free(p->cur_token.literal); // ']' tok
 
-    Node node = NODE(n_IndexExpression, ie);
-    if (peek_token_is(p, t_Assign)) {
-        next_token(p);
-        return parse_assign_expression(p, node);
-    }
-    return node;
+    return NODE(n_IndexExpression, ie);
 }
 
 static NodeBuffer
@@ -675,20 +646,43 @@ parse_return_statement(Parser* p) {
 
 static Node
 parse_expression_statement(Parser* p) {
-    ExpressionStatement* stmt = allocate(sizeof(ExpressionStatement));
-    stmt->tok = p->cur_token; // will be the same as stmt.expression.tok
-
-    stmt->expression = parse_expression(p, p_Lowest);
-    if (stmt->expression.obj == NULL) {
-        free(stmt);
+    Token tok = p->cur_token; // the same token as left.tok
+    Node left = parse_expression(p, p_Lowest);
+    if (left.obj == NULL) {
         return (Node){};
+    }
+
+    Node stmt;
+    if (peek_token_is(p, t_Assign)) {
+        next_token(p);
+        tok = p->cur_token; // the '=' token
+        next_token(p);
+
+        Node right = parse_expression(p, p_Lowest);
+        if (right.obj == NULL) {
+            free(tok.literal);
+            node_free(left);
+            return (Node){};
+        }
+
+        AssignStatement *as = allocate(sizeof(AssignStatement));
+        as->left = left;
+        as->tok = tok;
+        as->right = right;
+        stmt = NODE(n_AssignStatement, as);
+
+    } else {
+        ExpressionStatement* es = allocate(sizeof(ExpressionStatement));
+        es->tok = tok;
+        es->expression = left;
+        stmt = NODE(n_ExpressionStatement, es);
     }
 
     if (peek_token_is(p, t_Semicolon)) {
         next_token(p);
         free(p->cur_token.literal);
     }
-    return NODE(n_ExpressionStatement, stmt);
+    return stmt;
 }
 
 // on failure, return Node with `n.obj` == NULL
@@ -728,7 +722,6 @@ void parser_init(Parser* p) {
     p->prefix_parse_fns[t_Lbrace] = parse_hash_literal;
     p->prefix_parse_fns[t_Null] = parse_null_literal;
 
-    p->infix_parse_fns[t_Assign] = parse_assign_expression;
     p->infix_parse_fns[t_Plus] = parse_infix_expression;
     p->infix_parse_fns[t_Minus] = parse_infix_expression;
     p->infix_parse_fns[t_Slash] = parse_infix_expression;

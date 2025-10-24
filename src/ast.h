@@ -27,10 +27,10 @@ enum NodeType {
     n_IfExpression,
     n_CallExpression,
     n_IndexExpression,
-    n_AssignExpression,
 
     // Statements
     n_LetStatement,
+    n_AssignStatement,
     n_ReturnStatement,
     n_ExpressionStatement,
     n_BlockStatement,
@@ -72,9 +72,9 @@ typedef struct {
 
 typedef struct {
     Token tok; // the 't_Assign' token
-    Node left;
+    Node left; // [Identifier] or [IndexExpression]
     Node right;
-} AssignExpression;
+} AssignStatement;
 
 typedef struct {
     Token tok; // the 't_Return' token

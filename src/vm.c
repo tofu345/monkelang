@@ -377,21 +377,21 @@ execute_index_expression(VM *vm) {
 }
 
 static error
-execute_assign_array_index([[maybe_unused]] VM *vm, Object array, Object index,
+execute_set_array_index(Object array, Object index,
         Object elem) {
     ObjectBuffer *arr = array.data.array;
     int i = index.data.integer,
         max = arr->length - 1;
     if (i < 0 || i > max) {
-        return new_error("list index out of range");
+        return new_error("cannot set list index out of range");
     }
 
     arr->data[i] = elem;
-    return vm_push(vm, elem); // because of [OpPop] from [ExpressionStatement]
+    return 0;
 }
 
 static error
-execute_assign_hash_index(VM *vm, Object hash, Object index, Object elem) {
+execute_set_hash_index(Object hash, Object index, Object elem) {
     table *tbl = hash.data.hash;
     if (!hashable(index)) {
         return new_error("unusable as hash key: %s",
@@ -400,27 +400,28 @@ execute_assign_hash_index(VM *vm, Object hash, Object index, Object elem) {
 
     // [o_Null] value in table represents a lack of a value.
     if (elem.type == o_Null) {
-        return vm_push(vm, table_remove(tbl, index));
+        table_remove(tbl, index);
+        return 0;
     }
 
     Object result = table_set(tbl, index, elem);
     if (result.type == o_Null) {
-        return new_error("could not execute hash index assignment");
+        return new_error("could not set hash index");
     }
-    return vm_push(vm, result);
+    return 0;
 }
 
 static error
-execute_assign_index_expression(VM *vm) {
+execute_set_index(VM *vm) {
     Object index = vm_pop(vm);
     Object left = vm_pop(vm);
     Object right = vm_pop(vm);
 
     if (left.type == o_Array && index.type == o_Integer) {
-        return execute_assign_array_index(vm, left, index, right);
+        return execute_set_array_index(left, index, right);
 
     } else if (left.type == o_Hash) {
-        return execute_assign_hash_index(vm, left, index, right);
+        return execute_set_hash_index(left, index, right);
 
     } else {
         return new_error("index assignment operator not supported: %s[%s]",
@@ -720,14 +721,6 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 if (err) { return err; };
                 break;
 
-            case OpAssignGlobal:
-                // globals index
-                pos = read_big_endian_uint16(ins.data + ip + 1);
-                current_frame->ip += 2;
-
-                vm->globals[pos] = vm->stack[vm->sp - 1];
-                break;
-
             case OpArray:
                 // number of array elements
                 num = read_big_endian_uint16(ins.data + ip + 1);
@@ -759,7 +752,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 break;
 
             case OpSetIndex:
-                err = execute_assign_index_expression(vm);
+                err = execute_set_index(vm);
                 if (err) { return err; };
                 break;
 
@@ -815,15 +808,6 @@ error vm_run(VM *vm, Bytecode bytecode) {
 
                 err = vm_push(vm, vm->stack[current_frame->base_pointer + pos]);
                 if (err) { return err; };
-                break;
-
-            case OpAssignLocal:
-                // locals index
-                pos = read_big_endian_uint8(ins.data + ip + 1);
-                current_frame->ip += 1;
-
-                obj = vm->stack[vm->sp - 1];
-                vm->stack[current_frame->base_pointer + pos] = obj;
                 break;
 
             case OpGetBuiltin:

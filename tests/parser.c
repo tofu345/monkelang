@@ -1017,30 +1017,24 @@ void test_parsing_assign_expressions(void) {
     Node n = prog.stmts.data[0];
 
     TEST_ASSERT_MESSAGE(
-            n_ExpressionStatement == n.typ, "type not ExpressionStatement");
+            n_AssignStatement == n.typ, "type not AssignStatement");
 
-    ExpressionStatement* es = n.obj;
-
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-            n_AssignExpression, es->expression.typ,
-            "ExpressionStatement Value is not AssignExpression");
-
-    AssignExpression* ae = es->expression.obj;
+    AssignStatement* as = n.obj;
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            n_Identifier, ae->left.typ,
-            "AssignExpression.Left is not Identifier");
+            n_Identifier, as->left.typ,
+            "AssignStatement.Left is not Identifier");
 
-    Identifier* ident = ae->left.obj;
+    Identifier* ident = as->left.obj;
 
     TEST_ASSERT_EQUAL_STRING_MESSAGE(
             "foobar", ident->tok.literal, "wrong Identifier.Token.value");
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            n_IntegerLiteral, ae->right.typ,
-            "AssignExpression.Right is not IntegerLiteral");
+            n_IntegerLiteral, as->right.typ,
+            "AssignStatement.Right is not IntegerLiteral");
 
-    IntegerLiteral* int_lit = ae->right.obj;
+    IntegerLiteral* int_lit = as->right.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             0, int_lit->value, "wrong IntegerLiteral.value");
 
@@ -1063,21 +1057,15 @@ void test_parsing_index_assign_expressions(void) {
     Node n = prog.stmts.data[0];
 
     TEST_ASSERT_MESSAGE(
-            n_ExpressionStatement == n.typ, "type not ExpressionStatement");
+            n_AssignStatement == n.typ, "type not AssignStatement");
 
-    ExpressionStatement* es = n.obj;
-
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-            n_AssignExpression, es->expression.typ,
-            "ExpressionStatement Value is not AssignExpression");
-
-    AssignExpression* ae = es->expression.obj;
+    AssignStatement* as = n.obj;
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            n_IndexExpression, ae->left.typ,
-            "AssignExpression.Left is not IndexExpression");
+            n_IndexExpression, as->left.typ,
+            "AssignStatement.Left is not IndexExpression");
 
-    IndexExpression* index = ae->left.obj;
+    IndexExpression* index = as->left.obj;
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             n_Identifier, index->left.typ,
@@ -1096,9 +1084,9 @@ void test_parsing_index_assign_expressions(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             12, index_int->value, "wrong IndexExpression.Index.value");
 
-    IntegerLiteral* int_lit = ae->right.obj;
+    IntegerLiteral* int_lit = as->right.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            69, int_lit->value, "wrong AssignExpression.Right.value");
+            69, int_lit->value, "wrong AssignStatement.Right.value");
 
     program_free(&prog);
     parser_free(&p);

@@ -11,19 +11,17 @@ void print_errors(ErrorBuffer* errs) {
     errs->length = 0;
 }
 
-void check_parser_errors(Parser* p) {
-    if (p->errors.length == 0) { return; }
-    printf("parser had %d errors\n", p->errors.length);
-    print_errors(&p->errors);
-    parser_free(p);
-    TEST_FAIL();
-}
-
 Program test_parse(char *input) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    check_parser_errors(&p);
+    if (p.errors.length > 0) { 
+        printf("test %s\n", input);
+        printf("parser had %d errors\n", p.errors.length);
+        print_errors(&p.errors);
+        parser_free(&p);
+        TEST_FAIL();
+    }
     parser_free(&p);
     return prog;
 }

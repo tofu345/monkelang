@@ -195,10 +195,11 @@ fprint_string_literal(StringLiteral* sl, FILE* fp) {
 }
 
 static int
-fprint_assign_expression(AssignExpression *ae, FILE *fp) {
+fprint_assign_statement(AssignStatement *ae, FILE *fp) {
     node_fprint(ae->left, fp);
     FPRINTF(fp, " = ");
     node_fprint(ae->right, fp);
+    FPRINTF(fp, ";");
     return 0;
 }
 
@@ -257,8 +258,8 @@ int node_fprint(const Node n, FILE* fp) {
         case n_StringLiteral:
             return fprint_string_literal(n.obj, fp);
 
-        case n_AssignExpression:
-            return fprint_assign_expression(n.obj, fp);
+        case n_AssignStatement:
+            return fprint_assign_statement(n.obj, fp);
 
         case n_NullLiteral:
             FPRINTF(fp, "null");
@@ -385,7 +386,7 @@ void free_hash_literal(HashLiteral* hl) {
 }
 
 static void
-free_assign_expression(AssignExpression *ae) {
+free_assign_statement(AssignStatement *ae) {
     node_free(ae->left);
     node_free(ae->right);
     free(ae->tok.literal);
@@ -429,8 +430,8 @@ void node_free(Node n) {
         case n_IndexExpression:
             return free_index_expression(n.obj);
 
-        case n_AssignExpression:
-            return free_assign_expression(n.obj);
+        case n_AssignStatement:
+            return free_assign_statement(n.obj);
 
         case n_HashLiteral:
             return free_hash_literal(n.obj);

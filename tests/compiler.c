@@ -913,8 +913,7 @@ void test_assign_expressions(void) {
             make(OpConstant, 0),
             make(OpSetGlobal, 0),
             make(OpConstant, 1),
-            make(OpAssignGlobal, 0),
-            make(OpPop)
+            make(OpSetGlobal, 0)
         )
     );
     c_test(
@@ -929,8 +928,7 @@ void test_assign_expressions(void) {
             make(OpConstant, 3),
             make(OpGetGlobal, 0),
             make(OpConstant, 4),
-            make(OpSetIndex),
-            make(OpPop)
+            make(OpSetIndex)
         )
     );
     c_test(
@@ -940,8 +938,33 @@ void test_assign_expressions(void) {
             make(OpNull, 0),
             make(OpSetGlobal, 0),
             make(OpConstant, 0),
-            make(OpAssignGlobal, 0),
-            make(OpPop)
+            make(OpSetGlobal, 0)
+        )
+    );
+    c_test(
+        "\
+            let func = fn() {\
+                let a = 25;\
+                a = a * 2;\
+                return a;\
+            };\
+        ",
+        _C( 
+            INT(25), INT(2),
+            INS(
+                make(OpConstant, 0),
+                make(OpSetLocal, 0),
+                make(OpGetLocal, 0),
+                make(OpConstant, 1),
+                make(OpMul),
+                make(OpSetLocal, 0),
+                make(OpGetLocal, 0),
+                make(OpReturnValue)
+            )
+        ),
+        _I(
+            make(OpClosure, 2, 0),
+            make(OpSetGlobal, 0)
         )
     );
 }

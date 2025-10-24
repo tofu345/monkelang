@@ -3,12 +3,13 @@ let fibonacci = fn(num) {
     let seen = {0: 0, 1: 1};
     let fib = fn(num) {
         let res = seen[num];
-        if (res != null) { 
-            return res; 
+        if (res != null) {
+            return res;
         }
 
-        // very sane syntax
-        return seen[num] = fib(num - 1) + fib(num - 2);
+        res = fib(num - 1) + fib(num - 2);
+        seen[num] = res;
+        return res;
     };
     fib(num);
 };
