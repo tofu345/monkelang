@@ -1,4 +1,5 @@
 #include "allocation.h"
+#include "ast.h"
 #include "object.h"
 #include "utils.h"
 #include "vm.h"
@@ -284,7 +285,8 @@ void *vm_allocate(VM *vm, size_t size) {
             putc('\n', stdout);
             printf("starting mark_and_sweep from:\n");
             for (int i = 0; i <= vm->frames_index; i++) {
-                printf("-> function: %s\n", vm->frames[i].cl->func->name);
+                Identifier *id = vm->frames[i].cl->func->name;
+                printf("-> function: %.*s\n", id->tok.length, id->tok.start);
             }
             putc('\n', stdout);
         }
