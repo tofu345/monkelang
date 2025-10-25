@@ -984,6 +984,7 @@ c_test(
 
     error err = compile(&c, &prog);
     if (err != 0) {
+        printf("test: %s\n", input);
         printf("compiler error: %s\n", err);
         free(err);
         TEST_FAIL();
@@ -1051,9 +1052,10 @@ test_string_constant(char *expected, Constant actual) {
         return -1;
     }
 
-    if (strcmp(actual.data.string->data, expected) != 0) {
-        printf("object has wrong value. got='%s', want='%s'\n",
-                actual.data.string->data, expected);
+    Token *tok = actual.data.string;
+    if (strncmp(tok->start, expected, tok->length) != 0) {
+        printf("object has wrong value. got='%.*s', want='%s'\n",
+                tok->length, tok->start, expected);
         return -1;
     }
     return 0;

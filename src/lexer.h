@@ -3,25 +3,20 @@
 #include "token.h"
 
 #include <stddef.h>
-
-// TODO: read directly from a FILE.
-// TODO: attach length to Token.
+#include <stdint.h>
 
 typedef struct {
-    const char* input;
-    size_t input_len;
+    const char *input;
+    uint64_t input_len;
 
-    char ch;
-    short col;
+    char ch; // current char
+    uint64_t position;      // index of current char
+    uint64_t read_position; // after current char
+
+    // 1-based line number of current char
     int line;
-    size_t position;      // current position in input (points to current char)
-    size_t read_position; // current reading position in input (after current char)
 } Lexer;
 
-// initiliaze lexer object with input (NULL-terminated).
-void lexer_init(Lexer *l, const char* input);
+void lexer_init(Lexer *l, const char *input);
 
-// Returns the next token parsed from input, this token contains a
-// literal that is copied from the input and must be freed by the
-// caller.
-Token lexer_next_token(Lexer* l);
+Token lexer_next_token(Lexer *l);

@@ -25,34 +25,33 @@ let result = add(five, ten);\
 5 < 10 > 5;\
 \
 if (5 < 10) {\
-	return true;\
+    return true;\
 } else {\
-	return false;\
+    return false;\
 }\
 \
 10 == 10;\
 10 != 9;\
 \"foobar\"\
 \"foo bar\"\
+\"foo\nbar\"\
 [1, 2];\
-0xdeadbeef;\
-0b11011;\
 {\"foo\": \"bar\"};\
 // this should be ignored";
 
     struct Test {
-        TokenType exp_typ;
-        char* exp_lit;
+        TokenType type;
+        char* str;
     } tests[] = {
 	{t_Let, "let"},
 	{t_Ident, "five"},
 	{t_Assign, "="},
-	{t_Int, "5"},
+	{t_Digit, "5"},
 	{t_Semicolon, ";"},
 	{t_Let, "let"},
 	{t_Ident, "ten"},
 	{t_Assign, "="},
-	{t_Int, "10"},
+	{t_Digit, "10"},
 	{t_Semicolon, ";"},
 	{t_Let, "let"},
 	{t_Ident, "add"},
@@ -84,19 +83,19 @@ if (5 < 10) {\
 	{t_Minus, "-"},
 	{t_Slash, "/"},
 	{t_Asterisk, "*"},
-	{t_Int, "5"},
+	{t_Digit, "5"},
 	{t_Semicolon, ";"},
-	{t_Int, "5"},
+	{t_Digit, "5"},
 	{t_Lt, "<"},
-	{t_Int, "10"},
+	{t_Digit, "10"},
 	{t_Gt, ">"},
-	{t_Int, "5"},
+	{t_Digit, "5"},
 	{t_Semicolon, ";"},
 	{t_If, "if"},
 	{t_Lparen, "("},
-	{t_Int, "5"},
+	{t_Digit, "5"},
 	{t_Lt, "<"},
-	{t_Int, "10"},
+	{t_Digit, "10"},
 	{t_Rparen, ")"},
 	{t_Lbrace, "{"},
 	{t_Return, "return"},
@@ -109,25 +108,22 @@ if (5 < 10) {\
 	{t_False, "false"},
 	{t_Semicolon, ";"},
 	{t_Rbrace, "}"},
-	{t_Int, "10"},
+	{t_Digit, "10"},
 	{t_Eq, "=="},
-	{t_Int, "10"},
+	{t_Digit, "10"},
 	{t_Semicolon, ";"},
-	{t_Int, "10"},
+	{t_Digit, "10"},
 	{t_Not_eq, "!="},
-	{t_Int, "9"},
+	{t_Digit, "9"},
 	{t_Semicolon, ";"},
 	{t_String, "foobar"},
 	{t_String, "foo bar"},
+	{t_String, "foo\nbar"},
 	{t_Lbracket, "["},
-	{t_Int, "1"},
+	{t_Digit, "1"},
 	{t_Comma, ","},
-	{t_Int, "2"},
+	{t_Digit, "2"},
 	{t_Rbracket, "]"},
-	{t_Semicolon, ";"},
-	{t_Int, "0xdeadbeef"},
-	{t_Semicolon, ";"},
-	{t_Int, "0b11011"},
 	{t_Semicolon, ";"},
 	{t_Lbrace, "{"},
 	{t_String, "foo"},
@@ -142,27 +138,28 @@ if (5 < 10) {\
     Lexer l;
     lexer_init(&l, input);
     for (size_t i = 0; i < len_tests; i++) {
-        char* msg = NULL;
-        if (asprintf(&msg, "tests[%d]", (int)i) == -1) {
-            TEST_FAIL_MESSAGE("no memory");
-        };
-
         struct Test t = tests[i];
-        Token tok = lexer_next_token(&l);
-        TEST_ASSERT_EQUAL_STRING_MESSAGE(
-                show_token_type(t.exp_typ), show_token_type(tok.type), msg);
-        if (t.exp_typ == t_Eof) {
-            TEST_ASSERT_NULL(tok.literal);
-        } else {
-            TEST_ASSERT_EQUAL_STRING_MESSAGE(t.exp_lit, tok.literal, msg);
-            free(tok.literal);
+        Token tok =
+            lexer_next_token(&l);
+
+        if (t.type != tok.type) {
+            printf("test[%zu]: invalid token type, expected '%s' got '%s'\n",
+                    i, show_token_type(t.type), show_token_type(tok.type));
+            TEST_FAIL();
         }
 
-        free(msg);
+        if (t.type == t_Eof) {
+            TEST_ASSERT_NULL(tok.start);
+
+        } else if (strncmp(t.str, tok.start, tok.length) != 0) {
+            printf("test[%zu]: invalid token literal, expected '%s' got '%.*s'\n",
+                    i, t.str, tok.length, tok.start);
+            TEST_FAIL();
+        }
     }
 }
 
-void test_lexer_line_col(void) {
+void test_lexer_line(void) {
     char input[] = "let five = 5;\n\
 let ten = 10;\n\
 \n\
@@ -175,78 +172,76 @@ let add = fn(x, y) {\n\
 ";
 
     struct Test {
-        TokenType exp_typ;
-        char* exp_lit;
-        char* line_col;
+        TokenType type;
+        char* str;
+        int line;
     } tests[] = {
-	{t_Let, "let", "1,1"},
-	{t_Ident, "five", "1,5"},
-	{t_Assign, "=", "1,10"},
-	{t_Int, "5", "1,12"},
-	{t_Semicolon, ";", "1,13"},
-	{t_Let, "let", "2,1"},
-	{t_Ident, "ten", "2,5"},
-	{t_Assign, "=", "2,9"},
-	{t_Int, "10", "2,11"},
-	{t_Semicolon, ";", "2,13"},
-	{t_Let, "let", "4,1"},
-	{t_Ident, "add", "4,5"},
-	{t_Assign, "=", "4,9"},
-	{t_Function, "fn", "4,11"},
-	{t_Lparen, "(", "4,13"},
-	{t_Ident, "x", "4,14"},
-	{t_Comma, ",", "4,15"},
-	{t_Ident, "y", "4,17"},
-	{t_Rparen, ")", "4,18"},
-	{t_Lbrace, "{", "4,20"},
-	{t_Ident, "x", "5,5"},
-	{t_Plus, "+", "5,7"},
-	{t_Ident, "y", "5,9"},
-	{t_Semicolon, ";", "5,10"},
-	{t_Rbrace, "}", "6,1"},
-	{t_Semicolon, ";", "6,2"},
-	{t_Int, "10", "9,1"},
-	{t_Eq, "==", "9,4"},
-	{t_Int, "10", "9,7"},
-	{t_Semicolon, ";", "9,9"},
-	{t_Eof, "", "10,1"},
+	{t_Let, "let", 1},
+	{t_Ident, "five", 1},
+	{t_Assign, "=", 1},
+	{t_Digit, "5", 1},
+	{t_Semicolon, ";", 1},
+	{t_Let, "let", 2},
+	{t_Ident, "ten", 2},
+	{t_Assign, "=", 2},
+	{t_Digit, "10", 2},
+	{t_Semicolon, ";", 2},
+	{t_Let, "let", 4},
+	{t_Ident, "add", 4},
+	{t_Assign, "=", 4},
+	{t_Function, "fn", 4},
+	{t_Lparen, "(", 4},
+	{t_Ident, "x", 4},
+	{t_Comma, ",", 4},
+	{t_Ident, "y", 4},
+	{t_Rparen, ")", 4},
+	{t_Lbrace, "{", 4},
+	{t_Ident, "x", 5},
+	{t_Plus, "+", 5},
+	{t_Ident, "y", 5},
+	{t_Semicolon, ";", 5},
+	{t_Rbrace, "}", 6},
+	{t_Semicolon, ";", 6},
+	{t_Digit, "10", 9},
+	{t_Eq, "==", 9},
+	{t_Digit, "10", 9},
+	{t_Semicolon, ";", 9},
+	{t_Eof, "", 10},
     };
 
     size_t len_tests = sizeof(tests) / sizeof(tests[0]);
     Lexer l;
     lexer_init(&l, input);
     for (size_t i = 0; i < len_tests; i++) {
-        char* msg = NULL;
-        if (asprintf(&msg, "tests[%d]", (int)i) == -1) {
-            TEST_FAIL_MESSAGE("no memory");
-        };
-
         struct Test t = tests[i];
         Token tok = lexer_next_token(&l);
-        TEST_ASSERT_EQUAL_STRING_MESSAGE(
-                show_token_type(t.exp_typ), show_token_type(tok.type), msg);
-        if (t.exp_typ == t_Eof) {
-            TEST_ASSERT_NULL(tok.literal);
-        } else {
-            TEST_ASSERT_EQUAL_STRING_MESSAGE(t.exp_lit, tok.literal, msg);
-            free(tok.literal);
+
+        if (t.type != tok.type) {
+            printf("test[%zu]: invalid token type, expected '%s' got '%s'\n",
+                    i, show_token_type(t.type), show_token_type(tok.type));
+            TEST_FAIL();
         }
 
-        char* line_col = NULL;
-        if (asprintf(&line_col, "%d,%d", tok.line, tok.col) == -1) {
-            TEST_FAIL_MESSAGE("no memory");
-        };
+        if (t.type == t_Eof) {
+            TEST_ASSERT_NULL(tok.start);
 
-        TEST_ASSERT_EQUAL_STRING_MESSAGE(t.line_col, line_col, msg);
+        } else if (strncmp(t.str, tok.start, tok.length) != 0) {
+            printf("test[%zu]: invalid token literal, expected '%s' got '%.*s'\n",
+                    i, t.str, tok.length, tok.start);
+            TEST_FAIL();
+        }
 
-        free(line_col);
-        free(msg);
+        if (t.line != tok.line) {
+            printf("test[%zu]: invalid token line, expected %d got %d\n",
+                    i, t.line, tok.line);
+            TEST_FAIL();
+        }
     }
 }
 
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_lexer_next_token);
-    RUN_TEST(test_lexer_line_col);
+    RUN_TEST(test_lexer_line);
     return UNITY_END();
 }

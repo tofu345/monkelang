@@ -1,3 +1,5 @@
+#include "parser.h"
+
 #include <stdio.h>
 
 void run(char* program);

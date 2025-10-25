@@ -5,9 +5,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#define FNV_OFFSET 14695981039346656037UL
-#define FNV_PRIME 1099511628211UL
-
 bool hashable(Object key) {
     switch (key.type) {
         case o_String:
@@ -19,18 +16,13 @@ bool hashable(Object key) {
     }
 }
 
-// TODO: user error instead of crash.
 uint64_t object_hash(Object key) {
-    uint64_t hash;
     switch (key.type) {
         case o_String:
-            // hash_fnv1a
-            hash = FNV_OFFSET;
-            for (const char *p = key.data.string->data; *p; p++) {
-                hash ^= (uint64_t)(unsigned char)(*p);
-                hash *= FNV_PRIME;
+            {
+                CharBuffer *str = key.data.string;
+                return hash_string_fnv1a(str->data, str->length);
             }
-            return hash;
 
         case o_Boolean:
             return key.data.boolean;
@@ -38,7 +30,8 @@ uint64_t object_hash(Object key) {
             return key.data.integer;
 
         default:
-            die("object_hash: type %s (%d) not implemented", show_object_type(key.type), key.type);
+            die("object_hash: type %s (%d) not implemented",
+                    show_object_type(key.type), key.type);
             return 0;
     }
 }

@@ -7,7 +7,7 @@
 #include <assert.h>
 #include <stdio.h>
 
-CharBuffer *create_string(VM *vm, char *text, int length) {
+CharBuffer *create_string(VM *vm, const char *text, int length) {
 #ifdef DEBUG_PRINT
     printf("creating %s", show_object_type(o_String));
     if (text) {
@@ -128,8 +128,7 @@ Object object_copy(VM* vm, Object obj) {
     }
 }
 
-static void
-mark(Object obj) {
+void mark(Object obj) {
     assert(obj.type >= o_String);
 
 #ifdef DEBUG_PRINT
@@ -238,19 +237,21 @@ void mark_objs(Object *objs, int len) {
 
 void mark_and_sweep(VM *vm) {
 #ifdef DEBUG_PRINT
-    puts("begin mark_and_sweep");
     puts("stack:");
 #endif
+
     mark_objs(vm->stack, vm->sp);
 
 #ifdef DEBUG_PRINT
     puts("\nglobals:");
 #endif
+
     mark_objs(vm->globals, vm->num_globals);
 
 #ifdef DEBUG_PRINT
     puts("\nsweep:");
 #endif
+
     // sweep and rebuild Linked list of [Allocations].
     Allocation *cur = vm->last,
                *prev_marked = NULL;
@@ -269,6 +270,10 @@ void mark_and_sweep(VM *vm) {
         cur = next;
     }
     vm->last = prev_marked;
+
+#ifdef DEBUG_PRINT
+    putc('\n', stdout);
+#endif
 }
 
 void *vm_allocate(VM *vm, size_t size) {

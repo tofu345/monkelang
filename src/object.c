@@ -1,4 +1,5 @@
 #include "object.h"
+#include "ast.h"
 #include "builtin.h" // provides type for "Builtin"
 #include "utils.h"
 #include "table.h"
@@ -79,7 +80,8 @@ fprint_table(table *tbl, FILE* fp) {
 static int
 fprint_closure(Closure *cl, FILE *fp) {
     if (cl->func->name) {
-        FPRINTF(fp, "<function: %s>", cl->func->name);
+        Identifier *id = cl->func->name;
+        FPRINTF(fp, "<function: %.*s>", id->tok.length, id->tok.start);
     } else {
         FPRINTF(fp, "<anonymous function>");
     }

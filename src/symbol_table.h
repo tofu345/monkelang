@@ -3,6 +3,8 @@
 #include "hash-table/ht.h"
 #include "utils.h"
 
+#include <stdint.h>
+
 typedef enum {
     GlobalScope,
 
@@ -20,7 +22,7 @@ typedef enum {
 } SymbolScope;
 
 typedef struct {
-    char *name;
+    const char *name;
     SymbolScope scope;
     int index;
 } Symbol;
@@ -42,9 +44,9 @@ void enclosed_symbol_table(SymbolTable *st, SymbolTable *outer);
 void symbol_table_free(SymbolTable *st);
 
 // copy [name] and define [Symbol]
-Symbol *sym_define(SymbolTable *st, char *name);
+Symbol *sym_define(SymbolTable *st, const char *name, uint64_t hash);
 
-Symbol *sym_function_name(SymbolTable *st, char *name);
+Symbol *sym_function_name(SymbolTable *st, const char *name, uint64_t hash);
 Symbol *sym_builtin(SymbolTable *st, int index, const char *name);
 
-Symbol *sym_resolve(SymbolTable *st, char *name);
+Symbol *sym_resolve(SymbolTable *st, uint64_t hash);

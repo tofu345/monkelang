@@ -19,10 +19,15 @@ struct Keyword {
     {"return", t_Return},
 };
 
-TokenType lookup_ident(const char* ident) {
-    size_t len = sizeof(keywords) / sizeof(keywords[0]);
-    for (size_t i = 0; i < len; i++) {
-        if (strcmp(keywords[i].name, ident) == 0) {
+// TODO: replace with hashmap
+TokenType lookup_ident(const char* ident, int ident_len) {
+    static size_t num_keywords = sizeof(keywords) / sizeof(keywords[0]);
+    char *keyword;
+    int len;
+    for (size_t i = 0; i < num_keywords; i++) {
+        keyword = keywords[i].name;
+        len = strlen(keyword);
+        if (len == ident_len && strncmp(keyword, ident, len) == 0) {
             return keywords[i].tok_typ;
         }
     }
@@ -35,8 +40,7 @@ const char* token_types[] = {
     "Eof",
     "Identifier",
     "String",
-    "Int",
-    "Float",
+    "Digit",
     "=",
     "+",
     "-",

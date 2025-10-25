@@ -1,5 +1,4 @@
 #include "unity/unity.h"
-#include "unity/unity_internals.h"
 
 #include "../src/symbol_table.h"
 
@@ -60,8 +59,8 @@ void test_resolve_global(void) {
     SymbolTable global;
     symbol_table_init(&global);
 
-    sym_define(&global, "a");
-    sym_define(&global, "b");
+    sym_define(&global, "a", hash_fnv1a("a"));
+    sym_define(&global, "b", hash_fnv1a("b"));
 
     Symbol expected[] = {
         {.name = "a", .scope = GlobalScope, .index = 0},
@@ -80,14 +79,14 @@ void test_resolve_local(void) {
     SymbolTable global;
     symbol_table_init(&global);
 
-    sym_define(&global, "a");
-    sym_define(&global, "b");
+    sym_define(&global, "a", hash_fnv1a("a"));
+    sym_define(&global, "b", hash_fnv1a("b"));
 
     SymbolTable local;
     enclosed_symbol_table(&local, &global);
 
-    sym_define(&local, "c");
-    sym_define(&local, "d");
+    sym_define(&local, "c", hash_fnv1a("c"));
+    sym_define(&local, "d", hash_fnv1a("d"));
 
     Symbol expected[] = {
         {.name = "a", .scope = GlobalScope, .index = 0},
@@ -109,20 +108,20 @@ void test_resolve_nested_local(void) {
     SymbolTable global;
     symbol_table_init(&global);
 
-    sym_define(&global, "a");
-    sym_define(&global, "b");
+    sym_define(&global, "a", hash_fnv1a("a"));
+    sym_define(&global, "b", hash_fnv1a("b"));
 
     SymbolTable first_local;
     enclosed_symbol_table(&first_local, &global);
 
-    sym_define(&first_local, "c");
-    sym_define(&first_local, "d");
+    sym_define(&first_local, "c", hash_fnv1a("c"));
+    sym_define(&first_local, "d", hash_fnv1a("d"));
 
     SymbolTable second_local;
     enclosed_symbol_table(&second_local, &global);
 
-    sym_define(&second_local, "e");
-    sym_define(&second_local, "f");
+    sym_define(&second_local, "e", hash_fnv1a("e"));
+    sym_define(&second_local, "f", hash_fnv1a("f"));
 
     Symbol first_expected[] = {
         {.name = "a", .scope = GlobalScope, .index = 0},
@@ -191,20 +190,20 @@ void test_resolve_free(void) {
     SymbolTable global;
     symbol_table_init(&global);
 
-    sym_define(&global, "a");
-    sym_define(&global, "b");
+    sym_define(&global, "a", hash_fnv1a("a"));
+    sym_define(&global, "b", hash_fnv1a("b"));
 
     SymbolTable first_local;
     enclosed_symbol_table(&first_local, &global);
 
-    sym_define(&first_local, "c");
-    sym_define(&first_local, "d");
+    sym_define(&first_local, "c", hash_fnv1a("c"));
+    sym_define(&first_local, "d", hash_fnv1a("d"));
 
     SymbolTable second_local;
     enclosed_symbol_table(&second_local, &first_local);
 
-    sym_define(&second_local, "e");
-    sym_define(&second_local, "f");
+    sym_define(&second_local, "e", hash_fnv1a("e"));
+    sym_define(&second_local, "f", hash_fnv1a("f"));
 
     Symbol expected_symbols[] = {
         {.name = "a", .scope = GlobalScope, .index = 0},
@@ -246,18 +245,18 @@ void test_resolve_unresolvable_free(void) {
     SymbolTable global;
     symbol_table_init(&global);
 
-    sym_define(&global, "a");
+    sym_define(&global, "a", hash_fnv1a("a"));
 
     SymbolTable first_local;
     enclosed_symbol_table(&first_local, &global);
 
-    sym_define(&first_local, "c");
+    sym_define(&first_local, "c", hash_fnv1a("c"));
 
     SymbolTable second_local;
     enclosed_symbol_table(&second_local, &first_local);
 
-    sym_define(&second_local, "e");
-    sym_define(&second_local, "f");
+    sym_define(&second_local, "e", hash_fnv1a("e"));
+    sym_define(&second_local, "f", hash_fnv1a("f"));
 
     Symbol expected[] = {
         {.name = "a", .scope = GlobalScope, .index = 0},
@@ -279,7 +278,7 @@ void test_resolve_unresolvable_free(void) {
 
     bool fail = false;
     for (int i = 0; i < unresolvable_len; i++) {
-        Symbol *result = sym_resolve(&second_local, expected_unresolvable[i]);
+        Symbol *result = sym_resolve(&second_local, hash_fnv1a(expected_unresolvable[i]));
         if (result != NULL) {
             printf("name %s resolved, but was expected not to\n", expected_unresolvable[i]);
             fail = true;
@@ -297,7 +296,7 @@ void test_define_and_resolve_function_name(void) {
     SymbolTable global;
     symbol_table_init(&global);
 
-    sym_function_name(&global, "a");
+    sym_function_name(&global, "a", hash_fnv1a("a"));
 
     Symbol expected = {.name = "a", .scope = FunctionScope, .index = 0};
 
@@ -311,8 +310,8 @@ void test_shadowing_function_name(void) {
     SymbolTable global;
     symbol_table_init(&global);
 
-    sym_function_name(&global, "a");
-    sym_define(&global, "a");
+    sym_function_name(&global, "a", hash_fnv1a("a"));
+    sym_define(&global, "a", hash_fnv1a("a"));
 
     Symbol expected = {.name = "a", .scope = GlobalScope, .index = 0};
 
@@ -359,7 +358,7 @@ static int
 test_sym_resolve(SymbolTable *table, Symbol expected[], int len) {
     Symbol *result;
     for (int i = 0; i < len; i++) {
-        result = sym_resolve(table, expected[i].name);
+        result = sym_resolve(table, hash_fnv1a(expected[i].name));
         if (result == NULL) {
             printf("name '%s' not resolvable\n", expected[i].name);
             return -1;
@@ -404,7 +403,7 @@ test_sym_resolve_free(SymbolTable *table, Symbol expected[], int len,
 
 static int
 test_sym_define(SymbolTable *table, Symbol *expected, char *name) {
-    Symbol *a = sym_define(table, name);
+    Symbol *a = sym_define(table, name, hash_fnv1a(name));
     if (!symbol_eq(a, expected)) {
         printf("expected Symbol(%s, %s, %d) got Symbol(%s, %s, %d)\n",
                 expected->name, show_scope(expected->scope), expected->index,

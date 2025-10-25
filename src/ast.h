@@ -6,6 +6,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #define NODE(t, p) (Node){ t, p }
@@ -62,6 +63,7 @@ int program_fprint(Program* p, FILE* fp);
 
 typedef struct {
     Token tok; // the 't_Ident' token
+    uint64_t hash;
 } Identifier;
 
 typedef struct {
@@ -98,14 +100,12 @@ typedef struct {
 
 typedef struct {
     Token tok; // the prefix token, e.g !
-    char* op; // same as tok.literal
     Node right;
 } PrefixExpression;
 
 typedef struct {
-    Token tok; // the prefix token, e.g *
     Node left;
-    char* op; // same as tok.literal
+    Token tok;
     Node right;
 } InfixExpression;
 
@@ -135,8 +135,8 @@ typedef struct {
     Token tok; // the 'fn' token
     ParamBuffer params;
     BlockStatement* body;
-    // points to [LetStatement].name.tok.literal if in [LetStatement]
-    char *name;
+    // points to [LetStatement].name.tok if in [LetStatement]
+    Identifier *name;
 } FunctionLiteral;
 
 void free_function_literal(FunctionLiteral* fl);

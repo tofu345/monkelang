@@ -4,6 +4,20 @@
 #include <stddef.h>
 #include <stdlib.h>
 
+#define FNV_OFFSET 14695981039346656037UL
+#define FNV_PRIME 1099511628211UL
+
+uint64_t hash_string_fnv1a(const char *string, int length) {
+    uint64_t hash = FNV_OFFSET;
+    int i = 0;
+    for (const char *p = string; i < length; ++p, ++i) {
+        hash ^= (uint64_t)(unsigned char)(*p);
+        hash *= FNV_PRIME;
+    }
+    return hash;
+}
+
+
 void die(const char *fmt, ...) {
     va_list ap;
     int saved_errno;
@@ -31,21 +45,4 @@ int power_of_2_ceil(int n) {
     n++;
     if (n < 4) { n = 4; }
     return n;
-}
-
-DEFINE_BUFFER(Error, error)
-
-error new_error(const char* format, ...) {
-    va_list args;
-    va_start(args, format);
-    char* err = NULL;
-    if (vasprintf(&err, format, args) == -1) die("new_error: vasprintf");
-    va_end(args);
-    return err;
-}
-
-
-error error_num_args(const char *name, int expected, int actual) {
-    return new_error("%s takes %d argument%s got %d",
-            name, expected, expected != 1 ? "s" : "", actual);
 }

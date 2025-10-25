@@ -16,16 +16,28 @@ void test_print(void) {
         {
             n_LetStatement,
             &(LetStatement){
-                .tok = { t_Let, 0, 0, "let" },
+                .tok = { 
+                    .type = t_Let, 
+                    .start = "let",
+                    .length = 3
+                },
                 .name =
                     &(Identifier){
-                        .tok = { t_Ident, 0, 0, "myVar" },
+                        .tok = { 
+                            .type = t_Ident, 
+                            .start = "myVar", 
+                            .length = 5
+                        },
                     },
                 .value =
                     {
                         n_Identifier,
                         &(Identifier){
-                            .tok = { t_Ident, 0, 0, "anotherVar" },
+                            .tok = { 
+                                .type = t_Ident, 
+                                .start = "anotherVar",
+                                .length = 10
+                            },
                         },
                     }
             }

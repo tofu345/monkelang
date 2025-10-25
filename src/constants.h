@@ -1,25 +1,21 @@
 #pragma once
 
+#include "ast.h"
 #include "code.h"
+#include "token.h"
 #include "utils.h"
-
-typedef struct {
-    char *data;
-    int length;
-} StringConstant;
 
 typedef struct {
     Instructions instructions;
     int num_locals;
     int num_parameters;
-    char *name; // points to [FunctionLiteral.name] 
+    Identifier *name; // points to [FunctionLiteral.name]
 } Function;
 
 typedef enum {
     c_Integer = 1,
     c_Float,
-
-    c_String, // points to literal in AST.
+    c_String,
     c_Function,
 } ConstantType;
 
@@ -29,7 +25,7 @@ typedef struct {
     union {
         long integer;
         double floating;
-        StringConstant *string;
+        Token *string;
         Function *function;
     } data;
 } Constant;
@@ -37,3 +33,5 @@ typedef struct {
 BUFFER(Constant, Constant)
 
 void free_constant(Constant c);
+
+void free_function(Constant c);

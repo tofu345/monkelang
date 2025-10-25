@@ -1,12 +1,14 @@
 #include "lexer.h"
 #include "token.h"
-#include "utils.h"
 
-#include <stdlib.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
 
-static void read_char(Lexer* l) {
+typedef bool check_function(char ch);
+
+inline static void
+read_char(Lexer *l) {
     if (l->read_position >= l->input_len) {
         l->ch = 0;
     } else {
@@ -18,54 +20,19 @@ static void read_char(Lexer* l) {
 
     if (l->ch == '\n') {
         l->line++;
-        l->col = 0;
-    } else {
-        l->col++;
     }
 }
 
 void lexer_init(Lexer *l, const char *input) {
-    l->col = 0;
-    l->line = 1;
-    l->input = input;
-    l->input_len = strlen(input);
-    l->position = 0;
-    l->read_position = 0;
+    *l = (Lexer) {
+        .input = input,
+        .input_len = strlen(input),
+        .ch = 0,
+        .line = 1,
+        .position = 0,
+        .read_position = 0,
+    };
     read_char(l);
-}
-
-static void
-new_token(Token* t, TokenType type, char ch) {
-    // must malloc here
-    char* lit = malloc(2 * sizeof(char));
-    if (lit == NULL) die("malloc");
-    lit[0] = ch;
-    lit[1] = '\0';
-    t->literal = lit;
-    t->type = type;
-}
-
-static bool is_letter(char ch) {
-    return ('a' <= ch && ch <= 'z') || ('A' <= ch && ch <= 'Z') || ch == '_';
-}
-
-static bool is_digit(char ch) {
-    return ('0' <= ch && ch <= '9') || ch == '.';
-}
-
-static bool is_hex_digit(char ch) {
-    return ('0' <= ch && ch <= '9') || ('a' <= ch && ch <= 'f')
-        || ('A' <= ch && ch <= 'F');
-}
-
-static bool is_binary_digit(char ch) {
-    return ch == '0' || ch == '1';
-}
-
-static void skip_whitespace(Lexer* l) {
-    while (l->ch == ' ' || l->ch == '\t' || l->ch == '\n' || l->ch == '\r') {
-        read_char(l);
-    }
 }
 
 static char peek_char(Lexer *l) {
@@ -76,178 +43,177 @@ static char peek_char(Lexer *l) {
     }
 }
 
-static char* copy_string(Lexer* l, int from, int len) {
-    char* ident = malloc((len + 1) * sizeof(char));
-    if (ident == NULL) die("malloc");
-    memcpy(ident, l->input + from, len);
-    ident[len] = '\0';
-    return ident;
+inline static bool
+is_letter(char ch) {
+    return ('a' <= ch && ch <= 'z') || ('A' <= ch && ch <= 'Z') || ch == '_';
 }
 
-// read_string till closing quote, if not present return NULL.
-static char* read_string(Lexer* l) {
-    read_char(l);
-    int position = l->position;
-    int len = 0;
-    while (!(l->ch == '"' || l->ch == 0)) {
-        read_char(l);
-        len++;
-    }
-    if (l->ch != '"') return NULL;
-    return copy_string(l, position, len);
+inline static bool
+is_digit(char ch) {
+    return ('0' <= ch && ch <= '9') || ch == '.';
 }
 
-static char* read_identifier(Lexer* l) {
-    int position = l->position;
-    int len = 0;
-    while (is_letter(l->ch)) {
-        read_char(l);
-        len++;
+inline static bool
+is_whitespace(char ch) {
+    switch (ch) {
+        case ' ':
+        case '\n':
+        case '\t':
+        case '\r':
+            return true;
+
+        default:
+            return false;
     }
-    return copy_string(l, position, len);
 }
 
-static char* read_digit(Lexer* l, TokenType* t) {
-    int position = l->position;
-    int len = 0;
-
-    bool (*valid) (char) = &is_digit;
-    if (l->ch == '0') {
-        char peek = peek_char(l);
-        if (peek == 'x' || peek == 'X')
-            valid = &is_hex_digit;
-        else if (peek == 'b' || peek == 'B')
-            valid = &is_binary_digit;
-    }
-    // skip 0x | 0b
-    if (valid != &is_digit) {
-        read_char(l);
-        read_char(l);
-        len = 2;
-    }
-
-    bool is_float = false;
-    while (valid(l->ch)) {
-        is_float = is_float || l->ch == '.';
-        read_char(l);
-        len++;
-    }
-    *t = is_float ? t_Float : t_Int;
-
-    return copy_string(l, position, len);
+inline static bool
+not_closing_quote(char ch) {
+    return ch != '"';
 }
 
-Token lexer_next_token(Lexer* l) {
+// read while [check(l->ch)], return number of read characters.
+static int
+read_while(Lexer *l, check_function *check) {
+    int pos = l->read_position;
+
+    while (l->ch != 0 && check(l->ch)) {
+        read_char(l);
+    }
+
+    return l->read_position - pos;
+}
+
+static void
+skip_whitespace(Lexer *l) {
+    read_while(l, is_whitespace);
+}
+
+Token lexer_next_token(Lexer *l) {
     skip_whitespace(l);
 
-    Token tok = {0};
-    tok.line = l->line;
-    tok.col = l->col;
+    Token tok = {
+        .type = t_Illegal,
+        .line = l->line,
+        .start = l->input + l->position,
+        .length = 1,
+    };
+
     switch (l->ch) {
     case '=':
         if (peek_char(l) == '=') {
-            char ch = l->ch;
             read_char(l);
-            char* lit = malloc(3 * sizeof(char));
-            if (lit == NULL) die("malloc");
-            lit[0] = ch;
-            lit[1] = l->ch;
-            lit[2] = '\0';
-            tok = (Token){ t_Eq, l->col - 1, l->line, lit };
+            tok.type = t_Eq;
+            tok.length = 2;
+
         } else {
-            new_token(&tok, t_Assign, l->ch);
+            tok.type = t_Assign;
         }
         break;
+
     case '!':
         if (peek_char(l) == '=') {
-            char ch = l->ch;
             read_char(l);
-            char* lit = malloc(3 * sizeof(char));
-            if (lit == NULL) die("malloc");
-            lit[0] = ch;
-            lit[1] = l->ch;
-            lit[2] = '\0';
-            tok = (Token){ t_Not_eq, l->col - 1, l->line, lit };
+            tok.type = t_Not_eq;
+            tok.length = 2;
+
         } else {
-            new_token(&tok, t_Bang, l->ch);
+            tok.type = t_Bang;
         }
         break;
+
     case '+':
-        new_token(&tok, t_Plus, l->ch);
+        tok.type = t_Plus;
         break;
+
     case '-':
-        new_token(&tok, t_Minus, l->ch);
+        tok.type = t_Minus;
         break;
+
     case '/':
         if (peek_char(l) == '/') {
-            size_t position = l->read_position + 1;
-            char ch;
-            do {
-                ch = l->input[++position];
-            } while (position < l->input_len && ch != '\n');
-            l->read_position = position;
-            read_char(l);
+            while (l->ch != 0 && l->ch != '\n') {
+                read_char(l);
+            }
             return lexer_next_token(l);
+
         } else {
-            new_token(&tok, t_Slash, l->ch);
+            tok.type = t_Slash;
         }
         break;
+
     case '*':
-        new_token(&tok, t_Asterisk, l->ch);
+        tok.type = t_Asterisk;
         break;
+
     case '<':
-        new_token(&tok, t_Lt, l->ch);
+        tok.type = t_Lt;
         break;
+
     case '>':
-        new_token(&tok, t_Gt, l->ch);
+        tok.type = t_Gt;
         break;
+
     case ';':
-        new_token(&tok, t_Semicolon, l->ch);
+        tok.type = t_Semicolon;
         break;
+
     case ':':
-        new_token(&tok, t_Colon, l->ch);
+        tok.type = t_Colon;
         break;
+
     case ',':
-        new_token(&tok, t_Comma, l->ch);
+        tok.type = t_Comma;
         break;
+
     case '(':
-        new_token(&tok, t_Lparen, l->ch);
+        tok.type = t_Lparen;
         break;
+
     case ')':
-        new_token(&tok, t_Rparen, l->ch);
+        tok.type = t_Rparen;
         break;
+
     case '{':
-        new_token(&tok, t_Lbrace, l->ch);
+        tok.type = t_Lbrace;
         break;
+
     case '}':
-        new_token(&tok, t_Rbrace, l->ch);
+        tok.type = t_Rbrace;
         break;
+
     case '[':
-        new_token(&tok, t_Lbracket, l->ch);
+        tok.type = t_Lbracket;
         break;
+
     case ']':
-        new_token(&tok, t_Rbracket, l->ch);
+        tok.type = t_Rbracket;
         break;
+
     case '"':
+        read_char(l);
         tok.type = t_String;
-        tok.literal = read_string(l);
-        if (tok.literal == NULL)
-            tok.type = t_Illegal;
+        // exclude quotes
+        ++tok.start;
+        tok.length = read_while(l, not_closing_quote);
         break;
+
     case 0:
-        tok.literal = NULL;
         tok.type = t_Eof;
+        tok.start = NULL;
         return tok;
+
     default:
         if (is_letter(l->ch)) {
-            tok.literal = read_identifier(l);
-            tok.type = lookup_ident(tok.literal);
+            const char *start = l->input + l->position;
+            tok.length = read_while(l, is_letter);
+            tok.type = lookup_ident(start, tok.length);
             return tok;
+
         } else if (is_digit(l->ch)) {
-            tok.literal = read_digit(l, &tok.type);
+            tok.type = t_Digit;
+            tok.length = read_while(l, is_digit);
             return tok;
-        } else {
-            new_token(&tok, t_Illegal, l->ch);
         }
     }
 

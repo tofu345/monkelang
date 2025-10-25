@@ -21,5 +21,4 @@ Constants constants(Test *t, ...);
 
 Program test_parse(char *input);
 
-// print and free any errors, set [errs.length] to 0
-void print_errors(ErrorBuffer* errs);
+void print_parser_errors(Parser *p);

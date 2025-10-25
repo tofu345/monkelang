@@ -3,22 +3,23 @@
 
 #include <string.h>
 
-void print_errors(ErrorBuffer* errs) {
-    for (int i = 0; i < errs->length; i++) {
-        printf("%s\n", errs->data[i]);
-        free(errs->data[i]);
+void print_parser_errors(Parser *p) {
+    printf("parser had %d errors\n", p->errors.length);
+    for (int i = 0; i < p->errors.length; i++) {
+        Error err = p->errors.data[i];
+        print_error(p->l.input, &err);
+        free(err.message);
     }
-    errs->length = 0;
+    p->errors.length = 0;
 }
 
 Program test_parse(char *input) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    if (p.errors.length > 0) { 
+    if (p.errors.length > 0) {
         printf("test %s\n", input);
-        printf("parser had %d errors\n", p.errors.length);
-        print_errors(&p.errors);
+        print_parser_errors(&p);
         parser_free(&p);
         TEST_FAIL();
     }

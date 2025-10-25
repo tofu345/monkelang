@@ -1,3 +1,4 @@
+#include "repl.h"
 #include "compiler.h"
 #include "object.h"
 #include "parser.h"
@@ -8,14 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void
-print_errors(FILE* out, ErrorBuffer *buf) {
-    for (int i = 0; i < buf->length; i++) {
-        fprintf(out, "%s\n", buf->data[i]);
-        free(buf->data[i]);
-    }
-    buf->length = 0;
-}
+static void print_parser_errors(FILE* out, Parser *p);
 
 BUFFER(Program, Program)
 DEFINE_BUFFER(Program, Program)
@@ -47,10 +41,10 @@ void repl(FILE* in, FILE* out) {
 
         prog = parse(&p, input);
         if (p.errors.length > 0) {
-            fprintf(out, "Woops! We ran into some monkey business here!\n");
-            print_errors(out, &p.errors);
+            print_parser_errors(out, &p);
             program_free(&prog);
             goto cleanup;
+
         } else if (prog.stmts.length > 0) {
             ProgramBufferPush(&programs, prog);
         }
@@ -77,8 +71,6 @@ void repl(FILE* in, FILE* out) {
 
 cleanup:
         free(input);
-        free(p.peek_token.literal);
-        p.peek_token.literal = NULL;
         c.scopes.data[0].instructions.length = 0; // reset main scope
         vm.stack[0] = (Object){0}; // remove stack_elem
         vm.sp = 0;
@@ -105,8 +97,7 @@ void run(char* program) {
 
     prog = parse(&p, program);
     if (p.errors.length > 0) {
-        fprintf(stdout, "Woops! We ran into some monkey business here!\n");
-        print_errors(stdout, &p.errors);
+        print_parser_errors(stdout, &p);
         goto cleanup;
     }
 
@@ -131,4 +122,15 @@ cleanup:
     program_free(&prog);
     parser_free(&p);
     compiler_free(&c);
+}
+
+static void 
+print_parser_errors(FILE* out, Parser *p) {
+    fprintf(out, "Woops! We ran into some monkey business here!\n");
+    for (int i = 0; i < p->errors.length; i++) {
+        Error err = p->errors.data[i];
+        print_error(p->l.input, &err);
+        free(err.message);
+    }
+    p->errors.length = 0;
 }

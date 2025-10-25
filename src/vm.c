@@ -1,4 +1,5 @@
 #include "vm.h"
+#include "ast.h"
 #include "builtin.h"
 #include "code.h"
 #include "compiler.h"
@@ -106,8 +107,8 @@ vm_pop(VM *vm) {
     return vm->stack[--vm->sp];
 }
 
-static error
-execute_binary_float_operation(VM *vm, Opcode op, Object left, Object right) {
+static Object
+execute_binary_float_operation(Opcode op, Object left, Object right) {
     double result;
 
     switch (op) {
@@ -128,11 +129,11 @@ execute_binary_float_operation(VM *vm, Opcode op, Object left, Object right) {
                     lookup(op)->name, op);
     }
 
-    return vm_push(vm, OBJ(o_Float, .floating = result));
+    return OBJ(o_Float, .floating = result);
 }
 
-static error
-execute_binary_integer_operation(VM *vm, Opcode op, Object left, Object right) {
+static Object
+execute_binary_integer_operation(Opcode op, Object left, Object right) {
     long result;
 
     switch (op) {
@@ -153,14 +154,13 @@ execute_binary_integer_operation(VM *vm, Opcode op, Object left, Object right) {
                     lookup(op)->name, op);
     }
 
-    return vm_push(vm, OBJ(o_Integer, .integer = result));
+    return OBJ(o_Integer, .integer = result);
 }
 
-static error
+static Object
 execute_binary_string_operation(VM *vm, Opcode op, Object left, Object right) {
     if (op != OpAdd) {
-        return new_error("unkown binary string operator: %s",
-                lookup(op)->name);
+        return ERR("unkown binary string operator: %s", lookup(op)->name);
     }
 
     // copy [left] and [right] into new string
@@ -168,6 +168,7 @@ execute_binary_string_operation(VM *vm, Opcode op, Object left, Object right) {
                *r = right.data.string;
 
     int length = l->length + r->length;
+
     CharBuffer *new_str = create_string(vm, NULL, length);
 
     memcpy(new_str->data, l->data, l->length * sizeof(char));
@@ -175,25 +176,35 @@ execute_binary_string_operation(VM *vm, Opcode op, Object left, Object right) {
             r->length * sizeof(char));
     new_str->data[length] = '\0';
 
-    return vm_push(vm, OBJ(o_String, .string = new_str));
+    return OBJ(o_String, .string = new_str);
 }
 
 static error
 execute_binary_operation(VM *vm, Opcode op) {
-    Object right = vm_pop(vm);
-    Object left = vm_pop(vm);
+    // not [vm_pop()] to keep left and right in scope, in case GC is triggered.
+    Object right = vm->stack[vm->sp - 1];
+    Object left = vm->stack[vm->sp - 2];
+    Object result;
 
     if (left.type == o_Integer && right.type == o_Integer) {
-        return execute_binary_integer_operation(vm, op, left, right);
+        result = execute_binary_integer_operation(op, left, right);
 
     } else if (left.type == o_Float && right.type == o_Float) {
-        return execute_binary_float_operation(vm, op, left, right);
+        result = execute_binary_float_operation(op, left, right);
 
     } else if (left.type == o_String && right.type == o_String) {
-        return execute_binary_string_operation(vm, op, left, right);
+        result = execute_binary_string_operation(vm, op, left, right);
+
+    } else {
+        return error_unknown_operation(op, left, right);
     }
 
-    return error_unknown_operation(op, left, right);
+    vm->sp -= 2;
+
+    if (IS_ERR(result)) {
+        return result.data.err;
+    }
+    return vm_push(vm, result);
 }
 
 static error
@@ -430,9 +441,9 @@ vm_push_constant(VM *vm, Constant c) {
 
         case c_String:
             {
-                StringConstant *str_const = c.data.string;
+                Token *str_tok = c.data.string;
                 CharBuffer *new_str =
-                    create_string(vm, str_const->data, str_const->length);
+                    create_string(vm, str_tok->start, str_tok->length);
                 return vm_push(vm, OBJ(o_String, .string = new_str));
             }
 
@@ -495,7 +506,11 @@ call_closure(VM *vm, Closure *cl, int num_args) {
     if (num_args != fn->num_parameters) {
         char *name = "<anonymous function>";
         if (fn->name) {
-            name = fn->name;
+            Identifier *id = fn->name;
+            return new_error("%.*s takes %d argument%s got %d",
+                    id->tok.length, id->tok.start,
+                    fn->num_parameters, fn->num_parameters != 1 ? "s" : "",
+                    num_args);
         };
 
         return error_num_args(name, fn->num_parameters, num_args);
@@ -577,7 +592,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
         .instructions = *bytecode.instructions,
         .num_locals = 0,
         .num_parameters = 0,
-        .name = "<main>"
+        .name = &(Identifier){ .tok = (Token){ .start = "<main>" } }
     };
     Closure main_closure = { .func = &main_fn, .num_free = 0 };
 

@@ -1,13 +1,17 @@
 #pragma once
 
+#include <stddef.h>
+
 typedef enum __attribute__ ((__packed__)) {
     t_Illegal,
     t_Eof,
+
+    t_Ident, // identifiers (variable names)
+
     // literals
-    t_Ident, // variable names
     t_String,
-    t_Int,   // stored as `long`
-    t_Float, // stored as `double`
+    t_Digit, // integer and floating point numbers.
+
     // Operators
     t_Assign,
     t_Plus,
@@ -19,6 +23,7 @@ typedef enum __attribute__ ((__packed__)) {
     t_Gt,
     t_Eq,
     t_Not_eq,
+
     // Delimeters
     t_Colon,
     t_Comma,
@@ -29,6 +34,7 @@ typedef enum __attribute__ ((__packed__)) {
     t_Rbrace,
     t_Lbracket,
     t_Rbracket,
+
     // Keywords
     t_Function,
     t_Let,
@@ -37,17 +43,21 @@ typedef enum __attribute__ ((__packed__)) {
     t_Null,
     t_If,
     t_Else,
-    t_Return, // this must remain the last enum element, and cannot have a
-              // `PrefixParseFn` associated with it, see parser.h
+    t_Return,
 } TokenType;
 
 typedef struct {
     TokenType type;
-    short col;
-    int line;
-    char *literal; // a malloced string
+
+    int line; // 1-based line number
+
+    // from wren: points to the beginning of the [Token] in the source code.
+    const char *start;
+
+    // the number of characters of the source code the [Token] represents.
+    int length;
 } Token;
 
-TokenType lookup_ident(const char* ident);
+TokenType lookup_ident(const char* ident, int ident_len);
 
 const char* show_token_type(TokenType t);

@@ -57,7 +57,9 @@ void compiler_free(Compiler *c) {
     free(c->symbol_tables.data);
 
     for (int i = 0; i < c->constants.length; i++) {
-        free_constant(c->constants.data[i]);
+        if (c->constants.data[i].type == c_Function) {
+            free_function(c->constants.data[i]);
+        }
     }
     free(c->constants.data);
 }
@@ -68,6 +70,18 @@ last_instruction_is(Compiler *c, Opcode op) {
         return false;
     }
     return c->scopes.data[c->scope_index].last_instruction.opcode == op;
+}
+
+static void
+append_return_if_not_present(Compiler *c) {
+    switch (c->scopes.data[c->scope_index].last_instruction.opcode) {
+        case OpReturn:
+        case OpReturnValue:
+            return;
+        default:
+            emit(c, OpReturn);
+            return;
+    }
 }
 
 static void
@@ -161,8 +175,11 @@ _compile(Compiler *c, Node n) {
             {
                 LetStatement *ls = n.obj;
 
-                char *name = ls->name->tok.literal;
-                Symbol *symbol = sym_define(c->current_symbol_table, name);
+                Identifier *ident = ls->name;
+                char *name = (char *)ident->tok.start;
+                Symbol *symbol =
+                    sym_define(c->current_symbol_table, name, ident->hash);
+
                 if (symbol->index >= GlobalsSize) {
                     return new_error("too many global variables");
                 }
@@ -185,8 +202,14 @@ _compile(Compiler *c, Node n) {
                 }
 
                 ReturnStatement *rs = n.obj;
-                err = _compile(c, rs->return_value);
-                if (err) { return err; }
+
+                if (rs->return_value.obj == NULL) {
+                    emit(c, OpReturn);
+
+                } else {
+                    err = _compile(c, rs->return_value);
+                    if (err) { return err; }
+                }
 
                 emit(c, OpReturnValue);
                 return 0;
@@ -195,10 +218,10 @@ _compile(Compiler *c, Node n) {
         case n_Identifier:
             {
                 Identifier *id = n.obj;
-                char *name = id->tok.literal;
-                Symbol *symbol = sym_resolve(c->current_symbol_table, name);
+                Symbol *symbol = sym_resolve(c->current_symbol_table, id->hash);
                 if (symbol == NULL) {
-                    return new_error("undefined variable '%s'", name);
+                    return new_error("undefined variable '%.*s'",
+                            id->tok.length, id->tok.start);
                 }
 
                 load_symbol(c, symbol);
@@ -215,10 +238,10 @@ _compile(Compiler *c, Node n) {
                 if (stmt->left.typ == n_Identifier) {
                     Identifier *id = stmt->left.obj;
 
-                    char *name = id->tok.literal;
-                    Symbol *symbol = sym_resolve(c->current_symbol_table, name);
+                    Symbol *symbol = sym_resolve(c->current_symbol_table, id->hash);
                     if (symbol == NULL) {
-                        return new_error("undefined variable '%s'", name);
+                        return new_error("undefined variable '%.*s'",
+                                id->tok.length, id->tok.start);
                     }
 
                     char *format;
@@ -232,16 +255,16 @@ _compile(Compiler *c, Node n) {
                             return 0;
 
                         case FreeScope:
-                            format = "free variable '%s' is not assignable";
-                            return new_error(format, name);
+                            format = "free variable '%.*s' is not assignable";
+                            return new_error(format, id->tok.length, id->tok.start);
 
                         case FunctionScope:
-                            format = "function '%s' is not assignable";
-                            return new_error(format, name);
+                            format = "function '%.*s' is not assignable";
+                            return new_error(format, id->tok.length, id->tok.start);
 
                         case BuiltinScope:
                             format = "builtin %s() is not assignable";
-                            return new_error(format, name);
+                            return new_error(format, symbol->name);
                     }
 
                 } else if (stmt->left.typ == n_IndexExpression) {
@@ -258,7 +281,7 @@ _compile(Compiler *c, Node n) {
         case n_InfixExpression:
             {
                 InfixExpression *ie = n.obj;
-                if ('<' == ie->op[0]) {
+                if ('<' == ie->tok.start[0]) {
                     err = _compile(c, ie->right);
                     if (err) { return err; }
 
@@ -275,29 +298,30 @@ _compile(Compiler *c, Node n) {
                 err = _compile(c, ie->right);
                 if (err) { return err; }
 
-                if ('+' == ie->op[0]) {
+                if ('+' == ie->tok.start[0]) {
                     emit(c, OpAdd);
 
-                } else if ('-' == ie->op[0]) {
+                } else if ('-' == ie->tok.start[0]) {
                     emit(c, OpSub);
 
-                } else if ('*' == ie->op[0]) {
+                } else if ('*' == ie->tok.start[0]) {
                     emit(c, OpMul);
 
-                } else if ('/' == ie->op[0]) {
+                } else if ('/' == ie->tok.start[0]) {
                     emit(c, OpDiv);
 
-                } else if ('>' == ie->op[0]) {
+                } else if ('>' == ie->tok.start[0]) {
                     emit(c, OpGreaterThan);
 
-                } else if (!strcmp("==", ie->op)) {
+                } else if (!strncmp("==", ie->tok.start, 2)) {
                     emit(c, OpEqual);
 
-                } else if (!strcmp("!=", ie->op)) {
+                } else if (!strncmp("!=", ie->tok.start, 2)) {
                     emit(c, OpNotEqual);
 
                 } else {
-                    return new_error("unknown operator %s", ie->op);
+                    return new_error("unknown operator %.*s",
+                            ie->tok.length, ie->tok.start);
                 }
                 return 0;
             }
@@ -308,14 +332,15 @@ _compile(Compiler *c, Node n) {
                 err = _compile(c, pe->right);
                 if (err) { return err; }
 
-                if ('!' == pe->op[0]) {
+                if ('!' == pe->tok.start[0]) {
                     emit(c, OpBang);
 
-                } else if ('-' == pe->op[0]) {
+                } else if ('-' == pe->tok.start[0]) {
                     emit(c, OpMinus);
 
                 } else {
-                    return new_error("unknown operator %s", pe->op);
+                    return new_error("unknown operator %s",
+                            pe->tok.length, pe->tok.start);
                 }
                 return 0;
             }
@@ -453,14 +478,9 @@ _compile(Compiler *c, Node n) {
         case n_StringLiteral:
             {
                 StringLiteral *sl = n.obj;
-                StringConstant *str = malloc(sizeof(StringConstant));
-                if (str == NULL) { die("malloc"); }
-                str->data = sl->tok.literal;
-                str->length = strlen(sl->tok.literal);
-
                 Constant str_const = {
                     .type = c_String,
-                    .data = { .string = str }
+                    .data = { .string = &sl->tok }
                 };
                 emit(c, OpConstant, add_constant(c, str_const));
                 return 0;
@@ -470,22 +490,19 @@ _compile(Compiler *c, Node n) {
             {
                 FunctionLiteral *fl = n.obj;
 
-                // to avoid use after free if [vm_free()] comes after [program_free()].
-                char *name = NULL;
-                if (fl->name) {
-                    name = strdup(fl->name);
-                    if (name == NULL) { die("strdup"); }
-                }
-
                 enter_scope(c);
 
-                if (name) {
-                    sym_function_name(c->current_symbol_table, name);
+                if (fl->name) {
+                    sym_function_name(c->current_symbol_table,
+                            fl->name->tok.start, fl->name->hash);
                 }
 
                 ParamBuffer params = fl->params;
+                Identifier *cur;
                 for (int i = 0; i < params.length; i++) {
-                    sym_define(c->current_symbol_table, params.data[i]->tok.literal);
+                    cur = params.data[i];
+                    sym_define(c->current_symbol_table, cur->tok.start,
+                            cur->hash);
                 }
 
                 err = _compile(c, NODE(n_BlockStatement, fl->body));
@@ -493,9 +510,8 @@ _compile(Compiler *c, Node n) {
 
                 if (last_instruction_is(c, OpPop)) {
                     replace_last_pop_with_return(c);
-                }
-                if (!last_instruction_is(c, OpReturnValue)) {
-                    emit(c, OpReturn);
+                } else {
+                    append_return_if_not_present(c);
                 }
 
                 SymbolBuffer free_symbols =
@@ -515,7 +531,7 @@ _compile(Compiler *c, Node n) {
                     .instructions = *ins,
                     .num_locals = num_locals,
                     .num_parameters = params.length,
-                    .name = name,
+                    .name = fl->name,
                 };
                 Constant fn_const = {
                     .type = c_Function,

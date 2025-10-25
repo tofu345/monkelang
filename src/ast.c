@@ -10,19 +10,17 @@
     if (node_fprint( __VA_ARGS__, fp) == -1) \
         return -1;
 
+#define FPRINTF_TOKEN(fp, tok) \
+    if (fprintf(fp, "%.*s", tok.length, tok.start) <= 0) \
+        return -1;
+
 DEFINE_BUFFER(Param, Identifier*)
 DEFINE_BUFFER(Node, Node)
 DEFINE_BUFFER(Pair, Pair)
 
-char* token_literal(const Node n) {
-    // since the first element of every `node.obj` is a token.
-    Token* tok = n.obj;
-    return tok->literal;
-}
-
 static int
 fprint_identifier(Identifier* i, FILE* fp) {
-    FPRINTF(fp, "%s", i->tok.literal);
+    FPRINTF_TOKEN(fp, i->tok)
     return 0;
 }
 
@@ -40,7 +38,8 @@ fprint_float_literal(FloatLiteral* fl, FILE* fp) {
 
 static int
 fprint_prefix_expression(PrefixExpression* pe, FILE* fp) {
-    FPRINTF(fp, "(%s", pe->op);
+    FPRINTF(fp, "(");
+    FPRINTF_TOKEN(fp, pe->tok);
     NODE_FPRINT(fp, pe->right);
     FPRINTF(fp, ")");
     return 0;
@@ -50,7 +49,9 @@ static int
 fprint_infix_expression(InfixExpression* ie, FILE* fp) {
     FPRINTF(fp, "(");
     NODE_FPRINT(fp, ie->left);
-    FPRINTF(fp, " %s ", ie->op);
+    FPRINTF(fp, " ");
+    FPRINTF_TOKEN(fp, ie->tok)
+    FPRINTF(fp, " ");
     NODE_FPRINT(fp, ie->right);
     FPRINTF(fp, ")");
     return 0;
@@ -78,9 +79,10 @@ fprint_if_expression(IfExpression* ie, FILE* fp) {
 
 static int
 fprint_function_literal(FunctionLiteral* fl, FILE* fp) {
-    FPRINTF(fp, "%s", fl->tok.literal);
+    FPRINTF_TOKEN(fp, fl->tok);
     if (fl->name != NULL) {
-        FPRINTF(fp, "<%s>", fl->name);
+        Identifier *id = fl->name;
+        FPRINTF(fp, "<%.*s>", id->tok.length, id->tok.start);
     }
     FPRINTF(fp, "(");
     for (int i = 0; i < fl->params.length - 1; i++) {
@@ -110,8 +112,9 @@ fprint_call_expression(CallExpression* ce, FILE* fp) {
 
 static int
 fprint_let_statement(LetStatement* ls, FILE* fp) {
-    FPRINTF(fp, "%s %s = ",
-            ls->tok.literal, ls->name->tok.literal);
+    FPRINTF(fp, "let ")
+    FPRINTF_TOKEN(fp, ls->name->tok)
+    FPRINTF(fp, " = ")
     if (ls->value.obj != NULL) {
         NODE_FPRINT(fp, ls->value);
     }
@@ -121,13 +124,14 @@ fprint_let_statement(LetStatement* ls, FILE* fp) {
 
 static int
 fprint_boolean(BooleanLiteral* b, FILE* fp) {
-    FPRINTF(fp, "%s", b->tok.literal);
+    FPRINTF_TOKEN(fp, b->tok)
     return 0;
 }
 
 static int
 fprint_return_statement(ReturnStatement* rs, FILE* fp) {
-    FPRINTF(fp, "%s ", rs->tok.literal);
+    FPRINTF_TOKEN(fp, rs->tok)
+    FPRINTF(fp, " ")
     if (rs->return_value.obj != NULL) {
         NODE_FPRINT(fp, rs->return_value);
     }
@@ -190,7 +194,9 @@ fprint_table_literal(TableLiteral* hl, FILE* fp) {
 
 static int
 fprint_string_literal(StringLiteral* sl, FILE* fp) {
-    FPRINTF(fp, "\"%s\"", sl->tok.literal);
+    FPRINTF(fp, "\"");
+    FPRINTF_TOKEN(fp, sl->tok);
+    FPRINTF(fp, "\"");
     return 0;
 }
 
@@ -203,7 +209,7 @@ fprint_assign_statement(AssignStatement *ae, FILE *fp) {
     return 0;
 }
 
-int node_fprint(const Node n, FILE* fp) {
+int node_fprint(const Node n, __attribute__ ((unused)) FILE* fp) {
     if (n.obj == NULL) return 0;
 
     switch (n.typ) {
@@ -273,7 +279,6 @@ int node_fprint(const Node n, FILE* fp) {
 
 static void
 free_prefix_expression(PrefixExpression* pe) {
-    free(pe->tok.literal);
     node_free(pe->right);
     free(pe);
 }
@@ -281,13 +286,11 @@ free_prefix_expression(PrefixExpression* pe) {
 static void
 free_infix_expression(InfixExpression* ie) {
     node_free(ie->left);
-    free(ie->op);
     node_free(ie->right);
     free(ie);
 }
 
 void free_block_statement(BlockStatement* bs) {
-    free(bs->tok.literal);
     for (int i = 0; i < bs->stmts.length; i++) {
         node_free(bs->stmts.data[i]);
     }
@@ -297,7 +300,6 @@ void free_block_statement(BlockStatement* bs) {
 
 static void
 free_if_expression(IfExpression* ie) {
-    free(ie->tok.literal);
     node_free(ie->condition);
     if (ie->consequence != NULL)
         free_block_statement(ie->consequence);
@@ -307,9 +309,7 @@ free_if_expression(IfExpression* ie) {
 }
 
 void free_function_literal(FunctionLiteral* fl) {
-    free(fl->tok.literal);
     for (int i = 0; i < fl->params.length; i++) {
-        free(fl->params.data[i]->tok.literal);
         free(fl->params.data[i]);
     }
     free(fl->params.data);
@@ -320,7 +320,6 @@ void free_function_literal(FunctionLiteral* fl) {
 
 static void
 free_call_expression(CallExpression* ce) {
-    free(ce->tok.literal);
     node_free(ce->function);
     if (ce->args.data != NULL) {
         for (int i = 0; i < ce->args.length; i++) {
@@ -333,9 +332,7 @@ free_call_expression(CallExpression* ce) {
 
 static void
 free_let_statement(LetStatement* ls) {
-    free(ls->tok.literal);
     if (ls->name != NULL) {
-        free(ls->name->tok.literal);
         free(ls->name);
     }
     node_free(ls->value);
@@ -344,7 +341,6 @@ free_let_statement(LetStatement* ls) {
 
 static void
 free_return_statement(ReturnStatement* rs) {
-    free(rs->tok.literal);
     node_free(rs->return_value);
     free(rs);
 }
@@ -357,7 +353,6 @@ free_expression_statement(ExpressionStatement* es) {
 
 static void
 free_array_literal(ArrayLiteral* al) {
-    free(al->tok.literal);
     if (al->elements.data != NULL) {
         for (int i = 0; i < al->elements.length; i++)
             node_free(al->elements.data[i]);
@@ -368,14 +363,12 @@ free_array_literal(ArrayLiteral* al) {
 
 static void
 free_index_expression(IndexExpression* ie) {
-    free(ie->tok.literal);
     node_free(ie->left);
     node_free(ie->index);
     free(ie);
 }
 
 void free_table_literal(TableLiteral* hl) {
-    free(hl->tok.literal);
     for (int i = 0; i < hl->pairs.length; i++) {
         Pair* pair = &hl->pairs.data[i];
         node_free(pair->key);
@@ -389,7 +382,6 @@ static void
 free_assign_statement(AssignStatement *ae) {
     node_free(ae->left);
     node_free(ae->right);
-    free(ae->tok.literal);
     free(ae);
 }
 
@@ -450,8 +442,6 @@ void node_free(Node n) {
             return;
 
         default:
-            // since first field of `n.obj` is `Token`
-            free(((Token*)n.obj)->literal);
             free(n.obj);
             break;
     }

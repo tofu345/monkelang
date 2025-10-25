@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,8 +49,9 @@
 // from dwm :p
 void die(const char *fmt, ...);
 
+uint64_t hash_string_fnv1a(const char *string, int length);
+
 typedef char *error;
-BUFFER(Error, error)
 
 error new_error(const char* format, ...);
 error error_num_args(const char *name, int expected, int actual);

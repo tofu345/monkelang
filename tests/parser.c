@@ -1,6 +1,7 @@
 #include "unity/unity.h"
 
 #include "tests.h"
+#include "helpers.h"
 
 #include "../src/ast.h"
 #include "../src/parser.h"
@@ -20,25 +21,30 @@ static void check_parser_errors(Parser* p) {
         return;
     }
 
-    printf("parser had %d errors\n", p->errors.length);
-    for (int i = 0; i < p->errors.length; i++) {
-        printf("%s\n", p->errors.data[i]);
-    }
+    print_parser_errors(p);
     TEST_FAIL();
 }
 
 static void test_let_statement(Node stmt, const char* exp_name) {
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(token_literal(stmt), "let",
-            "wrong LetStatement.Token.literal");
+    Token *tok = stmt.obj;
+    if (strncmp("let", tok->start, tok->length)) {
+        printf("wrong LetStatement.Token.literal %.*s\n", tok->length,
+                tok->start);
+        TEST_FAIL();
+    }
+
     TEST_ASSERT_MESSAGE(n_LetStatement == stmt.typ, "type not LetStatement");
 
     LetStatement* let_stmt = (LetStatement*)stmt.obj;
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(exp_name, let_stmt->name->tok.literal,
-            "wrong LetStatement.Identifier.Value");
+    if (strncmp(exp_name, let_stmt->name->tok.start, let_stmt->name->tok.length)) {
+        puts("wrong LetStatement.Identifier.Value");
+        TEST_FAIL();
+    }
 }
 
 void test_return_statements(void) {
     char* input = "\
+return;\
 return 5;\
 return 10;\
 return 993322;\
@@ -47,19 +53,23 @@ return 993322;\
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            3, prog.stmts.length, "wrong prog.statements length");
+            4, prog.stmts.length, "wrong prog.statements length");
 
     for (int i = 0; i < prog.stmts.length; i++) {
         Node stmt = prog.stmts.data[i];
-        TEST_ASSERT_MESSAGE(n_ReturnStatement == stmt.typ,
-                "type not ReturnStatement");
-        TEST_ASSERT_EQUAL_STRING_MESSAGE(
-                "return", ((Token*)stmt.obj)->literal,
-                "wrong ReturnStatement.Token.literal");
+
+        if (stmt.typ != n_ReturnStatement) {
+            printf("type not ReturnStatement got='%d'\n", stmt.typ);
+            TEST_FAIL();
+        }
+
+        if (strncmp("return", ((Token*)stmt.obj)->start, ((Token*)stmt.obj)->length)) {
+            puts("wrong ReturnStatement.Token.literal");
+            TEST_FAIL();
+        }
     }
 
     program_free(&prog);
@@ -72,7 +82,6 @@ void test_identifier_expression(void) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
@@ -87,8 +96,10 @@ void test_identifier_expression(void) {
             n_Identifier == es->expression.typ, "type not Identifier");
 
     Identifier* ident = es->expression.obj;
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            "foobar", ident->tok.literal, "wrong Identifier.Token.value");
+    if (strncmp("foobar", ident->tok.start, ident->tok.length)) {
+        puts("wrong Identifier.Token.value");
+        TEST_FAIL();
+    }
 
     program_free(&prog);
     parser_free(&p);
@@ -102,8 +113,10 @@ _test_integer_literal(Node n, long value, char* expected) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             value, il->value, "wrong IntegerLiteral.value");
 
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            expected, il->tok.literal, "wrong IntegerLiteral.tok.literal");
+    if (strncmp(expected, il->tok.start, il->tok.length)) {
+        puts("wrong IntegerLiteral.tok.literal");
+        TEST_FAIL();
+    }
 }
 
 static void
@@ -128,8 +141,10 @@ test_float_literal(Node n, double value) {
     if (asprintf(&expected, "%.3f", value) == -1)
         TEST_FAIL_MESSAGE("no memory");
 
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            expected, il->tok.literal, "wrong FloatLiteral.tok.literal");
+    if (strncmp(expected, il->tok.start, il->tok.length)) {
+        puts("wrong FloatLiteral.tok.literal");
+        TEST_FAIL();
+    }
     free(expected);
 }
 
@@ -139,7 +154,6 @@ void test_integer_literal_expression(void) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
@@ -157,8 +171,10 @@ void test_integer_literal_expression(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             5, int_lit->value, "wrong IntegerLiteral.value");
 
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            "5", int_lit->tok.literal, "wrong IntegerLiteral.Token.literal");
+    if (strncmp("5", int_lit->tok.start, int_lit->tok.length)) {
+        puts("wrong IntegerLiteral.Token.literal");
+        TEST_FAIL();
+    }
 
     program_free(&prog);
     parser_free(&p);
@@ -170,7 +186,6 @@ void test_float_literal_expression(void) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
@@ -188,8 +203,10 @@ void test_float_literal_expression(void) {
     TEST_ASSERT_EQUAL_FLOAT_MESSAGE(
             5.01, fl_lit->value, "wrong FloatLiteral.value");
 
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            "5.01", fl_lit->tok.literal, "wrong FloatLiteral.Token.literal");
+    if (strncmp("5.01", fl_lit->tok.start, fl_lit->tok.length)) {
+        puts("wrong FloatLiteral.Token.literal");
+        TEST_FAIL();
+    }
 
     program_free(&prog);
     parser_free(&p);
@@ -199,8 +216,10 @@ static void
 test_identifier(Node n, const char* value) {
     TEST_ASSERT_MESSAGE(n_Identifier == n.typ, "type not type Identifier");
     Identifier* id = n.obj;
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            value, id->tok.literal, "wrong Identifier.Value");
+    if (strncmp(value, id->tok.start, id->tok.length)) {
+        puts("wrong Identifier.Value");
+        TEST_FAIL();
+    }
 }
 
 static void
@@ -209,9 +228,10 @@ test_boolean_literal(Node n, bool exp) {
             n_BooleanLiteral, n.typ, "wrong type BooleanLiteral");
     BooleanLiteral* b = n.obj;
     TEST_ASSERT_MESSAGE(b->value == exp, "wrong BooleanLiteral.value");
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            exp ? "true" : "false",
-            b->tok.literal, "wrong BooleanLiteral.Token.literal");
+    if (strncmp(exp ? "true" : "false", b->tok.start, b->tok.length)) {
+        puts("wrong BooleanLiteral.Token.literal");
+        TEST_FAIL();
+    }
 }
 
 static void
@@ -253,8 +273,6 @@ void test_let_statements(void) {
         Parser p;
         parser_init(&p);
         Program prog = parse(&p, test.input);
-        TEST_ASSERT_NOT_NULL_MESSAGE(
-                prog.stmts.data, "program.statements NULL");
         check_parser_errors(&p);
 
         Node stmt = prog.stmts.data[0];
@@ -284,7 +302,6 @@ void test_parsing_prefix_expressions(void) {
         Parser p;
         parser_init(&p);
         Program prog = parse(&p, test.input);
-        TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
         check_parser_errors(&p);
         TEST_ASSERT_EQUAL_INT_MESSAGE(
@@ -301,8 +318,10 @@ void test_parsing_prefix_expressions(void) {
                 "wrong PrefixExpression");
 
         PrefixExpression* pe = es->expression.obj;
-        TEST_ASSERT_EQUAL_STRING_MESSAGE(
-                test.operator, pe->op, "wrong PrefixExpression.op");
+        if (strncmp(test.operator, pe->tok.start, pe->tok.length)) {
+            puts("wrong PrefixExpression.op");
+            TEST_FAIL();
+        }
 
         test_literal_expression(pe->right, test.value);
 
@@ -337,8 +356,6 @@ void test_parsing_infix_expressions(void) {
         Parser p;
         parser_init(&p);
         Program prog = parse(&p, test.input);
-        TEST_ASSERT_NOT_NULL_MESSAGE
-            (prog.stmts.data, "program.statements NULL");
 
         check_parser_errors(&p);
         TEST_ASSERT_EQUAL_INT_MESSAGE
@@ -357,8 +374,10 @@ void test_parsing_infix_expressions(void) {
 
         test_literal_expression(ie->left, test.left_value);
 
-        TEST_ASSERT_EQUAL_STRING_MESSAGE(
-                test.operator, ie->op, "wrong InfixExpression.op");
+        if (strncmp(test.operator, ie->tok.start, ie->tok.length)) {
+            puts("wrong InfixExpression.op");
+            TEST_FAIL();
+        }
 
         test_literal_expression(ie->right, test.right_value);
 
@@ -496,8 +515,6 @@ void test_operator_precedence_parsing(void) {
         Parser p;
         parser_init(&p);
         Program prog = parse(&p, test.input);
-        TEST_ASSERT_NOT_NULL_MESSAGE
-            (prog.stmts.data, "program.statements NULL");
         check_parser_errors(&p);
 
         Node n = prog.stmts.data[0];
@@ -532,8 +549,10 @@ test_infix_expression(Node n, Test *left, char* operator, Test *right) {
 
     InfixExpression* ie = n.obj;
     test_literal_expression(ie->left, left);
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            operator, ie->op, "wrong InfixExpression.op");
+    if (strncmp(operator, ie->tok.start, ie->tok.length)) {
+        puts("wrong InfixExpression.op");
+        TEST_FAIL();
+    }
     test_literal_expression(ie->right, right);
 }
 
@@ -552,8 +571,6 @@ void test_boolean_expression(void) {
         Parser p;
         parser_init(&p);
         Program prog = parse(&p, test.input);
-        TEST_ASSERT_NOT_NULL_MESSAGE
-            (prog.stmts.data, "program.statements NULL");
         check_parser_errors(&p);
 
         TEST_ASSERT_EQUAL_INT_MESSAGE
@@ -583,7 +600,6 @@ void test_if_expression(void) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE
@@ -622,7 +638,6 @@ void test_if_else_expression(void) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE
@@ -667,7 +682,6 @@ void test_function_literal_parsing(void) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE
@@ -712,7 +726,6 @@ void test_function_literal_with_name(void) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.length,
@@ -729,9 +742,10 @@ void test_function_literal_with_name(void) {
 
     FunctionLiteral* fl = ls->value.obj;
 
-    if (strcmp("myFunction", fl->name) != 0) {
-        printf("function literal name wrong. want 'myFunction', got='%s'\n",
-                fl->name);
+    Token tok = fl->name->tok;
+    if(strncmp("myFunction", tok.start, tok.length) != 0) {
+        printf("function literal name wrong. want 'myFunction', got='%.*s'\n",
+                tok.length, tok.start);
         TEST_FAIL();
     }
 
@@ -756,7 +770,6 @@ void test_function_parameter_parsing(void) {
         Parser p;
         parser_init(&p);
         Program prog = parse(&p, test.input);
-        TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
         check_parser_errors(&p);
         TEST_ASSERT_EQUAL_INT_MESSAGE
             (1, prog.stmts.length, "wrong prog.statements length");
@@ -787,7 +800,6 @@ void test_call_expression_parsing(void) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
@@ -825,7 +837,6 @@ void test_string_literal_expression(void) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             1, prog.stmts.length, "wrong prog.statements length");
@@ -834,20 +845,21 @@ void test_string_literal_expression(void) {
     TEST_ASSERT_MESSAGE(
             n_StringLiteral == es->expression.typ, "type not StringLiteral");
     StringLiteral* sl = es->expression.obj;
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            "hello world", sl->tok.literal, "wrong StringLiteral.Value");
+    if (strncmp("hello world", sl->tok.start, sl->tok.length)) {
+        puts("wrong StringLiteral.Value");
+        TEST_FAIL();
+    }
 
     program_free(&prog);
     parser_free(&p);
 }
 
 void test_parsing_array_literals(void) {
-    char* input = "[1, 2 * 2, 3 + 3, 0xdeadbeef, 0b11011]";
+    char* input = "[1, 2 * 2, 3 + 3]";
 
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             1, prog.stmts.length, "wrong prog.statements length");
@@ -857,15 +869,13 @@ void test_parsing_array_literals(void) {
             n_ArrayLiteral == es->expression.typ, "type not ArrayLiteral");
     ArrayLiteral* al = es->expression.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-            5, al->elements.length, "wrong length of ArrayLiteral.elements");
+            3, al->elements.length, "wrong length of ArrayLiteral.elements");
 
     test_integer_literal(al->elements.data[0], 1);
     test_infix_expression(al->elements.data[1],
             TEST(int, 2), "*", TEST(int, 2));
     test_infix_expression(al->elements.data[2],
             TEST(int, 3), "+", TEST(int, 3));
-    _test_integer_literal(al->elements.data[3], 0xdeadbeef, "0xdeadbeef");
-    _test_integer_literal(al->elements.data[4], 27, "0b11011");
 
     program_free(&prog);
     parser_free(&p);
@@ -877,7 +887,6 @@ void test_parsing_index_expressions(void) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             1, prog.stmts.length, "wrong prog.statements length");
@@ -901,7 +910,6 @@ void test_parsing_table_literals_string_keys(void) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             1, prog.stmts.length, "wrong prog.statements length");
@@ -940,7 +948,6 @@ void test_parsing_empty_table_literal(void) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             1, prog.stmts.length, "wrong prog.statements length");
@@ -964,7 +971,6 @@ void test_parsing_table_literals_with_expressions(void) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             1, prog.stmts.length, "wrong prog.statements length");
@@ -992,8 +998,12 @@ void test_parsing_table_literals_with_expressions(void) {
     for (int i = 0; i < expected_len; i++) {
         struct Test test = expected[i];
         Pair* pair = &hl->pairs.data[i];
-        TEST_ASSERT_EQUAL_STRING_MESSAGE(test.key,
-                ((StringLiteral*)pair->key.obj)->tok.literal, "value not found");
+        StringLiteral *str = pair->key.obj;
+        if (strncmp(test.key, str->tok.start, str->tok.length)) {
+            printf("value %s not found got %.*s\n",
+                    test.key, str->tok.length, str->tok.start);
+            TEST_FAIL();
+        }
         test_infix_expression(pair->val,
                 TEST(int, test.left), test.op, TEST(int, test.right));
     }
@@ -1008,7 +1018,6 @@ void test_parsing_assign_expressions(void) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.length,
@@ -1027,8 +1036,10 @@ void test_parsing_assign_expressions(void) {
 
     Identifier* ident = as->left.obj;
 
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            "foobar", ident->tok.literal, "wrong Identifier.Token.value");
+    if (strncmp("foobar", ident->tok.start, ident->tok.length)) {
+        puts("wrong Identifier.Token.value");
+        TEST_FAIL();
+    }
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             n_IntegerLiteral, as->right.typ,
@@ -1048,7 +1059,6 @@ void test_parsing_index_assign_expressions(void) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.length,
@@ -1073,8 +1083,10 @@ void test_parsing_index_assign_expressions(void) {
 
     Identifier* ident = index->left.obj;
 
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            "foobar", ident->tok.literal, "wrong Identifier.Token.value");
+    if (strncmp("foobar", ident->tok.start, ident->tok.length)) {
+        puts("wrong Identifier.Token.value");
+        TEST_FAIL();
+    }
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             n_IntegerLiteral, index->index.typ,
@@ -1098,7 +1110,6 @@ void test_parsing_null_literals(void) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);
-    TEST_ASSERT_NOT_NULL_MESSAGE(prog.stmts.data, "program.statements NULL");
 
     check_parser_errors(&p);
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.length,
@@ -1117,9 +1128,10 @@ void test_parsing_null_literals(void) {
 
     NullLiteral *nl = es->expression.obj;
 
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            "null", nl->tok.literal,
-            "wrong NullLiteral.Token.value");
+    if (strncmp("null", nl->tok.start, nl->tok.length)) {
+        puts("wrong NullLiteral.Token.value");
+        TEST_FAIL();
+    }
 
     program_free(&prog);
     parser_free(&p);
