@@ -51,10 +51,5 @@ void die(const char *fmt, ...);
 
 uint64_t hash_string_fnv1a(const char *string, int length);
 
-typedef char *error;
-
-error new_error(const char* format, ...);
-error error_num_args(const char *name, int expected, int actual);
-
 // From: wrenPowerOf2Ceil: http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2Float
 int power_of_2_ceil(int n);
