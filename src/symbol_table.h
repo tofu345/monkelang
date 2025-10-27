@@ -14,7 +14,8 @@ typedef enum {
     // contains only the name of the function currently being compiled
     FunctionScope,
 
-    // variables in parent function(s)
+    // variables in parent function(s).
+    // free variable are shallow copied into child functions.
     FreeScope,
 
     // builtin functions
