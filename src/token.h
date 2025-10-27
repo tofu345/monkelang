@@ -58,6 +58,8 @@ typedef struct {
     int length;
 } Token;
 
+#define LITERAL(t) t.length, t.start
+
 TokenType lookup_ident(const char* ident, int ident_len);
 
 const char* show_token_type(TokenType t);

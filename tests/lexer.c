@@ -42,118 +42,123 @@ if (5 < 10) {\
     struct Test {
         TokenType type;
         char* str;
+        int length;
     } tests[] = {
-	{t_Let, "let"},
-	{t_Ident, "five"},
-	{t_Assign, "="},
-	{t_Digit, "5"},
-	{t_Semicolon, ";"},
-	{t_Let, "let"},
-	{t_Ident, "ten"},
-	{t_Assign, "="},
-	{t_Digit, "10"},
-	{t_Semicolon, ";"},
-	{t_Let, "let"},
-	{t_Ident, "add"},
-	{t_Assign, "="},
-	{t_Function, "fn"},
-	{t_Lparen, "("},
-	{t_Ident, "x"},
-	{t_Comma, ","},
-	{t_Ident, "y"},
-	{t_Rparen, ")"},
-	{t_Lbrace, "{"},
-	{t_Ident, "x"},
-	{t_Plus, "+"},
-	{t_Ident, "y"},
-	{t_Semicolon, ";"},
-	{t_Rbrace, "}"},
-	{t_Semicolon, ";"},
-	{t_Let, "let"},
-	{t_Ident, "result"},
-	{t_Assign, "="},
-	{t_Ident, "add"},
-	{t_Lparen, "("},
-	{t_Ident, "five"},
-	{t_Comma, ","},
-	{t_Ident, "ten"},
-	{t_Rparen, ")"},
-	{t_Semicolon, ";"},
-	{t_Bang, "!"},
-	{t_Minus, "-"},
-	{t_Slash, "/"},
-	{t_Asterisk, "*"},
-	{t_Digit, "5"},
-	{t_Semicolon, ";"},
-	{t_Digit, "5"},
-	{t_Lt, "<"},
-	{t_Digit, "10"},
-	{t_Gt, ">"},
-	{t_Digit, "5"},
-	{t_Semicolon, ";"},
-	{t_If, "if"},
-	{t_Lparen, "("},
-	{t_Digit, "5"},
-	{t_Lt, "<"},
-	{t_Digit, "10"},
-	{t_Rparen, ")"},
-	{t_Lbrace, "{"},
-	{t_Return, "return"},
-	{t_True, "true"},
-	{t_Semicolon, ";"},
-	{t_Rbrace, "}"},
-	{t_Else, "else"},
-	{t_Lbrace, "{"},
-	{t_Return, "return"},
-	{t_False, "false"},
-	{t_Semicolon, ";"},
-	{t_Rbrace, "}"},
-	{t_Digit, "10"},
-	{t_Eq, "=="},
-	{t_Digit, "10"},
-	{t_Semicolon, ";"},
-	{t_Digit, "10"},
-	{t_Not_eq, "!="},
-	{t_Digit, "9"},
-	{t_Semicolon, ";"},
-	{t_String, "foobar"},
-	{t_String, "foo bar"},
-	{t_String, "foo\nbar"},
-	{t_Lbracket, "["},
-	{t_Digit, "1"},
-	{t_Comma, ","},
-	{t_Digit, "2"},
-	{t_Rbracket, "]"},
-	{t_Semicolon, ";"},
-	{t_Lbrace, "{"},
-	{t_String, "foo"},
-	{t_Colon, ":"},
-	{t_String, "bar"},
-	{t_Rbrace, "}"},
-	{t_Semicolon, ";"},
-	{t_Eof, ""},
+	{t_Let, "let", 3},
+	{t_Ident, "five", 4},
+	{t_Assign, "=", 1},
+	{t_Digit, "5", 1},
+	{t_Semicolon, ";", 1},
+	{t_Let, "let", 3},
+	{t_Ident, "ten", 3},
+	{t_Assign, "=", 1},
+	{t_Digit, "10", 2},
+	{t_Semicolon, ";", 1},
+	{t_Let, "let", 3},
+	{t_Ident, "add", 3},
+	{t_Assign, "=", 1},
+	{t_Function, "fn", 2},
+	{t_Lparen, "(", 1},
+	{t_Ident, "x", 1},
+	{t_Comma, ",", 1},
+	{t_Ident, "y", 1},
+	{t_Rparen, ")", 1},
+	{t_Lbrace, "{", 1},
+	{t_Ident, "x", 1},
+	{t_Plus, "+", 1},
+	{t_Ident, "y", 1},
+	{t_Semicolon, ";", 1},
+	{t_Rbrace, "}", 1},
+	{t_Semicolon, ";", 1},
+	{t_Let, "let", 3},
+	{t_Ident, "result", 6},
+	{t_Assign, "=", 1},
+	{t_Ident, "add", 3},
+	{t_Lparen, "(", 1},
+	{t_Ident, "five", 4},
+	{t_Comma, ",", 1},
+	{t_Ident, "ten", 3},
+	{t_Rparen, ")", 1},
+	{t_Semicolon, ";", 1},
+	{t_Bang, "!", 1},
+	{t_Minus, "-", 1},
+	{t_Slash, "/", 1},
+	{t_Asterisk, "*", 1},
+	{t_Digit, "5", 1},
+	{t_Semicolon, ";", 1},
+	{t_Digit, "5", 1},
+	{t_Lt, "<", 1},
+	{t_Digit, "10", 2},
+	{t_Gt, ">", 1},
+	{t_Digit, "5", 1},
+	{t_Semicolon, ";", 1},
+	{t_If, "if", 2},
+	{t_Lparen, "(", 1},
+	{t_Digit, "5", 1},
+	{t_Lt, "<", 1},
+	{t_Digit, "10", 2},
+	{t_Rparen, ")", 1},
+	{t_Lbrace, "{", 1},
+	{t_Return, "return", 6},
+	{t_True, "true", 4},
+	{t_Semicolon, ";", 1},
+	{t_Rbrace, "}", 1},
+	{t_Else, "else", 4},
+	{t_Lbrace, "{", 1},
+	{t_Return, "return", 6},
+	{t_False, "false", 5},
+	{t_Semicolon, ";", 1},
+	{t_Rbrace, "}", 1},
+	{t_Digit, "10", 2},
+	{t_Eq, "==", 2},
+	{t_Digit, "10", 2},
+	{t_Semicolon, ";", 1},
+	{t_Digit, "10", 2},
+	{t_Not_eq, "!=", 2},
+	{t_Digit, "9", 1},
+	{t_Semicolon, ";", 1},
+	{t_String, "foobar", 6},
+	{t_String, "foo bar", 7},
+	{t_String, "foo\nbar", 7},
+	{t_Lbracket, "[", 1},
+	{t_Digit, "1", 1},
+	{t_Comma, ",", 1},
+	{t_Digit, "2", 1},
+	{t_Rbracket, "]", 1},
+	{t_Semicolon, ";", 1},
+	{t_Lbrace, "{", 1},
+	{t_String, "foo", 3},
+	{t_Colon, ":", 1},
+	{t_String, "bar", 3},
+	{t_Rbrace, "}", 1},
+	{t_Semicolon, ";", 1},
+	{t_Eof, "", 1},
     };
 
     size_t len_tests = sizeof(tests) / sizeof(tests[0]);
     Lexer l;
     lexer_init(&l, input);
     for (size_t i = 0; i < len_tests; i++) {
-        struct Test t = tests[i];
+        struct Test test = tests[i];
         Token tok =
             lexer_next_token(&l);
 
-        if (t.type != tok.type) {
-            printf("test[%zu]: invalid token type, expected '%s' got '%s'\n",
-                    i, show_token_type(t.type), show_token_type(tok.type));
+        if (test.type != tok.type) {
+            printf("test[%zu] %.*s: invalid token type, expected '%s' got '%s'\n",
+                    i, LITERAL(tok),
+                    show_token_type(test.type), show_token_type(tok.type));
             TEST_FAIL();
         }
 
-        if (t.type == t_Eof) {
-            TEST_ASSERT_NULL(tok.start);
-
-        } else if (strncmp(t.str, tok.start, tok.length) != 0) {
+        if (strncmp(test.str, tok.start, tok.length) != 0) {
             printf("test[%zu]: invalid token literal, expected '%s' got '%.*s'\n",
-                    i, t.str, tok.length, tok.start);
+                    i, test.str, tok.length, tok.start);
+            TEST_FAIL();
+        }
+
+        if (test.length != tok.length) {
+            printf("test[%zu] %.*s: invalid token length, expected %d got %d\n",
+                    i, LITERAL(tok), test.length, tok.length);
             TEST_FAIL();
         }
     }
@@ -222,10 +227,7 @@ let add = fn(x, y) {\n\
             TEST_FAIL();
         }
 
-        if (t.type == t_Eof) {
-            TEST_ASSERT_NULL(tok.start);
-
-        } else if (strncmp(t.str, tok.start, tok.length) != 0) {
+        if (strncmp(t.str, tok.start, tok.length) != 0) {
             printf("test[%zu]: invalid token literal, expected '%s' got '%.*s'\n",
                     i, t.str, tok.length, tok.start);
             TEST_FAIL();

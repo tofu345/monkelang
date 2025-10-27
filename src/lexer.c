@@ -9,13 +9,16 @@ typedef bool check_function(char ch);
 
 inline static void
 read_char(Lexer *l) {
-    if (l->read_position >= l->input_len) {
+    l->position = l->read_position;
+
+    if (l->position >= l->input_len) {
         l->ch = 0;
+        return;
+
     } else {
-        l->ch = l->input[l->read_position];
+        l->ch = l->input[l->position];
     }
 
-    l->position = l->read_position;
     l->read_position += 1;
 
     if (l->ch == '\n') {
@@ -75,22 +78,22 @@ not_closing_quote(char ch) {
 // read while [check(l->ch)], return number of read characters.
 static int
 read_while(Lexer *l, check_function *check) {
-    int pos = l->read_position;
+    int pos = l->position;
 
-    while (l->ch != 0 && check(l->ch)) {
+    while (check(l->ch)) {
         read_char(l);
     }
 
-    return l->read_position - pos;
-}
+    // if EOF include last character before '\0'
+    if (l->ch == 0) {
+        return l->read_position - pos;
+    }
 
-static void
-skip_whitespace(Lexer *l) {
-    read_while(l, is_whitespace);
+    return l->position - pos;
 }
 
 Token lexer_next_token(Lexer *l) {
-    skip_whitespace(l);
+    read_while(l, is_whitespace);
 
     Token tok = {
         .type = t_Illegal,
@@ -132,9 +135,13 @@ Token lexer_next_token(Lexer *l) {
 
     case '/':
         if (peek_char(l) == '/') {
-            while (l->ch != 0 && l->ch != '\n') {
-                read_char(l);
+            // comments
+            uint64_t pos = l->read_position + 1;
+            while (pos < l->input_len && l->input[pos] != '\n') {
+                pos++;
             }
+            l->read_position = pos;
+            read_char(l);
             return lexer_next_token(l);
 
         } else {
@@ -200,14 +207,12 @@ Token lexer_next_token(Lexer *l) {
 
     case 0:
         tok.type = t_Eof;
-        tok.start = NULL;
         return tok;
 
     default:
         if (is_letter(l->ch)) {
-            const char *start = l->input + l->position;
             tok.length = read_while(l, is_letter);
-            tok.type = lookup_ident(start, tok.length);
+            tok.type = lookup_ident(tok.start, tok.length);
             return tok;
 
         } else if (is_digit(l->ch)) {
