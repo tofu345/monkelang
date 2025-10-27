@@ -3,6 +3,7 @@
 #include "ast.h"
 #include "code.h"
 #include "constants.h"
+#include "errors.h"
 
 #include <stdio.h>
 #include <stdbool.h>

@@ -3,6 +3,7 @@
 #include "builtin.h"
 #include "code.h"
 #include "constants.h"
+#include "errors.h"
 #include "symbol_table.h"
 #include "utils.h"
 
@@ -16,6 +17,9 @@ static int add_constant(Compiler *c, Constant obj_const);
 
 // allocate new [SymbolTable] and add ptr to [c.symbol_tables]
 static SymbolTable *new_symbol_table(Compiler *c);
+
+// create [Error] with [n.token]
+static Error *compiler_error(Node n, char* format, ...);
 
 DEFINE_BUFFER(Scope, CompilationScope)
 DEFINE_BUFFER(SymbolTable, SymbolTable *)
@@ -147,9 +151,9 @@ load_symbol(Compiler *c, Symbol *s) {
     }
 }
 
-static error
+static Error *
 _compile(Compiler *c, Node n) {
-    error err;
+    Error *err;
     switch (n.typ) {
         case n_BlockStatement:
             {
@@ -181,7 +185,8 @@ _compile(Compiler *c, Node n) {
                     sym_define(c->current_symbol_table, name, ident->hash);
 
                 if (symbol->index >= GlobalsSize) {
-                    return new_error("too many global variables");
+                    return compiler_error(
+                            (Node){.obj = ident}, "too many global variables");
                 }
 
                 err = _compile(c, ls->value);
@@ -198,7 +203,8 @@ _compile(Compiler *c, Node n) {
         case n_ReturnStatement:
             {
                 if (c->scope_index == 0) {
-                    return new_error("return statement outside function");
+                    return compiler_error(n,
+                            "return statement outside function");
                 }
 
                 ReturnStatement *rs = n.obj;
@@ -220,8 +226,8 @@ _compile(Compiler *c, Node n) {
                 Identifier *id = n.obj;
                 Symbol *symbol = sym_resolve(c->current_symbol_table, id->hash);
                 if (symbol == NULL) {
-                    return new_error("undefined variable '%.*s'",
-                            id->tok.length, id->tok.start);
+                    return compiler_error(n,
+                            "undefined variable '%.*s'", LITERAL(id->tok));
                 }
 
                 load_symbol(c, symbol);
@@ -237,11 +243,13 @@ _compile(Compiler *c, Node n) {
 
                 if (stmt->left.typ == n_Identifier) {
                     Identifier *id = stmt->left.obj;
+                    Node id_node = { .obj = id };
 
                     Symbol *symbol = sym_resolve(c->current_symbol_table, id->hash);
                     if (symbol == NULL) {
-                        return new_error("undefined variable '%.*s'",
-                                id->tok.length, id->tok.start);
+                        return compiler_error(id_node,
+                                "undefined variable '%.*s' is not assignable",
+                                LITERAL(id->tok));
                     }
 
                     char *format;
@@ -255,17 +263,19 @@ _compile(Compiler *c, Node n) {
                             return 0;
 
                         case FreeScope:
-                            format = "free variable '%.*s' is not assignable";
-                            return new_error(format, id->tok.length, id->tok.start);
+                            emit(c, OpSetFree, symbol->index);
+                            return 0;
 
                         case FunctionScope:
                             format = "function '%.*s' is not assignable";
-                            return new_error(format, id->tok.length, id->tok.start);
+                            break;
 
                         case BuiltinScope:
-                            format = "builtin %s() is not assignable";
-                            return new_error(format, symbol->name);
+                            format = "builtin %.*s() is not assignable";
+                            break;
                     }
+
+                    return compiler_error(id_node, format, LITERAL(id->tok));
 
                 } else if (stmt->left.typ == n_IndexExpression) {
                     err = _compile(c, stmt->left);
@@ -275,7 +285,8 @@ _compile(Compiler *c, Node n) {
                     return 0;
                 }
 
-                return new_error("cannot assign non-variable");
+                return compiler_error(stmt->left,
+                        "cannot assign non-variable");
             }
 
         case n_InfixExpression:
@@ -320,8 +331,8 @@ _compile(Compiler *c, Node n) {
                     emit(c, OpNotEqual);
 
                 } else {
-                    return new_error("unknown operator %.*s",
-                            ie->tok.length, ie->tok.start);
+                    die("compiler: unknown infix operator %.*s",
+                            LITERAL(ie->tok));
                 }
                 return 0;
             }
@@ -339,8 +350,8 @@ _compile(Compiler *c, Node n) {
                     emit(c, OpMinus);
 
                 } else {
-                    return new_error("unknown operator %s",
-                            pe->tok.length, pe->tok.start);
+                    die("compiler: unknown prefix operator %.*s",
+                            LITERAL(pe->tok));
                 }
                 return 0;
             }
@@ -600,8 +611,8 @@ Instructions *leave_scope(Compiler *c) {
     return ins;
 }
 
-error compile(Compiler *c, Program *prog) {
-    error err;
+Error *compile(Compiler *c, Program *prog) {
+    Error *err;
     for (int i = 0; i < prog->stmts.length; i++) {
         err = _compile(c, prog->stmts.data[i]);
         if (err) { return err; }
@@ -610,11 +621,9 @@ error compile(Compiler *c, Program *prog) {
 }
 
 Bytecode bytecode(Compiler *c) {
-    return (Bytecode){
+    return (Bytecode) {
         .instructions = c->current_instructions,
         .constants = &c->constants,
-
-        // global symbol table
         .num_globals = c->symbol_tables.data[0]->num_definitions,
     };
 }
@@ -625,4 +634,20 @@ new_symbol_table(Compiler *c) {
     if (new == NULL) { die("malloc"); }
     SymbolTableBufferPush(&c->symbol_tables, new);
     return new;
+}
+
+static Error *
+compiler_error(Node n, char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    char* msg = NULL;
+    if (vasprintf(&msg, format, args) == -1) die("compiler_error");
+    va_end(args);
+
+    Error *err = malloc(sizeof(Error));
+    *err = (Error){
+        .token = *node_token(n),
+        .message = msg
+    };
+    return err;
 }

@@ -11,12 +11,12 @@
 void setUp(void) {}
 void tearDown(void) {}
 
-// compiler test
 static void c_test(
     char *input,
     Constants expectedConstants,
     Instructions *expectedInstructions
 );
+static void c_test_error(const char *input, const char *expected_error);
 
 #define INT(n) TEST(int, n)
 #define STR(s) TEST(str, s)
@@ -87,12 +87,12 @@ void test_integer_arithmetic(void) {
 void test_boolean_expressions(void) {
     c_test(
         "true",
-        (Constants){0},
+        NO_CONSTANTS,
         _I( make(OpTrue), make(OpPop) )
     );
     c_test(
         "false",
-        (Constants){0},
+        NO_CONSTANTS,
         _I( make(OpFalse), make(OpPop) )
     );
     c_test(
@@ -137,7 +137,7 @@ void test_boolean_expressions(void) {
     );
     c_test(
         "true == false",
-        (Constants){0},
+        NO_CONSTANTS,
         _I(
             make(OpTrue),
             make(OpFalse),
@@ -147,7 +147,7 @@ void test_boolean_expressions(void) {
     );
     c_test(
         "true != false",
-        (Constants){0},
+        NO_CONSTANTS,
         _I(
             make(OpTrue),
             make(OpFalse),
@@ -157,7 +157,7 @@ void test_boolean_expressions(void) {
     );
     c_test(
         "!true",
-        (Constants){0},
+        NO_CONSTANTS,
         _I(
             make(OpTrue),
             make(OpBang),
@@ -282,7 +282,7 @@ void test_string_expressions(void) {
 void test_array_literals(void) {
     c_test(
         "[]",
-        (Constants){0},
+        NO_CONSTANTS,
         _I(
             make(OpArray, 0),
             make(OpPop)
@@ -321,7 +321,7 @@ void test_array_literals(void) {
 void test_Table_literals(void) {
     c_test(
         "{}",
-        (Constants){0},
+        NO_CONSTANTS,
         _I(
             make(OpTable, 0),
             make(OpPop)
@@ -795,21 +795,24 @@ void test_closures(void) {
             fn() {\
                 let b = 77;\
                 fn() {\
-                    let c = 88;\
+                    b = 88;\
+                    let c = 99;\
                     global + a + b + c;\
                 }\
             }\
         }\
         ",
         _C(
-            INT(55), INT(66), INT(77), INT(88),
+            INT(55), INT(66), INT(77), INT(88), INT(99),
             INS(
                 make(OpConstant, 3),
+                make(OpSetFree, 0),
+                make(OpConstant, 4),
                 make(OpSetLocal, 0),
                 make(OpGetGlobal, 0),
-                make(OpGetFree, 0),
-                make(OpAdd),
                 make(OpGetFree, 1),
+                make(OpAdd),
+                make(OpGetFree, 0),
                 make(OpAdd),
                 make(OpGetLocal, 0),
                 make(OpAdd),
@@ -818,23 +821,23 @@ void test_closures(void) {
             INS(
                 make(OpConstant, 2),
                 make(OpSetLocal, 0),
-                make(OpGetFree, 0),
                 make(OpGetLocal, 0),
-                make(OpClosure, 4, 2),
+                make(OpGetFree, 0),
+                make(OpClosure, 5, 2),
                 make(OpReturnValue)
            ),
            INS(
                 make(OpConstant, 1),
                 make(OpSetLocal, 0),
                 make(OpGetLocal, 0),
-                make(OpClosure, 5, 1),
+                make(OpClosure, 6, 1),
                 make(OpReturnValue)
            )
         ),
         _I(
             make(OpConstant, 0),
             make(OpSetGlobal, 0),
-            make(OpClosure, 6, 0),
+            make(OpClosure, 7, 0),
             make(OpPop)
         )
     );
@@ -969,8 +972,54 @@ void test_assign_expressions(void) {
     );
 }
 
+void test_compiler_errors(void) {
+    c_test_error("b", "undefined variable 'b'");
+    c_test_error("b = 1", "undefined variable 'b' is not assignable");
+    c_test_error("return", "return statement outside function");
+    c_test_error(
+        "let a = fn() { a = 1; }",
+        "function 'a' is not assignable"
+    );
+    c_test_error(
+        "len = 1;",
+        "builtin len() is not assignable"
+    );
+}
+
 static int test_instructions(Instructions *expected, Instructions *actual);
 static int test_constants(Constants expected, ConstantBuffer *actual);
+
+static void
+c_test_error(const char *input, const char *expected_error) {
+    bool fail = false;
+
+    Program prog = test_parse(input);
+
+    Compiler c;
+    compiler_init(&c);
+    Error *err = compile(&c, &prog);
+    if (!err) {
+        printf("expected compiler error but received none");
+        fail = true;
+        goto cleanup;
+    }
+
+    if (strcmp(err->message, expected_error) != 0) {
+        printf("wrong compiler error\nwant= '%s'\ngot = '%s'\n",
+                expected_error, err->message);
+        fail = true;
+    }
+
+cleanup:
+    program_free(&prog);
+    compiler_free(&c);
+    if (err) { free_error(err); }
+
+    if (fail) {
+        TEST_FAIL();
+        printf("in test: '%s'\n\n", input);
+    }
+}
 
 static void
 c_test(
@@ -978,28 +1027,35 @@ c_test(
     Constants expectedConstants,
     Instructions *expectedInstructions
 ) {
+    bool fail = false;
+
     Program prog = test_parse(input);
+
     Compiler c;
     compiler_init(&c);
 
-    error err = compile(&c, &prog);
+    Error *err = compile(&c, &prog);
     if (err != 0) {
-        printf("test: %s\n", input);
-        printf("compiler error: %s\n", err);
-        free(err);
-        TEST_FAIL();
-    };
-    Bytecode code = bytecode(&c);
+        print_error(input, err);
+        free_error(err);
 
-    int _err = test_instructions(expectedInstructions, code.instructions);
-    if (_err != 0) {
-        printf("test: %s\n", input);
-        TEST_FAIL();
+        fail = true;
+        goto cleanup;
+    };
+
+    Bytecode code = bytecode(&c);
+    int res = test_instructions(expectedInstructions, code.instructions);
+    if (res != 0) {
+        fail = true;
+        goto cleanup;
     }
 
-    _err = test_constants(expectedConstants, code.constants);
-    if (_err != 0) { TEST_FAIL(); }
+    res = test_constants(expectedConstants, code.constants);
+    if (res != 0) {
+        fail = true;
+    }
 
+cleanup:
     program_free(&prog);
     free(expectedInstructions->data);
     free(expectedInstructions);
@@ -1012,6 +1068,11 @@ c_test(
     }
     free(expectedConstants.data);
     compiler_free(&c);
+
+    if (fail) {
+        TEST_FAIL();
+        printf("in test: '%s'\n\n", input);
+    }
 }
 
 static int
@@ -1146,5 +1207,6 @@ int main(void) {
     RUN_TEST(test_closures);
     RUN_TEST(test_recursive_functions);
     RUN_TEST(test_assign_expressions);
+    RUN_TEST(test_compiler_errors);
     return UNITY_END();
 }

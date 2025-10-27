@@ -1,4 +1,5 @@
 #include "ast.h"
+#include "errors.h"
 #include "utils.h"
 #include "lexer.h"
 #include "parser.h"
@@ -13,7 +14,7 @@
 #define IS_INVALID(n) (n.obj == NULL)
 
 // create [ParserError] with [p.cur_token]
-static void new_parser_error(Parser* p, char* format, ...);
+static void parser_error(Parser* p, char* format, ...);
 
 static Node parse_statement(Parser* p);
 static Node parse_expression(Parser* p, enum Precedence precedence);
@@ -74,14 +75,14 @@ next_token(Parser* p) {
 
 static void
 cur_tok_error(Parser* p, TokenType t) {
-    new_parser_error(p,
+    parser_error(p,
             "expected token to be '%s', got '%s' instead",
             show_token_type(t), show_token_type(p->peek_token.type));
 }
 
 static void
 peek_error(Parser* p, TokenType t) {
-    new_parser_error(p,
+    parser_error(p,
             "expected next token to be '%s', got '%s' instead",
             show_token_type(t), show_token_type(p->peek_token.type));
 }
@@ -111,9 +112,7 @@ expect_peek(Parser* p, TokenType t) {
 
 static void
 no_prefix_parse_error(Parser* p, TokenType t) {
-    new_parser_error(p,
-            "unexpected token '%.*s'",
-            p->cur_token.length, p->cur_token.start, show_token_type(t));
+    parser_error(p, "unexpected token '%s'", show_token_type(t));
 }
 
 static Node
@@ -177,6 +176,12 @@ parse_float(Parser* p) {
 
 static Node
 parse_digit(Parser* p) {
+    for (int i = 0; i < p->cur_token.length; i++) {
+        if (p->cur_token.start[i] == '.') {
+            return parse_float(p);
+        }
+    }
+
     IntegerLiteral* il = allocate(sizeof(IntegerLiteral));
     il->tok = p->cur_token;
 
@@ -198,14 +203,9 @@ parse_digit(Parser* p) {
     long value = strtol(literal + base, &endptr, base);
     if (endptr != end || errno == ERANGE) {
         free(il);
-        Node fl = parse_float(p);
-        if (!IS_INVALID(fl)) {
-            return fl;
-        }
-
-        new_parser_error(p,
+        parser_error(p,
                 "could not parse '%.*s' as integer or float",
-                p->cur_token.length, p->cur_token.start);
+                LITERAL(p->cur_token));
         return INVALID;
     }
 
@@ -659,7 +659,7 @@ parse_statement(Parser* p) {
     case t_Return:
         return parse_return_statement(p);
     case t_Illegal:
-        new_parser_error(p,
+        parser_error(p,
                 "illegal character '%.*s'",
                 p->cur_token.length, p->cur_token.start);
         return INVALID;
@@ -718,7 +718,7 @@ Program parse(Parser* p, const char *input) {
             NodeBufferPush(&prog.stmts, stmt);
 
         } else if (p->errors.length >= MAX_ERRORS) {
-            new_parser_error(p, "too many errors, stopping now\n");
+            parser_error(p, "too many errors, stopping now\n");
             break;
         }
 
@@ -735,12 +735,15 @@ void program_free(Program* p) {
 }
 
 static void
-new_parser_error(Parser* p, char* format, ...) {
+parser_error(Parser* p, char* format, ...) {
     va_list args;
     va_start(args, format);
     char* msg = NULL;
     if (vasprintf(&msg, format, args) == -1) die("parser_error");
-    ErrorBufferPush(&p->errors,
-        (Error){ .token = p->cur_token, .message = msg });
     va_end(args);
+
+    ErrorBufferPush(&p->errors, (Error) {
+        .token = p->cur_token,
+        .message = msg
+    });
 }

@@ -1,5 +1,6 @@
 #include "repl.h"
 #include "compiler.h"
+#include "errors.h"
 #include "object.h"
 #include "parser.h"
 #include "utils.h"
@@ -27,7 +28,10 @@ void repl(FILE* in, FILE* out) {
     vm_init(&vm, NULL, NULL, NULL);
 
     char *input;
+
     error err;
+    Error *e;
+
     size_t len;
     Object stack_elem;
     while (1) {
@@ -37,6 +41,12 @@ void repl(FILE* in, FILE* out) {
         if (getline(&input, &len, in) == -1) {
             free(input);
             break;
+        }
+
+        // remove trailing newline
+        len = strlen(input);
+        if (input[len - 1] == '\n') {
+            input[len - 1] = '\0';
         }
 
         prog = parse(&p, input);
@@ -49,11 +59,11 @@ void repl(FILE* in, FILE* out) {
             ProgramBufferPush(&programs, prog);
         }
 
-        err = compile(&c, &prog);
-        if (err) {
+        e = compile(&c, &prog);
+        if (e) {
             fprintf(out, "Woops! Compilation failed!\n");
-            puts(err);
-            free(err);
+            print_error(input, e);
+            free_error(e);
             goto cleanup;
         }
 
@@ -90,6 +100,7 @@ void run(char* program) {
     Compiler c;
     VM vm;
     error err;
+    Error *e;
 
     parser_init(&p);
     compiler_init(&c);
@@ -101,11 +112,11 @@ void run(char* program) {
         goto cleanup;
     }
 
-    err = compile(&c, &prog);
-    if (err) {
+    e = compile(&c, &prog);
+    if (e) {
         fprintf(stdout, "Woops! Compilation failed!\n");
-        puts(err);
-        free(err);
+        print_error(program, e);
+        free_error(e);
         goto cleanup;
     }
 
@@ -124,7 +135,7 @@ cleanup:
     compiler_free(&c);
 }
 
-static void 
+static void
 print_parser_errors(FILE* out, Parser *p) {
     fprintf(out, "Woops! We ran into some monkey business here!\n");
     for (int i = 0; i < p->errors.length; i++) {

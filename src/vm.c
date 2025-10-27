@@ -27,6 +27,7 @@ instructions(Frame *f) {
     return f->cl->func->instructions;
 }
 
+// TODO: better error message
 static error
 error_unknown_operation(Opcode op, Object left, Object right) {
     return new_error("unkown operation: %s %s %s",
@@ -812,6 +813,13 @@ error vm_run(VM *vm, Bytecode bytecode) {
 
                 err = vm_push(vm, current_frame->cl->free[pos]);
                 if (err) { return err; };
+                break;
+            case OpSetFree:
+                // free variable index
+                pos = read_big_endian_uint8(ins.data + ip + 1);
+                current_frame->ip += 1;
+
+                current_frame->cl->free[pos] = vm_pop(vm);
                 break;
 
             case OpCurrentClosure:

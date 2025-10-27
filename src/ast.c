@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+Token *node_token(Node n) {
+    return n.obj;
+}
+
 #define NODE_FPRINT(fp, ...) \
     if (node_fprint( __VA_ARGS__, fp) == -1) \
         return -1;
@@ -66,7 +70,7 @@ int fprint_block_statement(BlockStatement* bs, FILE* fp) {
 
 static int
 fprint_if_expression(IfExpression* ie, FILE* fp) {
-    FPRINTF(fp, "if");
+    FPRINTF(fp, "if ");
     NODE_FPRINT(fp, ie->condition);
     FPRINTF(fp, " ");
     fprint_block_statement(ie->consequence, fp);

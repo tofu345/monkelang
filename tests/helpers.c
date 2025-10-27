@@ -13,7 +13,7 @@ void print_parser_errors(Parser *p) {
     p->errors.length = 0;
 }
 
-Program test_parse(char *input) {
+Program test_parse(const char *input) {
     Parser p;
     parser_init(&p);
     Program prog = parse(&p, input);

@@ -42,9 +42,8 @@ typedef struct {
     void* obj; // if NULL, err
 } Node;
 
-// Retrieve token_literal of `n.obj.tok.literal`, [n.obj] must contain a
-// `Token` as its first field
-char* token_literal(Node n);
+// [n.obj] must contain a `Token` as its first field
+Token *node_token(Node n);
 
 // Returns -1 on write to FILE err
 int node_fprint(const Node n, FILE* fp);
@@ -61,6 +60,7 @@ typedef struct {
 // Returns -1 on write to FILE err
 int program_fprint(Program* p, FILE* fp);
 
+// TODO: store [Identifiers] in hashmap
 typedef struct {
     Token tok; // the 't_Ident' token
     uint64_t hash;
@@ -99,13 +99,13 @@ typedef struct {
 } FloatLiteral;
 
 typedef struct {
-    Token tok; // the prefix token, e.g !
+    Token tok; // the prefix token, e.g '!'
     Node right;
 } PrefixExpression;
 
 typedef struct {
+    Token tok; // the infix token, e.g. '+'
     Node left;
-    Token tok;
     Node right;
 } InfixExpression;
 

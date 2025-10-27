@@ -515,16 +515,34 @@ test_recursive_fibonacci(void) {
 static void
 test_assign_expressions(void) {
     vm_test("let a = 15; a = 5; a", TEST(int, 5));
+    vm_test("let a = null; a = 5;", TEST(int, 5));
+
+    // assign index expressions
     vm_test("let arr = [1, 2, 3]; arr[0] = 5; arr[0]", TEST(int, 5));
     vm_test(
         "\
-            let hash = {1: 2, 3: 4};\
-            hash[1] = null;\
-            hash[1]\
+        let hash = {1: 2, 3: 4};\
+        hash[1] = null;\
+        hash[1]\
         ",
         TEST_NULL
     );
-    vm_test("let a = null; a = 5;", TEST(int, 5));
+
+    // assign free variable
+    vm_test(
+        "\
+        let a = 66;\
+        fn() {\
+            let b = 77;\
+            fn() {\
+                b = 88;\
+                let c = 99;\
+                a + b + c;\
+            }() + b\
+        }()\
+        ",
+        TEST(int, 330)
+    );
 }
 
 static TestArray *
@@ -718,20 +736,19 @@ test_expected_object(Test expected, Object actual) {
 
 static void
 vm_test(char *input, Test *expected) {
-    Compiler c;
-    VM vm;
-    Program prog = test_parse(input);
-    compiler_init(&c);
-    vm_init(&vm, NULL, NULL, NULL);
+    bool fail = false;
 
-    error err = compile(&c, &prog);
+    Compiler c;
+    compiler_init(&c);
+    Program prog = test_parse(input);
+
+    Error *err = compile(&c, &prog);
     if (err) {
-        printf("test: %s\n", input);
-        printf("compiler error: %s\n\n", err);
-        free(err);
-        program_free(&prog);
-        compiler_free(&c);
-        TEST_FAIL();
+        print_error(input, err);
+        free_error(err);
+
+        fail = true;
+        goto cleanup;
     };
 
     // // display constants
@@ -756,61 +773,76 @@ vm_test(char *input, Test *expected) {
     // }
     // putc('\n', stdout);
 
-    err = vm_run(&vm, bytecode(&c));
-    if (err) {
-        printf("test: %s\n", input);
-        printf("vm error: %s\n\n", err);
+    VM vm;
+    vm_init(&vm, NULL, NULL, NULL);
+
+    error e = vm_run(&vm, bytecode(&c));
+    if (e) {
+        printf("vm error: %s\n", e);
         free(err);
-        TEST_FAIL();
+        fail = true;
+        goto cleanup;
     }
 
     Object stack_elem = vm_last_popped(&vm);
-    int _err = test_expected_object(*expected, stack_elem);
-    if (_err != 0) {
-        printf("test_expected_object failed for test: %s\n\n", input);
-        TEST_FAIL();
+    int res = test_expected_object(*expected, stack_elem);
+    if (res != 0) {
+        fail = true;
     }
 
     vm_free(&vm);
+
+cleanup:
     program_free(&prog);
     compiler_free(&c);
+
+    if (fail) {
+        TEST_FAIL();
+        printf("in test: '%s'\n\n", input);
+    }
 }
 
 static void
 vm_test_error(char *input, char *expected_error) {
-    Compiler c;
-    VM vm;
-    Program prog = test_parse(input);
-    compiler_init(&c);
-    vm_init(&vm, NULL, NULL, NULL);
+    bool fail = false;
 
-    error err = compile(&c, &prog);
+    Compiler c;
+    compiler_init(&c);
+    Program prog = test_parse(input);
+
+    Error *err = compile(&c, &prog);
     if (err) {
-        printf("test: %s\n", input);
-        printf("compiler error: %s\n\n", err);
-        free(err);
-        program_free(&prog);
-        compiler_free(&c);
-        TEST_FAIL();
+        print_error(input, err);
+        free_error(err);
+        fail = true;
+        goto cleanup;
     };
 
-    err = vm_run(&vm, bytecode(&c));
-    if (!err) {
+    VM vm;
+    vm_init(&vm, NULL, NULL, NULL);
+
+    error e = vm_run(&vm, bytecode(&c));
+    if (!e) {
         printf("expected VM error for test: %s\n", input);
-        TEST_FAIL();
+        fail = true;
+
+    } else if (strcmp(e, expected_error) != 0) {
+        printf("wrong VM error\nwant= %s\ngot = %s\n",
+                expected_error, e);
+        fail = true;
     }
+    free(e);
 
     vm_free(&vm);
+
+cleanup:
     program_free(&prog);
     compiler_free(&c);
 
-    if (strcmp(err, expected_error) != 0) {
-        printf("wrong VM error for test: %s\nwant= %s\ngot = %s\n",
-                input, expected_error, err);
+    if (fail) {
+        printf("in test: '%s'\n\n", input);
         TEST_FAIL();
     }
-
-    free(err);
 }
 
 int main(void) {

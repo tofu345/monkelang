@@ -52,6 +52,7 @@ const Definition definitions[] = {
     // constant index of Function and number of free variables
     DEF(OpClosure, closure),
     DEF(OpGetFree, one), // free variable index
+    DEF(OpSetFree, one), // free variable index
     DEF_EMPTY(OpCurrentClosure),
 };
 

@@ -7,6 +7,7 @@
 typedef enum {
     OpConstant = 1,
     OpPop,
+
     OpAdd,
     OpSub,
     OpMul,
@@ -45,6 +46,7 @@ typedef enum {
 
     OpClosure,
     OpGetFree,
+    OpSetFree, // NOTE: this will only update the value in the nested scope.
     OpCurrentClosure,
 } Opcode;
 

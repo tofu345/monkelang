@@ -34,7 +34,7 @@ typedef struct {
 void compiler_init(Compiler *c);
 void compiler_free(Compiler *c);
 
-error compile(Compiler *c, Program *prog);
+Error *compile(Compiler *c, Program *prog);
 
 // append [Instruction] with [Opcode] and [int] operands
 int emit(Compiler *c, Opcode op, ...);
@@ -45,8 +45,6 @@ Instructions *leave_scope(Compiler *c);
 typedef struct {
     Instructions *instructions;
     ConstantBuffer *constants;
-
-    // NOTE: does not account for reassigning variables to same name.
     int num_globals;
 } Bytecode;
 
