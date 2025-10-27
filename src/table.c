@@ -255,9 +255,14 @@ __next_bucket(tbl_it *it) {
 bool
 tbl_next(tbl_it *it) {
     while (1) {
-        if (it->_index > N) {
-            if (!__next_bucket(it))
+        if (it->_index >= N) {
+            if (it->_bucket->overflow) {
+                it->_bucket = it->_bucket->overflow;
+                it->_index = 0;
+
+            } else if (!__next_bucket(it)) {
                 return false;
+            }
             continue;
         }
 
@@ -268,14 +273,10 @@ tbl_next(tbl_it *it) {
             continue;
         }
 
-        it->cur_key = (Object){
-            .type = key_typ,
-            .data = it->_bucket->k_data[it->_index]
-        };
-        it->cur_val = (Object){
-            .type = it->_bucket->v_type[it->_index],
-            .data = it->_bucket->v_data[it->_index]
-        };
+        it->cur_key.type = key_typ;
+        it->cur_key.data = it->_bucket->k_data[it->_index];
+        it->cur_val.type = it->_bucket->v_type[it->_index];
+        it->cur_val.data = it->_bucket->v_data[it->_index];
         it->_index++;
         return true;
     }

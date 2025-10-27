@@ -125,7 +125,27 @@ test_table_expand(void) {
         TEST_FAIL_MESSAGE("wrong table length");
     }
 
+    bool is_found[num];
+    memset(is_found, 0, num);
+
+    tbl_it it;
+    tbl_iterator(&it, &tbl);
+    while (tbl_next(&it)) {
+        int idx = it.cur_key.data.integer;
+        if (idx < 0 || idx >= num) continue;
+        is_found[idx] = true;
+    }
+
+    bool all_found = true;
+    for (int i = 0; i < num; i++) {
+        if (!is_found[i]) {
+            all_found = false;
+            printf("could not find %d\n", i);
+        }
+    }
+
     table_free(&tbl);
+    TEST_ASSERT(all_found);
 }
 
 int main(void) {
