@@ -1,6 +1,7 @@
 #pragma once
 
-// specialized hash-table (from https://github.com/tofu345/hash-table) for [Object]'s
+// specialized hash-table (from https://github.com/tofu345/hash-table)
+// for [Object]'s
 
 #include <stddef.h>
 #include <stdint.h>
@@ -36,17 +37,17 @@ struct table {
 void *table_init(table *tbl);
 void table_free(table *tbl);
 
-// Get item with [key].
-// Return value, or [Object] with type [o_Null] if not found.
+// Get item with [key]. Return value, or [o_Null Object] if not found.
 Object table_get(table *tbl, Object key);
 
-// Returns previous value of [key] if present or [value] on success.
-// [o_Null Object] if:
-// - [key] or [value] is [o_Null Object].
+// Returns [Null Object] if:
+// - [key] or [value] is [Null Object].
 // - allocation of [table_bucket] overflow failed.
+// Returns previous value of [key] if present.
+// Returns [value] otherwise.
 Object table_set(table *tbl, Object key, Object value);
 
-// Remove item with [key] and return its value or [o_Null] if not found.
+// Remove item with [key] and return its value or [Null Object] if not found.
 Object table_remove(table *tbl, Object key);
 
 typedef struct {
@@ -55,9 +56,9 @@ typedef struct {
 
     // Don't use these fields directly.
     table *_tbl;
-    table_bucket *_bucket;  // current bucket under inspection
-    size_t _bucket_idx;     // index of current bucket into `_buckets`
-    int _index;          // index of current entry into `_bucket.entries`
+    table_bucket *_bucket; // current bucket under inspection
+    size_t _bucket_idx;    // index of current bucket into `_buckets`
+    int _index;            // index of current entry into `_bucket.entries`
 } tbl_it;
 
 // Initialize new iterator (for use with table_next).

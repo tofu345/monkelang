@@ -167,6 +167,9 @@ parse_float(Parser* p) {
     double value = strtod(fl->tok.start, &endptr);
     if (endptr != end || errno == ERANGE) {
         free(fl);
+        parser_error(p,
+                "could not parse '%.*s' as float",
+                LITERAL(p->cur_token));
         return INVALID;
     }
 
@@ -190,11 +193,6 @@ parse_digit(Parser* p) {
     char* endptr;
     int base = 0;
 
-    if (literal[1] == '\0') {
-        il->value = literal[0] - '0';
-        return NODE(n_IntegerLiteral, il);
-    }
-
     if ('b' == literal[1]) {
         base = 2; // skip '0b',
                   // [strtol] infers base 16 or 8 not base 2.
@@ -204,7 +202,7 @@ parse_digit(Parser* p) {
     if (endptr != end || errno == ERANGE) {
         free(il);
         parser_error(p,
-                "could not parse '%.*s' as integer or float",
+                "could not parse '%.*s' as integer",
                 LITERAL(p->cur_token));
         return INVALID;
     }
@@ -424,7 +422,7 @@ parse_table_literal(Parser* p) {
 static Node
 parse_call_expression(Parser* p, Node function) {
     CallExpression* ce = allocate(sizeof(CallExpression));
-    ce->tok = p->cur_token;
+    ce->tok = *node_token(function);
     ce->function = function;
     ce->args = parse_expression_list(p, t_Rparen);
     if (ce->args.length == -1) {

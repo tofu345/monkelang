@@ -100,6 +100,7 @@ Token lexer_next_token(Lexer *l) {
         .line = l->line,
         .start = l->input + l->position,
         .length = 1,
+        .position = l->position,
     };
 
     switch (l->ch) {

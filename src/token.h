@@ -56,6 +56,9 @@ typedef struct {
 
     // the number of characters of the source code the [Token] represents.
     int length;
+
+    // the offset of [start] from the start of the source code.
+    int position;
 } Token;
 
 #define LITERAL(t) t.length, t.start
