@@ -19,36 +19,34 @@ error error_num_args(const char *name, int expected, int actual) {
             name, expected, expected != 1 ? "s" : "", actual);
 }
 
-void print_error(const char *input, Error *err) {
-    Token tok = err->token;
+void highlight_token(Token tok) {
     const char *cur = tok.start;
 
-    // find distance from start of line to [err.token.start].
-    int left_dist = 0;
-    while (true) {
-        if (cur == input || *(cur - 1) == '\n') {
+    // distance from start of line to [token.start].
+    int offset = tok.position;
+    for (; offset > 0; offset--) {
+        // walk left until start of source code or end of previous line.
+        if (*(cur - 1) == '\n') {
             break;
         }
         cur--;
-        left_dist++;
     }
+    int left_dist = tok.position - offset;
 
     const char *start_of_line = cur;
     cur = tok.start + tok.length;
 
-    // find distance from [err.token.start] to end of line.
+    // distance from [token.start] to end of line.
     int right_dist = 0;
-    char ch;
     while (true) {
-        ch = *cur;
-        if (ch == '\n' || ch == '\0') {
+        // walk right until end of source code or end of current line.
+        char ch = *cur;
+        if (ch == '\0' || ch == '\n') {
             break;
         }
         cur++;
         right_dist++;
     }
-
-    printf("%s\n", err->message);
 
     // print line
     printf("%4d | %.*s\n", tok.line,
@@ -56,11 +54,19 @@ void print_error(const char *input, Error *err) {
             start_of_line);
 
     // highlight token
-    left_dist += 7; // padding + ' | '
+    left_dist += 7; // + 'line | '
     int n;
     for (n = 0; n < left_dist; n++) { putc(' ', stdout); }
     for (n = 0; n < tok.length; n++) { putc('^', stdout); }
     putc('\n', stdout);
+}
+
+void print_error(Error *err) {
+    highlight_token(err->token);
+
+    if (err->message) {
+        printf("%s\n", err->message);
+    }
 }
 
 void free_error(Error *err) {

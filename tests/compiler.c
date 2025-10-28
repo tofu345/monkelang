@@ -1036,7 +1036,7 @@ c_test(
 
     Error *err = compile(&c, &prog);
     if (err != 0) {
-        print_error(input, err);
+        print_error(err);
         free_error(err);
 
         fail = true;

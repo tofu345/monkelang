@@ -142,7 +142,7 @@ typedef struct {
 void free_function_literal(FunctionLiteral* fl);
 
 typedef struct {
-    Token tok; // the '(' token
+    Token tok; // the 't_Ident' token
     Node function; // Identifier or FunctionLiteral
     NodeBuffer args;
 } CallExpression;

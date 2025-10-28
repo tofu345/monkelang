@@ -10,16 +10,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void print_parser_errors(FILE* out, Parser *p);
-
+BUFFER(Input, char *)
+DEFINE_BUFFER(Input, char *)
 BUFFER(Program, Program)
 DEFINE_BUFFER(Program, Program)
+
+static void print_parser_errors(FILE* out, Parser *p);
 
 void repl(FILE* in, FILE* out) {
     Parser p;
     parser_init(&p);
     Program prog;
-    ProgramBuffer programs = {0};
 
     Compiler c;
     compiler_init(&c);
@@ -27,13 +28,18 @@ void repl(FILE* in, FILE* out) {
     VM vm;
     vm_init(&vm, NULL, NULL, NULL);
 
-    char *input;
-
     error err;
     Error *e;
 
+    char *input;
     size_t len;
     Object stack_elem;
+
+    // Keep previous inputs and ASTs around because tokens point to the source
+    // code directly.
+    InputBuffer inputs = {0};
+    ProgramBuffer programs = {0};
+
     while (1) {
         fprintf(out, ">> ");
         input = NULL;
@@ -43,26 +49,28 @@ void repl(FILE* in, FILE* out) {
             break;
         }
 
-        // remove trailing newline
-        len = strlen(input);
-        if (input[len - 1] == '\n') {
-            input[len - 1] = '\0';
-        }
-
         prog = parse(&p, input);
         if (p.errors.length > 0) {
             print_parser_errors(out, &p);
             program_free(&prog);
+            free(input);
             goto cleanup;
+        }
 
-        } else if (prog.stmts.length > 0) {
+        if (prog.stmts.length > 0) {
+            InputBufferPush(&inputs, input);
             ProgramBufferPush(&programs, prog);
+
+        } else {
+            // in case [input] only contains whitespace.
+            free(input);
+            continue;
         }
 
         e = compile(&c, &prog);
         if (e) {
             fprintf(out, "Woops! Compilation failed!\n");
-            print_error(input, e);
+            print_error(e);
             free_error(e);
             goto cleanup;
         }
@@ -70,6 +78,7 @@ void repl(FILE* in, FILE* out) {
         err = vm_run(&vm, bytecode(&c));
         if (err) {
             fprintf(out, "Woops! Executing bytecode failed!\n");
+            print_vm_stack_trace(&vm);
             puts(err);
             free(err);
             goto cleanup;
@@ -80,18 +89,23 @@ void repl(FILE* in, FILE* out) {
         fputc('\n', out);
 
 cleanup:
-        free(input);
         c.scopes.data[0].instructions.length = 0; // reset main scope
         vm.stack[0] = (Object){0}; // remove stack_elem
         vm.sp = 0;
+        vm.frames_index = 0;
     }
 
     vm_free(&vm);
+    compiler_free(&c);
+
     for (int i = 0; i < programs.length; i++)
         program_free(&programs.data[i]);
     free(programs.data);
     parser_free(&p);
-    compiler_free(&c);
+
+    for (int i = 0; i < inputs.length; i++)
+        free(inputs.data[i]);
+    free(inputs.data);
 }
 
 void run(char* program) {
@@ -115,7 +129,7 @@ void run(char* program) {
     e = compile(&c, &prog);
     if (e) {
         fprintf(stdout, "Woops! Compilation failed!\n");
-        print_error(program, e);
+        print_error(e);
         free_error(e);
         goto cleanup;
     }
@@ -140,7 +154,7 @@ print_parser_errors(FILE* out, Parser *p) {
     fprintf(out, "Woops! We ran into some monkey business here!\n");
     for (int i = 0; i < p->errors.length; i++) {
         Error err = p->errors.data[i];
-        print_error(p->l.input, &err);
+        print_error(&err);
         free(err.message);
     }
     p->errors.length = 0;

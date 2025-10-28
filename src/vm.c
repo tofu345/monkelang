@@ -4,6 +4,7 @@
 #include "code.h"
 #include "compiler.h"
 #include "constants.h"
+#include "errors.h"
 #include "object.h"
 #include "table.h"
 #include "utils.h"
@@ -13,9 +14,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+// initialize `vm.frames[vm.frames_index]`
 static void
-frame_init(Frame *f, Closure *cl, int base_pointer) {
-    *f = (Frame) {
+frame_init(VM *vm, Closure *cl, int base_pointer) {
+    vm->frames[vm->frames_index] = (Frame) {
         .cl = cl,
         .ip = -1,
         .base_pointer = base_pointer,
@@ -57,6 +59,15 @@ void vm_init(VM *vm, Object *stack, Object *globals, Frame *frames) {
         if (frames == NULL) { die("vm frames create"); }
     }
     vm->frames = frames;
+
+    if (!vm->main_fn) {
+        vm->main_fn = malloc(sizeof(Function));
+        if (vm->main_fn == NULL) { die("malloc"); }
+    }
+    if (!vm->main_cl) {
+        vm->main_cl = malloc(sizeof(Closure));
+        if (vm->main_cl == NULL) { die("malloc"); }
+    }
 }
 
 void vm_free(VM *vm) {
@@ -73,6 +84,8 @@ void vm_free(VM *vm) {
     free(vm->stack);
     free(vm->globals);
     free(vm->frames);
+    free(vm->main_cl);
+    free(vm->main_fn);
 }
 
 // return to previous [Frame]
@@ -82,12 +95,11 @@ pop_frame(VM *vm) {
     return vm->frames + vm->frames_index;
 }
 
-// add new frame if less than [MaxFraxes]
+// increment [vm.frames_index] if less than [MaxFraxes]
 static error
 new_frame(VM *vm) {
     vm->frames_index++;
     if (vm->frames_index >= MaxFraxes) {
-        vm->frames_index = 0;
         return new_error("exceeded maximum function call stack");
     }
     return 0;
@@ -197,7 +209,15 @@ execute_binary_operation(VM *vm, Opcode op) {
         result = execute_binary_string_operation(vm, op, left, right);
 
     } else {
-        return error_unknown_operation(op, left, right);
+        static const char binary_ops[] = {'+', '-', '*', '/'};
+        if (op > OpDiv) {
+            return error_unknown_operation(op, left, right);
+        }
+
+        int idx = op - OpAdd;
+        return new_error("unkown operation: %s %c %s",
+                show_object_type(left.type), binary_ops[idx],
+                show_object_type(right.type));
     }
 
     vm->sp -= 2;
@@ -492,6 +512,8 @@ build_table(VM *vm, int start_index, int end_index) {
             continue;
         }
 
+        // FIXME: die() instead?
+        // should only happen if allocation of bucket overflow fails.
         if (IS_NULL(table_set(tbl, key, val))) {
             return ERR("could not set table value: %s",
                     show_object_type(val.type));
@@ -505,28 +527,28 @@ static error
 call_closure(VM *vm, Closure *cl, int num_args) {
     Function *fn = cl->func;
     if (num_args != fn->num_parameters) {
-        char *name = "<anonymous function>";
         if (fn->name) {
             Identifier *id = fn->name;
             return new_error("%.*s takes %d argument%s got %d",
-                    id->tok.length, id->tok.start,
+                    LITERAL(id->tok),
                     fn->num_parameters, fn->num_parameters != 1 ? "s" : "",
                     num_args);
         };
 
-        return error_num_args(name, fn->num_parameters, num_args);
+        return error_num_args("<anonymous function>",
+                fn->num_parameters, num_args);
     }
 
     error err = new_frame(vm);
     if (err) { return err; }
 
     int base_pointer = vm->sp - num_args;
-    Frame *f = vm->frames + vm->frames_index;
-    frame_init(f, cl, base_pointer);
+    frame_init(vm, cl, base_pointer);
 
     if (fn->num_locals > 0) {
-        // set local variables to [o_Null] to avoid wierd stuff if GC is
-        // triggered.
+        // set local variables to [o_Null] to avoid use after free if GC is
+        // triggered and accesses Compound Data Types on the stack that are
+        // potentially freed.
         memset(vm->stack + vm->sp, 0, fn->num_locals * sizeof(Object));
     }
 
@@ -589,15 +611,18 @@ vm_push_closure(VM *vm, int const_index, int num_free) {
 }
 
 error vm_run(VM *vm, Bytecode bytecode) {
-    Function main_fn = {
+    *vm->main_fn = (Function) {
         .instructions = *bytecode.instructions,
         .num_locals = 0,
         .num_parameters = 0,
-        .name = &(Identifier){ .tok = (Token){ .start = "<main>" } }
+        .name = NULL
     };
-    Closure main_closure = { .func = &main_fn, .num_free = 0 };
+    *vm->main_cl = (Closure) {
+        .func = vm->main_fn,
+        .num_free = 0
+    };
 
-    frame_init(vm->frames, &main_closure, 0);
+    frame_init(vm, vm->main_cl, 0);
     vm->num_globals = bytecode.num_globals;
     vm->constants = *bytecode.constants;
 
@@ -837,4 +862,13 @@ error vm_run(VM *vm, Bytecode bytecode) {
 
 Object vm_last_popped(VM *vm) {
     return vm->stack[vm->sp];
+}
+
+void print_vm_stack_trace(VM *vm) {
+    for (int i = 1; i <= vm->frames_index; i++) {
+        putc('\n', stdout);
+        Identifier *id = vm->frames[i].cl->func->name;
+        highlight_token(id->tok);
+        printf("in call: %.*s()\n", LITERAL(id->tok));
+    }
 }

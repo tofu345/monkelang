@@ -7,7 +7,7 @@ void print_parser_errors(Parser *p) {
     printf("parser had %d errors\n", p->errors.length);
     for (int i = 0; i < p->errors.length; i++) {
         Error err = p->errors.data[i];
-        print_error(p->l.input, &err);
+        print_error(&err);
         free(err.message);
     }
     p->errors.length = 0;

@@ -21,7 +21,11 @@ typedef struct {
 
 BUFFER(Error, Error)
 
-// print [err.message], print line of [err.token] and highlight [err.token]
-void print_error(const char *input, Error *err);
+// print [err.message] if not NULL and [highlight_token(err.token)]
+void print_error(Error *err);
+
+// print line of [tok].
+// highlight [tok.start] to [tok.start + tok.length].
+void highlight_token(Token tok);
 
 void free_error(Error *err);

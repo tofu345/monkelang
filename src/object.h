@@ -57,7 +57,7 @@ typedef union {
     table* table;
     Closure *closure;
     error err;
-    const struct Builtin *builtin;
+    const Builtin *builtin;
 
     void *ptr;
 } ObjectData;

@@ -744,7 +744,7 @@ vm_test(char *input, Test *expected) {
 
     Error *err = compile(&c, &prog);
     if (err) {
-        print_error(input, err);
+        print_error(err);
         free_error(err);
 
         fail = true;
@@ -812,7 +812,7 @@ vm_test_error(char *input, char *expected_error) {
 
     Error *err = compile(&c, &prog);
     if (err) {
-        print_error(input, err);
+        print_error(err);
         free_error(err);
         fail = true;
         goto cleanup;
