@@ -65,9 +65,8 @@ table *create_table(VM *vm) {
     return tbl;
 }
 
-Closure *create_closure(VM *vm, Function *func, Object *free,
-        int num_free) {
-
+Closure *
+create_closure(VM *vm, CompiledFunction *func, Object *free, int num_free) {
     size_t free_size = num_free * sizeof(Object),
            size = sizeof(Closure) + free_size;
 

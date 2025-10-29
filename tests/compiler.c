@@ -318,7 +318,7 @@ void test_array_literals(void) {
     );
 }
 
-void test_Table_literals(void) {
+void test_table_literals(void) {
     c_test(
         "{}",
         NO_CONSTANTS,
@@ -491,9 +491,9 @@ void test_compiler_scopes(void) {
         TEST_FAIL_MESSAGE("compiler did not enclose symbol_table");
     }
 
-    free(c.current_instructions->data); // free Instructions not added to
-                                        // [c.constants]
-    leave_scope(&c);
+    Instructions *ins = leave_scope(&c);
+    free(ins->data); // instructions of nested scope
+
     if (c.scope_index != 0) {
         printf("scope_index wrong. got=%d, want=%d\n", c.scope_index, 0);
         TEST_FAIL();
@@ -529,6 +529,7 @@ void test_compiler_scopes(void) {
         TEST_FAIL();
     }
 
+    free(c.current_instructions->data); // instructions of main scope
     compiler_free(&c);
 }
 
@@ -972,6 +973,30 @@ void test_assign_expressions(void) {
     );
 }
 
+void test_return_statements(void) {
+    c_test(
+        "fn() { if (true) { return } else { 20 }; 3333; }",
+        _C(
+            INT(20),
+            INT(3333),
+            INS(
+                make(OpTrue),
+                make(OpJumpNotTruthy, 8),
+                make(OpReturn),
+                make(OpJump, 11),
+                make(OpConstant, 0),
+                make(OpPop),
+                make(OpConstant, 1),
+                make(OpReturnValue)
+            )
+        ),
+        _I(
+            make(OpClosure, 2, 0),
+            make(OpPop)
+        )
+    );
+}
+
 void test_compiler_errors(void) {
     c_test_error("b", "undefined variable 'b'");
     c_test_error("b = 1", "undefined variable 'b' is not assignable");
@@ -987,7 +1012,8 @@ void test_compiler_errors(void) {
 }
 
 static int test_instructions(Instructions *expected, Instructions *actual);
-static int test_constants(Constants expected, ConstantBuffer *actual);
+static int test_constants(Constants expected, ConstantBuffer *actual,
+                          FunctionBuffer *functions);
 
 static void
 c_test_error(const char *input, const char *expected_error) {
@@ -999,7 +1025,7 @@ c_test_error(const char *input, const char *expected_error) {
     compiler_init(&c);
     Error *err = compile(&c, &prog);
     if (!err) {
-        printf("expected compiler error but received none");
+        printf("expected compiler error but received none\n");
         fail = true;
         goto cleanup;
     }
@@ -1044,13 +1070,15 @@ c_test(
     };
 
     Bytecode code = bytecode(&c);
-    int res = test_instructions(expectedInstructions, code.instructions);
+    CompiledFunction *main_fn = &code.functions->data[0];
+    int res = test_instructions(expectedInstructions, &main_fn->instructions);
+
     if (res != 0) {
         fail = true;
         goto cleanup;
     }
 
-    res = test_constants(expectedConstants, code.constants);
+    res = test_constants(expectedConstants, code.constants, code.functions);
     if (res != 0) {
         fail = true;
     }
@@ -1070,8 +1098,8 @@ cleanup:
     compiler_free(&c);
 
     if (fail) {
-        TEST_FAIL();
         printf("in test: '%s'\n\n", input);
+        TEST_FAIL();
     }
 }
 
@@ -1137,7 +1165,9 @@ test_integer_constant(long expected, Constant actual) {
 }
 
 static int
-test_constants(Constants expected, ConstantBuffer *actual) {
+test_constants(Constants expected, ConstantBuffer *actual,
+               FunctionBuffer *functions) {
+
     if (actual->length != expected.length) {
         printf("wrong constants length.\nwant=%d\ngot =%d\n",
                 expected.length, actual->length);
@@ -1173,8 +1203,9 @@ test_constants(Constants expected, ConstantBuffer *actual) {
                     return -1;
                 }
 
-                err = test_instructions(exp.val._ins,
-                    &cur.data.function->instructions);
+                CompiledFunction *func =
+                    &functions->data[cur.data.function_index];
+                err = test_instructions(exp.val._ins, &func->instructions);
                 if (err != 0) {
                     printf("constant %d - test_instructions failed\n", i);
                     return -1;
@@ -1196,7 +1227,7 @@ int main(void) {
     RUN_TEST(test_global_let_statements);
     RUN_TEST(test_string_expressions);
     RUN_TEST(test_array_literals);
-    RUN_TEST(test_Table_literals);
+    RUN_TEST(test_table_literals);
     RUN_TEST(test_index_expressions);
     RUN_TEST(test_functions);
     RUN_TEST(test_functions_without_return_value);
@@ -1207,6 +1238,7 @@ int main(void) {
     RUN_TEST(test_closures);
     RUN_TEST(test_recursive_functions);
     RUN_TEST(test_assign_expressions);
+    RUN_TEST(test_return_statements);
     RUN_TEST(test_compiler_errors);
     return UNITY_END();
 }

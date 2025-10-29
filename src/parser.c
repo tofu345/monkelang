@@ -629,6 +629,11 @@ parse_expression_or_assign_statement(Parser* p) {
             return INVALID;
         }
 
+        if (left.typ == n_Identifier && right.typ == n_FunctionLiteral) {
+            FunctionLiteral *fl = right.obj;
+            fl->name = left.obj;
+        }
+
         AssignStatement *as = allocate(sizeof(AssignStatement));
         as->left = left;
         as->tok = tok;

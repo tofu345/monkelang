@@ -75,8 +75,24 @@ Object object_eq(Object left, Object right);
 // print [Object] to [fp], returns -1 on error
 int object_fprint(Object o, FILE* fp);
 
+typedef struct {
+    Instructions instructions;
+    int num_locals;
+    int num_parameters;
+
+    // where in the source code the function was defined.
+    FunctionLiteral *literal;
+
+    // TODO: store indices of all statements, for printing vm errors.
+    // typedef struct {
+    //     int index;
+    //     Node statement;
+    // } something;
+
+} CompiledFunction;
+
 struct Closure {
-    Function *func;
+    CompiledFunction *func;
 
     int num_free;
     Object free[]; // free variables, see [symbol_table.h/FreeScope]

@@ -19,36 +19,39 @@
     } name##Buffer;                                                           \
                                                                               \
     void name##BufferInit(name##Buffer* buf);                                 \
-    void name##BufferAllocate(name##Buffer* buf, int length);                 \
+    void name##BufferFill(name##Buffer* buf, typ val, int length);            \
     void name##BufferPush(name##Buffer* buf, typ val);                        \
 
 // From: wren DEFINE_BUFFER
 #define DEFINE_BUFFER(name, typ)                                              \
     void name##BufferInit(name##Buffer* buf) {                                \
-        memset(buf, 0, sizeof(name##Buffer));                                 \
+        buf->data = NULL;                                                     \
+        buf->length = 0;                                                      \
+        buf->capacity = 0;                                                    \
     }                                                                         \
                                                                               \
-    void name##BufferAllocate(name##Buffer* buf, int length) {                \
-        buf->length += length;                                                \
-        if (buf->length > buf->capacity) {                                    \
-            int capacity = power_of_2_ceil(buf->length);                      \
+    void name##BufferFill(name##Buffer* buf, typ val, int length) {           \
+        if (buf->length + length > buf->capacity) {                           \
+            int capacity = power_of_2_ceil(buf->length + length);             \
             buf->data = realloc(buf->data, capacity * sizeof(typ));           \
             if (buf->data == NULL) {                                          \
                 die("realloc %sBuffer", #name);                               \
             }                                                                 \
             buf->capacity = capacity;                                         \
         }                                                                     \
+        for (int i = 0; i < length; i++) {                                    \
+            buf->data[buf->length++] = val;                                   \
+        }                                                                     \
     }                                                                         \
                                                                               \
     void name##BufferPush(name##Buffer* buf, typ val) {                       \
-        int i = buf->length;                                                  \
-        name##BufferAllocate(buf, 1);                                         \
-        buf->data[i] = val;                                                   \
+        name##BufferFill(buf, val, 1);                                        \
     }                                                                         \
 
 // from dwm :p
 void die(const char *fmt, ...);
 
+// return fnv1a hash of `string[0:length)` exclusive.
 uint64_t hash_string_fnv1a(const char *string, int length);
 
 // From: wrenPowerOf2Ceil: http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2Float

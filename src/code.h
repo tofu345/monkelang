@@ -46,7 +46,7 @@ typedef enum {
 
     OpClosure,
     OpGetFree,
-    OpSetFree, // NOTE: this will only update the value in the nested scope.
+    OpSetFree, // NOTE: this will only update the [Object] in the nested scope.
     OpCurrentClosure,
 } Opcode;
 

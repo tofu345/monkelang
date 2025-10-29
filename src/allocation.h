@@ -22,4 +22,5 @@ Object object_copy(VM* vm, Object obj);
 CharBuffer *create_string(VM *vm, const char *text, int length);
 ObjectBuffer *create_array(VM *vm, Object *data, int length);
 table *create_table(VM *vm);
-Closure *create_closure(VM *vm, Function *func, Object *free, int num_free);
+Closure *create_closure(VM *vm, CompiledFunction *func, Object *free,
+                        int num_free);

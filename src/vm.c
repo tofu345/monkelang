@@ -60,12 +60,8 @@ void vm_init(VM *vm, Object *stack, Object *globals, Frame *frames) {
     }
     vm->frames = frames;
 
-    if (!vm->main_fn) {
-        vm->main_fn = malloc(sizeof(Function));
-        if (vm->main_fn == NULL) { die("malloc"); }
-    }
-    if (!vm->main_cl) {
-        vm->main_cl = malloc(sizeof(Closure));
+    if (vm->main_cl == NULL) {
+        vm->main_cl = calloc(1, sizeof(Closure));
         if (vm->main_cl == NULL) { die("malloc"); }
     }
 }
@@ -85,7 +81,6 @@ void vm_free(VM *vm) {
     free(vm->globals);
     free(vm->frames);
     free(vm->main_cl);
-    free(vm->main_fn);
 }
 
 // return to previous [Frame]
@@ -525,10 +520,11 @@ build_table(VM *vm, int start_index, int end_index) {
 
 static error
 call_closure(VM *vm, Closure *cl, int num_args) {
-    Function *fn = cl->func;
+    CompiledFunction *fn = cl->func;
     if (num_args != fn->num_parameters) {
-        if (fn->name) {
-            Identifier *id = fn->name;
+        FunctionLiteral *lit = fn->literal;
+        if (lit->name) {
+            Identifier *id = lit->name;
             return new_error("%.*s takes %d argument%s got %d",
                     LITERAL(id->tok),
                     fn->num_parameters, fn->num_parameters != 1 ? "s" : "",
@@ -603,26 +599,26 @@ vm_push_closure(VM *vm, int const_index, int num_free) {
         return new_error("not a function: constant %d", const_index);
     }
 
+    int idx = constant.data.function_index;
+    CompiledFunction *func = &vm->functions->data[idx];
+
+    Object *free_variables = &vm->stack[vm->sp - num_free];
+    Closure *closure = create_closure(vm, func, free_variables, num_free);
+
+    // remove free variables from stack
     vm->sp -= num_free;
-    Closure *closure = create_closure(vm, constant.data.function,
-            vm->stack + vm->sp, num_free);
 
     return vm_push(vm, OBJ(o_Closure, .closure = closure));
 }
 
 error vm_run(VM *vm, Bytecode bytecode) {
-    *vm->main_fn = (Function) {
-        .instructions = *bytecode.instructions,
-        .num_locals = 0,
-        .num_parameters = 0,
-        .name = NULL
-    };
+    vm->functions = bytecode.functions;
     *vm->main_cl = (Closure) {
-        .func = vm->main_fn,
-        .num_free = 0
+        .func = vm->functions->data, // first function
+        .num_free = 0,
     };
-
     frame_init(vm, vm->main_cl, 0);
+
     vm->num_globals = bytecode.num_globals;
     vm->constants = *bytecode.constants;
 
@@ -638,6 +634,8 @@ error vm_run(VM *vm, Bytecode bytecode) {
         ip = ++current_frame->ip;
         op = ins.data[ip];
 
+        // TODO: use computed gotos
+        // https://eli.thegreenplace.net/2012/07/12/computed-goto-for-efficient-dispatch-tables
         switch (op) {
             case OpConstant:
                 // constant index
@@ -865,10 +863,12 @@ Object vm_last_popped(VM *vm) {
 }
 
 void print_vm_stack_trace(VM *vm) {
+    // the main closure does not point to the AST.
     for (int i = 1; i <= vm->frames_index; i++) {
-        Identifier *id = vm->frames[i].cl->func->name;
-        if (id) {
-            highlight_token(id->tok);
+        FunctionLiteral *lit = vm->frames[i].cl->func->literal;
+        highlight_token(lit->tok);
+        if (lit->name) {
+            Identifier *id = lit->name;
             printf("in <function: %.*s>\n", LITERAL(id->tok));
         } else {
             printf("in <anonymous function>\n");

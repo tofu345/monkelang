@@ -135,7 +135,9 @@ typedef struct {
     Token tok; // the 'fn' token
     ParamBuffer params;
     BlockStatement* body;
-    // points to [LetStatement].name.tok if in [LetStatement]
+
+    // if [FunctionLiteral] is in [LetStatement] or [AssignStatement],
+    // points to corresponding Identifier.
     Identifier *name;
 } FunctionLiteral;
 

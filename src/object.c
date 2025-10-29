@@ -79,8 +79,9 @@ fprint_table(table *tbl, FILE* fp) {
 
 static int
 fprint_closure(Closure *cl, FILE *fp) {
-    if (cl->func->name) {
-        Identifier *id = cl->func->name;
+    FunctionLiteral *lit = cl->func->literal;
+    if (lit->name) {
+        Identifier *id = lit->name;
         FPRINTF(fp, "<function: %.*s>", id->tok.length, id->tok.start);
     } else {
         FPRINTF(fp, "<anonymous function>");

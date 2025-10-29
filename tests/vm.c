@@ -797,8 +797,8 @@ cleanup:
     compiler_free(&c);
 
     if (fail) {
-        TEST_FAIL();
         printf("in test: '%s'\n\n", input);
+        TEST_FAIL();
     }
 }
 

@@ -23,6 +23,7 @@ static Error *compiler_error(Node n, char* format, ...);
 
 DEFINE_BUFFER(Scope, CompilationScope)
 DEFINE_BUFFER(SymbolTable, SymbolTable *)
+DEFINE_BUFFER(Function, CompiledFunction)
 
 void compiler_init(Compiler *c) {
     memset(c, 0, sizeof(Compiler));
@@ -44,28 +45,36 @@ void compiler_init(Compiler *c) {
     // init main scope
     ScopeBufferPush(&c->scopes, (CompilationScope){0});
     c->current_instructions = &c->scopes.data[0].instructions;
+
+    // init main function with empty instructions.  later set in [compile()].
+    FunctionBufferPush(&c->functions, (CompiledFunction){0});
 }
 
 void compiler_free(Compiler *c) {
-    for (int i = 0; i < c->scopes.length; i++) {
+    int i;
+    SymbolTable *cur;
+
+    // functions that failed compilation.
+    for (i = 1; i < c->scopes.length; i++) {
+        // from 1 because the main function [CompilationScope] is not removed.
         free(c->scopes.data[i].instructions.data);
     }
     free(c->scopes.data);
 
-    SymbolTable *cur;
-    for (int i = 0; i < c->symbol_tables.length; i++) {
+    for (i = 0; i < c->symbol_tables.length; i++) {
         cur = c->symbol_tables.data[i];
         symbol_table_free(cur);
         free(cur);
     }
     free(c->symbol_tables.data);
 
-    for (int i = 0; i < c->constants.length; i++) {
-        if (c->constants.data[i].type == c_Function) {
-            free_function(c->constants.data[i]);
-        }
-    }
     free(c->constants.data);
+
+    // [Instructions] of functions.
+    for (i = 0; i < c->functions.length; i++) {
+        free(c->functions.data[i].instructions.data);
+    }
+    free(c->functions.data);
 }
 
 static bool
@@ -78,14 +87,12 @@ last_instruction_is(Compiler *c, Opcode op) {
 
 static void
 append_return_if_not_present(Compiler *c) {
-    switch (c->scopes.data[c->scope_index].last_instruction.opcode) {
-        case OpReturn:
-        case OpReturnValue:
-            return;
-        default:
-            emit(c, OpReturn);
-            return;
+    Opcode last = c->scopes.data[c->scope_index].last_instruction.opcode;
+    if (last == OpReturn || last == OpReturnValue) {
+        return;
     }
+
+    emit(c, OpReturn);
 }
 
 static void
@@ -215,9 +222,9 @@ _compile(Compiler *c, Node n) {
                 } else {
                     err = _compile(c, rs->return_value);
                     if (err) { return err; }
-                }
 
-                emit(c, OpReturnValue);
+                    emit(c, OpReturnValue);
+                }
                 return 0;
             }
 
@@ -371,6 +378,9 @@ _compile(Compiler *c, Node n) {
                 if (last_instruction_is(c, OpPop)) {
                     remove_last_pop(c);
                 }
+
+                // TODO: when if branch ends in ReturnStatement, do not
+                // emit OpJump
 
                 // Emit an `OpJump` with a bogus value
                 int jump_pos = emit(c, OpJump, 9999);
@@ -531,25 +541,25 @@ _compile(Compiler *c, Node n) {
                     c->current_symbol_table->num_definitions;
                 Instructions *ins = leave_scope(c);
 
-                // push free_symbols onto the stack, go into [Closure]
+                // push free_symbols onto the stack, to go into [Closure].
                 for (int i = 0; i < free_symbols.length; i++) {
                     load_symbol(c, free_symbols.data[i]);
                 }
 
-                Function *fn = malloc(sizeof(Function));
-                if (fn == NULL) { die("malloc"); }
-                *fn = (Function) {
+                int pos = c->functions.length;
+                FunctionBufferPush(&c->functions, (CompiledFunction){
                     .instructions = *ins,
                     .num_locals = num_locals,
                     .num_parameters = params.length,
-                    .name = fl->name,
-                };
+                    .literal = fl,
+                });
+
                 Constant fn_const = {
                     .type = c_Function,
-                    .data = { .function = fn }
+                    .data = { .function_index = pos }
                 };
-                emit(c, OpClosure, add_constant(c, fn_const),
-                        free_symbols.length);
+                int const_index = add_constant(c, fn_const);
+                emit(c, OpClosure, const_index, free_symbols.length);
                 return 0;
             }
 
@@ -615,14 +625,20 @@ Error *compile(Compiler *c, Program *prog) {
     Error *err;
     for (int i = 0; i < prog->stmts.length; i++) {
         err = _compile(c, prog->stmts.data[i]);
-        if (err) { return err; }
+        if (err) { break; }
     }
-    return 0;
+
+    // if compilation ended in main function.
+    if (c->scope_index == 0) {
+        // set main [Function] [Instructions].
+        c->functions.data[0].instructions = *c->current_instructions;
+    }
+    return err;
 }
 
 Bytecode bytecode(Compiler *c) {
     return (Bytecode) {
-        .instructions = c->current_instructions,
+        .functions = &c->functions,
         .constants = &c->constants,
         .num_globals = c->symbol_tables.data[0]->num_definitions,
     };

@@ -5,13 +5,6 @@
 #include "token.h"
 #include "utils.h"
 
-typedef struct {
-    Instructions instructions;
-    int num_locals;
-    int num_parameters;
-    Identifier *name; // points to [FunctionLiteral.name]
-} Function;
-
 typedef enum {
     c_Integer = 1,
     c_Float,
@@ -26,12 +19,13 @@ typedef struct {
         long integer;
         double floating;
         Token *string;
-        Function *function;
+
+        // not a pointer because [c.functions] calls realloc().
+        // which moved data, invalidating old pointers.
+        int function_index;
     } data;
 } Constant;
 
 BUFFER(Constant, Constant)
 
-void free_constant(Constant c);
-
-void free_function(Constant c);
+// void free_constant(Constant c);
