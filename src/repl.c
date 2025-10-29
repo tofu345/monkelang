@@ -17,6 +17,10 @@ DEFINE_BUFFER(Program, Program)
 
 static void print_parser_errors(FILE* out, Parser *p);
 
+// getline() but if first line ends with '{', read and append multiple
+// lines to [input] until a blank line is encountered.
+int multigetline(char **input, size_t *input_cap, FILE *in, FILE *out);
+
 void repl(FILE* in, FILE* out) {
     Parser p;
     parser_init(&p);
@@ -32,7 +36,9 @@ void repl(FILE* in, FILE* out) {
     Error *e;
 
     char *input;
-    size_t len;
+    size_t cap;
+    int len;
+
     Object stack_elem;
 
     // Keep previous inputs and ASTs around because tokens point to the source
@@ -43,10 +49,16 @@ void repl(FILE* in, FILE* out) {
     while (1) {
         fprintf(out, ">> ");
         input = NULL;
-        len = 0;
-        if (getline(&input, &len, in) == -1) {
+        cap = 0;
+        len = multigetline(&input, &cap, in, out);
+        if (len == -1) {
             free(input);
             break;
+
+        // [input] only contains '\n'.
+        } else if (len == 1) {
+            free(input);
+            continue;
         }
 
         prog = parse(&p, input);
@@ -60,11 +72,6 @@ void repl(FILE* in, FILE* out) {
         if (prog.stmts.length > 0) {
             InputBufferPush(&inputs, input);
             ProgramBufferPush(&programs, prog);
-
-        } else {
-            // in case [input] only contains whitespace.
-            free(input);
-            continue;
         }
 
         e = compile(&c, &prog);
@@ -85,8 +92,10 @@ void repl(FILE* in, FILE* out) {
         }
 
         stack_elem = vm_last_popped(&vm);
-        object_fprint(stack_elem, out);
-        fputc('\n', out);
+        if (stack_elem.type != o_Null) {
+            object_fprint(stack_elem, out);
+            fputc('\n', out);
+        }
 
 cleanup:
         c.scopes.data[0].instructions.length = 0; // reset main scope
@@ -137,6 +146,7 @@ void run(char* program) {
     err = vm_run(&vm, bytecode(&c));
     if (err) {
         fprintf(stdout, "Woops! Executing bytecode failed!\n");
+        print_vm_stack_trace(&vm);
         puts(err);
         free(err);
         goto cleanup;
@@ -158,4 +168,54 @@ print_parser_errors(FILE* out, Parser *p) {
         free(err.message);
     }
     p->errors.length = 0;
+}
+
+int multigetline(char **input, size_t *input_cap, FILE *in, FILE *out) {
+    // [len] is number of chars read.
+    int len = getline(input, input_cap, in);
+    if (len == -1) { return -1; }
+
+    // blank line, only '\n'
+    if (len == 1) { return len; }
+
+    // if last character before '\n' is '{' read next line.
+    if ((*input)[len - 2] != '{') { return len; }
+
+    char *line = NULL;
+    size_t line_cap = 0,
+           capacity = *input_cap;
+    while (1) {
+        fprintf(out, ".. ");
+
+        int line_len = getline(&line, &line_cap, in);
+        if (line_len == -1) {
+            free(line);
+            return -1;
+        }
+
+        // blank line
+        if (line_len == 1) {
+            (*input)[len] = '\0';
+            break;
+        }
+
+        // realloc [input] if necessary
+        if ((size_t)(len + line_len) > capacity) {
+            capacity *= 2;
+            char *ptr = realloc(*input, capacity);
+            if (ptr == NULL) {
+                free(line);
+                return -1;
+            }
+            *input = ptr;
+            *input_cap = capacity;
+        }
+
+        // append new line to [input]
+        strncpy((*input) + len, line, line_len);
+        len += line_len;
+    }
+
+    free(line);
+    return len;
 }

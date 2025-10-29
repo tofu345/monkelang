@@ -591,11 +591,11 @@ parse_return_statement(Parser* p) {
     ReturnStatement* stmt = allocate(sizeof(ReturnStatement));
     stmt->tok = p->cur_token;
 
-    next_token(p);
-
     // empty return statement if the expression after 'return' cannot be
     // parsed.
     if (p->prefix_parse_fns[p->cur_token.type]) {
+        next_token(p);
+
         stmt->return_value = parse_expression(p, p_Lowest);
         if (IS_INVALID(stmt->return_value)) {
             free(stmt);

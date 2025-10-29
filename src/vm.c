@@ -866,9 +866,12 @@ Object vm_last_popped(VM *vm) {
 
 void print_vm_stack_trace(VM *vm) {
     for (int i = 1; i <= vm->frames_index; i++) {
-        putc('\n', stdout);
         Identifier *id = vm->frames[i].cl->func->name;
-        highlight_token(id->tok);
-        printf("in call: %.*s()\n", LITERAL(id->tok));
+        if (id) {
+            highlight_token(id->tok);
+            printf("in <function: %.*s>\n", LITERAL(id->tok));
+        } else {
+            printf("in <anonymous function>\n");
+        }
     }
 }
