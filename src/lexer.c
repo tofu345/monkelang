@@ -57,17 +57,13 @@ is_digit(char ch) {
 }
 
 inline static bool
-is_whitespace(char ch) {
-    switch (ch) {
-        case ' ':
-        case '\n':
-        case '\t':
-        case '\r':
-            return true;
+is_identifier(char ch) {
+    return is_letter(ch) || is_digit(ch);
+}
 
-        default:
-            return false;
-    }
+inline static bool
+is_whitespace(char ch) {
+    return ch == ' ' || ch == '\n' || ch == '\t' || ch == '\r';
 }
 
 inline static bool
@@ -212,7 +208,7 @@ Token lexer_next_token(Lexer *l) {
 
     default:
         if (is_letter(l->ch)) {
-            tok.length = read_while(l, is_letter);
+            tok.length = read_while(l, is_identifier);
             tok.type = lookup_ident(tok.start, tok.length);
             return tok;
 

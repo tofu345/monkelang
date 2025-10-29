@@ -15,6 +15,7 @@ void test_lexer_next_token(void) {
     // who needs new lines?
     char input[] = "let five = 5;\
 let ten = 10;\
+let digitAnd20 = 50;\
 \
 let add = fn(x, y) {\
     x + y;\
@@ -53,6 +54,11 @@ if (5 < 10) {\
 	{t_Ident, "ten", 3},
 	{t_Assign, "=", 1},
 	{t_Digit, "10", 2},
+	{t_Semicolon, ";", 1},
+	{t_Let, "let", 3},
+	{t_Ident, "digitAnd20", 10},
+	{t_Assign, "=", 1},
+	{t_Digit, "50", 2},
 	{t_Semicolon, ";", 1},
 	{t_Let, "let", 3},
 	{t_Ident, "add", 3},
