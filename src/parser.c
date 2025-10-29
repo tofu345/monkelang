@@ -593,7 +593,7 @@ parse_return_statement(Parser* p) {
 
     // empty return statement if the expression after 'return' cannot be
     // parsed.
-    if (p->prefix_parse_fns[p->cur_token.type]) {
+    if (p->prefix_parse_fns[p->peek_token.type]) {
         next_token(p);
 
         stmt->return_value = parse_expression(p, p_Lowest);
