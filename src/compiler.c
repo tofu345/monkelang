@@ -4,6 +4,7 @@
 #include "code.h"
 #include "constants.h"
 #include "errors.h"
+#include "object.h"
 #include "symbol_table.h"
 #include "utils.h"
 
@@ -15,15 +16,18 @@
 
 static int add_constant(Compiler *c, Constant obj_const);
 
-// allocate new [SymbolTable] and add ptr to [c.symbol_tables]
+// malloc [SymbolTable], add to [c.symbol_tables].
 static SymbolTable *new_symbol_table(Compiler *c);
+
+// malloc [CompiledFunction], add to [c.functions].
+static CompiledFunction *new_function(Compiler *c);
 
 // create [Error] with [n.token]
 static Error *compiler_error(Node n, char* format, ...);
 
 DEFINE_BUFFER(Scope, CompilationScope)
 DEFINE_BUFFER(SymbolTable, SymbolTable *)
-DEFINE_BUFFER(Function, CompiledFunction)
+DEFINE_BUFFER(Function, CompiledFunction *)
 
 void compiler_init(Compiler *c) {
     memset(c, 0, sizeof(Compiler));
@@ -47,7 +51,8 @@ void compiler_init(Compiler *c) {
     c->current_instructions = &c->scopes.data[0].instructions;
 
     // init main function with empty instructions.  later set in [compile()].
-    FunctionBufferPush(&c->functions, (CompiledFunction){0});
+    CompiledFunction *main_fn = new_function(c);
+    *main_fn = (CompiledFunction){0};
 }
 
 void compiler_free(Compiler *c) {
@@ -72,7 +77,9 @@ void compiler_free(Compiler *c) {
 
     // [Instructions] of functions.
     for (i = 0; i < c->functions.length; i++) {
-        free(c->functions.data[i].instructions.data);
+        CompiledFunction *fn = c->functions.data[i];
+        free(fn->instructions.data);
+        free(fn);
     }
     free(c->functions.data);
 }
@@ -547,12 +554,13 @@ _compile(Compiler *c, Node n) {
                 }
 
                 int pos = c->functions.length;
-                FunctionBufferPush(&c->functions, (CompiledFunction){
+                CompiledFunction *fn = new_function(c);
+                *fn = (CompiledFunction){
                     .instructions = *ins,
                     .num_locals = num_locals,
                     .num_parameters = params.length,
                     .literal = fl,
-                });
+                };
 
                 Constant fn_const = {
                     .type = c_Function,
@@ -622,7 +630,7 @@ Instructions *leave_scope(Compiler *c) {
 }
 
 Error *compile(Compiler *c, Program *prog) {
-    Error *err;
+    Error *err = NULL;
     for (int i = 0; i < prog->stmts.length; i++) {
         err = _compile(c, prog->stmts.data[i]);
         if (err) { break; }
@@ -631,7 +639,7 @@ Error *compile(Compiler *c, Program *prog) {
     // if compilation ended in main function.
     if (c->scope_index == 0) {
         // set main [Function] [Instructions].
-        c->functions.data[0].instructions = *c->current_instructions;
+        c->functions.data[0]->instructions = *c->current_instructions;
     }
     return err;
 }
@@ -650,6 +658,14 @@ new_symbol_table(Compiler *c) {
     if (new == NULL) { die("malloc"); }
     SymbolTableBufferPush(&c->symbol_tables, new);
     return new;
+}
+
+static CompiledFunction *
+new_function(Compiler *c) {
+    CompiledFunction *fn = malloc(sizeof(CompiledFunction));
+    if (fn == NULL) { die("malloc"); }
+    FunctionBufferPush(&c->functions, fn);
+    return fn;
 }
 
 static Error *

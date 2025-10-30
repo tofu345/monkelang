@@ -600,7 +600,7 @@ vm_push_closure(VM *vm, int const_index, int num_free) {
     }
 
     int idx = constant.data.function_index;
-    CompiledFunction *func = &vm->functions->data[idx];
+    CompiledFunction *func = vm->functions->data[idx];
 
     Object *free_variables = &vm->stack[vm->sp - num_free];
     Closure *closure = create_closure(vm, func, free_variables, num_free);
@@ -614,7 +614,7 @@ vm_push_closure(VM *vm, int const_index, int num_free) {
 error vm_run(VM *vm, Bytecode bytecode) {
     vm->functions = bytecode.functions;
     *vm->main_cl = (Closure) {
-        .func = vm->functions->data, // first function
+        .func = vm->functions->data[0], // first function
         .num_free = 0,
     };
     frame_init(vm, vm->main_cl, 0);

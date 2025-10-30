@@ -1070,7 +1070,7 @@ c_test(
     };
 
     Bytecode code = bytecode(&c);
-    CompiledFunction *main_fn = &code.functions->data[0];
+    CompiledFunction *main_fn = code.functions->data[0];
     int res = test_instructions(expectedInstructions, &main_fn->instructions);
 
     if (res != 0) {
@@ -1204,7 +1204,7 @@ test_constants(Constants expected, ConstantBuffer *actual,
                 }
 
                 CompiledFunction *func =
-                    &functions->data[cur.data.function_index];
+                    functions->data[cur.data.function_index];
                 err = test_instructions(exp.val._ins, &func->instructions);
                 if (err != 0) {
                     printf("constant %d - test_instructions failed\n", i);

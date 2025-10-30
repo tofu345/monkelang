@@ -19,7 +19,7 @@ typedef struct {
 
 BUFFER(Scope, CompilationScope)
 BUFFER(SymbolTable, SymbolTable *)
-BUFFER(Function, CompiledFunction)
+BUFFER(Function, CompiledFunction *)
 
 typedef struct {
     ConstantBuffer constants;

@@ -16,12 +16,18 @@ char* read_file(char* filename) {
     rewind(fp);
 
     char* buf = malloc((bufsize + 1) * sizeof(char));
+    if (buf == NULL) {
+        fprintf(stderr, "error: could not allocate memory\n");
+        fclose(fp);
+        return NULL;
+    }
+
     size_t new_len = fread(buf, sizeof(char), bufsize, fp);
     if (ferror(fp) != 0) {
         fprintf(stderr, "error: could not read file '%s'\n", filename);
+        free(buf);
         fclose(fp);
         return NULL;
-
     } else {
         buf[new_len++] = '\0';
     }

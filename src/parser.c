@@ -268,7 +268,6 @@ static BlockStatement*
 parse_block_statement(Parser* p) {
     BlockStatement* bs = allocate(sizeof(BlockStatement));
     bs->tok = p->cur_token;
-    NodeBufferInit(&bs->stmts);
 
     next_token(p);
 
@@ -292,8 +291,6 @@ parse_block_statement(Parser* p) {
 // returns -1 on err
 static int
 parse_function_parameters(Parser* p, FunctionLiteral* fl) {
-    ParamBufferInit(&fl->params);
-
     next_token(p);
 
     if (cur_token_is(p, t_Rparen)) {
@@ -374,7 +371,6 @@ static Node
 parse_table_literal(Parser* p) {
     TableLiteral* hl = allocate(sizeof(TableLiteral));
     hl->tok = p->cur_token;
-    PairBufferInit(&hl->pairs);
 
     while (!peek_token_is(p, t_Rbrace)) {
         next_token(p);
@@ -452,8 +448,9 @@ parse_index_expression(Parser* p, Node left) {
 static NodeBuffer
 __free_elements_in(NodeBuffer buf) {
     if (buf.data != NULL) {
-        for (int i = 0; i < buf.length; i++)
+        for (int i = 0; i < buf.length; i++) {
             node_free(buf.data[i]);
+        }
         free(buf.data);
         buf.data = NULL;
     }
@@ -464,8 +461,7 @@ __free_elements_in(NodeBuffer buf) {
 // [NodeBuffer.length] is -1 on err.
 static NodeBuffer
 parse_expression_list(Parser* p, TokenType end) {
-    NodeBuffer list;
-    NodeBufferInit(&list);
+    NodeBuffer list = {0};
 
     if (peek_token_is(p, end)) {
         next_token(p);

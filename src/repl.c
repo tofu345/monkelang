@@ -67,12 +67,13 @@ void repl(FILE* in, FILE* out) {
             program_free(&prog);
             free(input);
             goto cleanup;
+        } else if (prog.stmts.length == 0) {
+            free(input);
+            continue;
         }
 
-        if (prog.stmts.length > 0) {
-            InputBufferPush(&inputs, input);
-            ProgramBufferPush(&programs, prog);
-        }
+        InputBufferPush(&inputs, input);
+        ProgramBufferPush(&programs, prog);
 
         e = compile(&c, &prog);
         if (e) {
@@ -132,6 +133,8 @@ void run(char* program) {
     prog = parse(&p, program);
     if (p.errors.length > 0) {
         print_parser_errors(stdout, &p);
+        goto cleanup;
+    } else if (prog.stmts.length == 0) {
         goto cleanup;
     }
 

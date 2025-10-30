@@ -49,7 +49,7 @@ void highlight_token(Token tok) {
     }
 
     // print line
-    printf("%4d | %.*s\n", tok.line,
+    printf("\n%4d | %.*s\n", tok.line,
             left_dist + tok.length + right_dist,
             start_of_line);
 

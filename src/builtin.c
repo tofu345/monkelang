@@ -152,7 +152,7 @@ builtin_push(__attribute__ ((unused)) VM *vm, Object *args, int num_args) {
     return args[0];
 }
 
-static void
+inline static void
 _puts(Object obj) {
     if (obj.type == o_String) {
         printf("%s", obj.data.string->data);
@@ -163,12 +163,13 @@ _puts(Object obj) {
 
 Object
 builtin_puts(__attribute__ ((unused)) VM *vm, Object *args, int num_args) {
-    for (int i = 0; i < num_args - 1; i++) {
+    int end = num_args - 1;
+    for (int i = 0; i < end; i++) {
         _puts(args[i]);
         printf(" ");
     }
     if (num_args >= 1)
-        _puts(args[num_args - 1]);
+        _puts(args[end]);
 
     putc('\n', stdout);
     return NULL_OBJ;
