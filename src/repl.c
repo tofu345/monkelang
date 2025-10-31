@@ -33,7 +33,6 @@ void repl(FILE* in, FILE* out) {
     VM vm;
     vm_init(&vm, NULL, NULL, NULL);
 
-    error err;
     Error *e;
 
     // TODO: append all inputs into one string and parse incrementally
@@ -85,7 +84,7 @@ void repl(FILE* in, FILE* out) {
             goto cleanup;
         }
 
-        err = vm_run(&vm, bytecode(&c));
+        error err = vm_run(&vm, bytecode(&c));
         if (err) {
             fprintf(out, "Woops! Executing bytecode failed!\n");
             print_vm_stack_trace(&vm);
@@ -136,7 +135,6 @@ void run(char* program) {
     Program prog;
     Compiler c;
     VM vm;
-    error err;
     Error *e;
 
     parser_init(&p);
@@ -159,7 +157,7 @@ void run(char* program) {
         goto cleanup;
     }
 
-    err = vm_run(&vm, bytecode(&c));
+    error err = vm_run(&vm, bytecode(&c));
     if (err) {
         fprintf(stdout, "Woops! Executing bytecode failed!\n");
         print_vm_stack_trace(&vm);

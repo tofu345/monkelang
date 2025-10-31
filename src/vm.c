@@ -524,7 +524,7 @@ call_closure(VM *vm, Closure *cl, int num_args) {
     CompiledFunction *fn = cl->func;
     if (num_args != fn->num_parameters) {
         FunctionLiteral *lit = fn->literal;
-        if (lit && lit->name) {
+        if (lit->name) {
             Identifier *id = lit->name;
             return new_error("%.*s takes %d argument%s got %d",
                     LITERAL(id->tok),
@@ -623,7 +623,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
     Frame *current_frame = vm->frames;
     Instructions ins = instructions(current_frame);
 
-    const Builtin *builtins = get_builtins();
+    Builtins builtins = get_builtins();
     Opcode op;
     int ip, pos, num;
     Object obj;
@@ -812,7 +812,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 current_frame->ip += 1;
 
                 err = vm_push(vm,
-                        OBJ(o_BuiltinFunction, .builtin = builtins + pos));
+                        OBJ(o_BuiltinFunction, .builtin = builtins.data + pos));
                 if (err) { return err; };
                 break;
 
@@ -860,29 +860,55 @@ Object vm_last_popped(VM *vm) {
     return vm->stack[vm->sp];
 }
 
+// find source code mapping [f.ip] occurs at.
+static SourceMapping *
+find_mapping(Frame f) {
+    SourceMappingBuffer maps = f.cl->func->mappings;
+    assert(maps.length > 0);
+
+    // uses binary search to find [SourceMapping] with highest [position] less
+    // than [f.ip].
+    int low = 0,
+        high = maps.length - 1;
+
+    while (low < high) {
+        int mid = low + (high - low) / 2,
+            position = maps.data[mid].position;
+
+        if (position == f.ip) {
+            return &maps.data[mid];
+
+        } else if (position > f.ip) {
+            high = mid - 1;
+
+        } else {
+            low = mid + 1;
+        }
+    }
+
+    if (maps.data[low].position > f.ip) {
+        return &maps.data[low - 1];
+    }
+    return &maps.data[low];
+}
+
 void print_vm_stack_trace(VM *vm) {
-    // the main closure does not point to the AST.
     for (int i = 0; i <= vm->frames_index; i++) {
         Frame frame = vm->frames[i];
         CompiledFunction *func = frame.cl->func;
 
-        printf("ip: %d\n", frame.ip);
-        for (int j = 0; j < func->mappings.length; j++) {
-            SourceMapping *cur = &func->mappings.data[j];
-            printf("index: %d", cur->position);
-            Token *tok = node_token(cur->statement);
-            highlight_token(*tok);
-            putc('\n', stdout);
-        }
+        SourceMapping *mapping = find_mapping(frame);
+        Token *tok = node_token(mapping->statement);
+        highlight_token(*tok);
 
+        // the main function does not have a [FunctionLiteral].
         if (i == 0) {
-            printf("<main function>\n");
+            printf("in <main function>\n");
             continue;
         }
 
         FunctionLiteral *lit = func->literal;
-        if (lit && lit->name) {
-            // highlight_token(lit->tok);
+        if (lit->name) {
             Identifier *id = lit->name;
             printf("in <function: %.*s>\n", LITERAL(id->tok));
         } else {

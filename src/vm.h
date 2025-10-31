@@ -48,7 +48,7 @@ typedef struct {
     int num_globals;
 
     Frame *frames; // function call stack
-    int frames_index; // index of current frame
+    int frames_index; // 0-based index of current frame
 
     // The current number of bytes to allocate till before GC is run.
     int bytesTillGC;

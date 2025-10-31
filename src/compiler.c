@@ -543,6 +543,7 @@ _compile(Compiler *c, Node n) {
                 CompiledFunction *fn = c->cur_scope->function;
                 fn->num_locals = c->current_symbol_table->num_definitions;
                 fn->num_parameters = params.length;
+                fn->literal = fl;
 
                 // add to list of compiled functions
                 FunctionBufferPush(&c->functions, fn);
