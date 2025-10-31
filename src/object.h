@@ -56,8 +56,10 @@ typedef union {
     ObjectBuffer* array;
     table* table;
     Closure *closure;
-    error err;
     const Builtin *builtin;
+
+    // TODO: user [Error]s
+    error err;
 
     void *ptr;
 } ObjectData;
@@ -74,22 +76,6 @@ Object object_eq(Object left, Object right);
 
 // print [Object] to [fp], returns -1 on error
 int object_fprint(Object o, FILE* fp);
-
-typedef struct {
-    Instructions instructions;
-    int num_locals;
-    int num_parameters;
-
-    // where in the source code the function was defined.
-    FunctionLiteral *literal;
-
-    // TODO: store indices of all statements, for printing vm errors.
-    // typedef struct {
-    //     int index;
-    //     Node statement;
-    // } something;
-
-} CompiledFunction;
 
 struct Closure {
     CompiledFunction *func;

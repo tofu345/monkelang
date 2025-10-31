@@ -11,6 +11,7 @@
 #include "allocation.h"
 
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -523,7 +524,7 @@ call_closure(VM *vm, Closure *cl, int num_args) {
     CompiledFunction *fn = cl->func;
     if (num_args != fn->num_parameters) {
         FunctionLiteral *lit = fn->literal;
-        if (lit->name) {
+        if (lit && lit->name) {
             Identifier *id = lit->name;
             return new_error("%.*s takes %d argument%s got %d",
                     LITERAL(id->tok),
@@ -599,9 +600,7 @@ vm_push_closure(VM *vm, int const_index, int num_free) {
         return new_error("not a function: constant %d", const_index);
     }
 
-    int idx = constant.data.function_index;
-    CompiledFunction *func = vm->functions->data[idx];
-
+    CompiledFunction *func = constant.data.function;
     Object *free_variables = &vm->stack[vm->sp - num_free];
     Closure *closure = create_closure(vm, func, free_variables, num_free);
 
@@ -612,9 +611,8 @@ vm_push_closure(VM *vm, int const_index, int num_free) {
 }
 
 error vm_run(VM *vm, Bytecode bytecode) {
-    vm->functions = bytecode.functions;
     *vm->main_cl = (Closure) {
-        .func = vm->functions->data[0], // first function
+        .func = bytecode.main_function,
         .num_free = 0,
     };
     frame_init(vm, vm->main_cl, 0);
@@ -864,10 +862,27 @@ Object vm_last_popped(VM *vm) {
 
 void print_vm_stack_trace(VM *vm) {
     // the main closure does not point to the AST.
-    for (int i = 1; i <= vm->frames_index; i++) {
-        FunctionLiteral *lit = vm->frames[i].cl->func->literal;
-        highlight_token(lit->tok);
-        if (lit->name) {
+    for (int i = 0; i <= vm->frames_index; i++) {
+        Frame frame = vm->frames[i];
+        CompiledFunction *func = frame.cl->func;
+
+        printf("ip: %d\n", frame.ip);
+        for (int j = 0; j < func->mappings.length; j++) {
+            SourceMapping *cur = &func->mappings.data[j];
+            printf("index: %d", cur->position);
+            Token *tok = node_token(cur->statement);
+            highlight_token(*tok);
+            putc('\n', stdout);
+        }
+
+        if (i == 0) {
+            printf("<main function>\n");
+            continue;
+        }
+
+        FunctionLiteral *lit = func->literal;
+        if (lit && lit->name) {
+            // highlight_token(lit->tok);
             Identifier *id = lit->name;
             printf("in <function: %.*s>\n", LITERAL(id->tok));
         } else {

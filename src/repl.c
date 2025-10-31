@@ -21,6 +21,7 @@ static void print_parser_errors(FILE* out, Parser *p);
 // lines to [input] until a blank line is encountered.
 int multigetline(char **input, size_t *input_cap, FILE *in, FILE *out);
 
+// TODO: repl tests
 void repl(FILE* in, FILE* out) {
     Parser p;
     parser_init(&p);
@@ -35,6 +36,7 @@ void repl(FILE* in, FILE* out) {
     error err;
     Error *e;
 
+    // TODO: append all inputs into one string and parse incrementally
     char *input;
     size_t cap;
     int len;
@@ -99,10 +101,21 @@ void repl(FILE* in, FILE* out) {
         }
 
 cleanup:
-        c.scopes.data[0].instructions.length = 0; // reset main scope
-        vm.stack[0] = (Object){0}; // remove stack_elem
+        // free unsuccessfully [CompiledFunction]s and reset main function
+        // instructions.
+        if (c.cur_scope_index > 0) {
+            for (int i = c.cur_scope_index; i > 0; i--) {
+                free_function(c.scopes.data[i].function);
+            }
+            c.cur_scope_index = 0;
+            c.cur_scope = c.scopes.data;
+            c.current_instructions = &c.cur_scope->function->instructions;
+        }
+        c.current_instructions->length = 0;
+        // reset VM
         vm.sp = 0;
         vm.frames_index = 0;
+        vm.stack[0] = (Object){0}; // remove stack_elem
     }
 
     vm_free(&vm);

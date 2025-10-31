@@ -19,8 +19,12 @@ static int add_constant(Compiler *c, Constant obj_const);
 // malloc [SymbolTable], add to [c.symbol_tables].
 static SymbolTable *new_symbol_table(Compiler *c);
 
-// malloc [CompiledFunction], add to [c.functions].
-static CompiledFunction *new_function(Compiler *c);
+// calloc new [CompiledFunction].
+static CompiledFunction *new_function();
+
+// append new [SourceMapping] with [c.current_instructions.length] and
+// [stmt.token] to [c.cur_scope.mappings].
+static void source_map_statement(Compiler *c, Node stmt);
 
 // create [Error] with [n.token]
 static Error *compiler_error(Node n, char* format, ...);
@@ -46,28 +50,27 @@ void compiler_init(Compiler *c) {
         i++;
     }
 
-    // init main scope
-    ScopeBufferPush(&c->scopes, (CompilationScope){0});
-    c->current_instructions = &c->scopes.data[0].instructions;
+    // main function
+    CompiledFunction *main_fn = new_function();
 
-    // init main function with empty instructions.  later set in [compile()].
-    CompiledFunction *main_fn = new_function(c);
-    *main_fn = (CompiledFunction){0};
+    ScopeBufferPush(&c->scopes, (CompilationScope){
+        .function = main_fn
+    });
+    c->cur_scope = &c->scopes.data[0];
+    c->current_instructions = &main_fn->instructions;
 }
 
 void compiler_free(Compiler *c) {
     int i;
-    SymbolTable *cur;
 
-    // functions that failed compilation.
-    for (i = 1; i < c->scopes.length; i++) {
-        // from 1 because the main function [CompilationScope] is not removed.
-        free(c->scopes.data[i].instructions.data);
+    // free main function and functions that failed compilation.
+    for (i = 0; i < c->scopes.length; i++) {
+        free_function(c->scopes.data[i].function);
     }
     free(c->scopes.data);
 
     for (i = 0; i < c->symbol_tables.length; i++) {
-        cur = c->symbol_tables.data[i];
+        SymbolTable *cur = c->symbol_tables.data[i];
         symbol_table_free(cur);
         free(cur);
     }
@@ -75,11 +78,8 @@ void compiler_free(Compiler *c) {
 
     free(c->constants.data);
 
-    // [Instructions] of functions.
     for (i = 0; i < c->functions.length; i++) {
-        CompiledFunction *fn = c->functions.data[i];
-        free(fn->instructions.data);
-        free(fn);
+        free_function(c->functions.data[i]);
     }
     free(c->functions.data);
 }
@@ -89,12 +89,12 @@ last_instruction_is(Compiler *c, Opcode op) {
     if (c->current_instructions->length == 0) {
         return false;
     }
-    return c->scopes.data[c->scope_index].last_instruction.opcode == op;
+    return c->cur_scope->last_instruction.opcode == op;
 }
 
 static void
 append_return_if_not_present(Compiler *c) {
-    Opcode last = c->scopes.data[c->scope_index].last_instruction.opcode;
+    Opcode last = c->cur_scope->last_instruction.opcode;
     if (last == OpReturn || last == OpReturnValue) {
         return;
     }
@@ -104,9 +104,9 @@ append_return_if_not_present(Compiler *c) {
 
 static void
 remove_last_pop(Compiler *c) {
-    CompilationScope *cur_scope = c->scopes.data + c->scope_index;
-    cur_scope->instructions.length = cur_scope->last_instruction.position;
-    cur_scope->last_instruction = cur_scope->previous_instruction;
+    c->current_instructions->length =
+        c->cur_scope->last_instruction.position;
+    c->cur_scope->last_instruction = c->cur_scope->previous_instruction;
 }
 
 static void
@@ -120,13 +120,12 @@ replace_instruction(Compiler *c, int pos, Instructions new) {
 
 static void
 replace_last_opcode_with(Compiler *c, Opcode old, Opcode new) {
-    CompilationScope *cur_scope = c->scopes.data + c->scope_index;
-    int last_pos = cur_scope->last_instruction.position;
+    int last_pos = c->cur_scope->last_instruction.position;
 
     assert(c->current_instructions->data[last_pos] == old);
 
     replace_instruction(c, last_pos, make(new));
-    cur_scope->last_instruction.opcode = new;
+    c->cur_scope->last_instruction.opcode = new;
 }
 
 static void
@@ -181,6 +180,8 @@ _compile(Compiler *c, Node n) {
 
         case n_ExpressionStatement:
             {
+                source_map_statement(c, n);
+
                 ExpressionStatement *es = n.obj;
                 err = _compile(c, es->expression);
                 if (err) { return err; }
@@ -191,6 +192,8 @@ _compile(Compiler *c, Node n) {
 
         case n_LetStatement:
             {
+                source_map_statement(c, n);
+
                 LetStatement *ls = n.obj;
 
                 Identifier *ident = ls->name;
@@ -216,7 +219,9 @@ _compile(Compiler *c, Node n) {
 
         case n_ReturnStatement:
             {
-                if (c->scope_index == 0) {
+                source_map_statement(c, n);
+
+                if (c->cur_scope_index == 0) {
                     return compiler_error(n,
                             "return statement outside function");
                 }
@@ -250,6 +255,8 @@ _compile(Compiler *c, Node n) {
 
         case n_AssignStatement:
             {
+                source_map_statement(c, n);
+
                 AssignStatement *stmt = n.obj;
 
                 err = _compile(c, stmt->right);
@@ -542,29 +549,26 @@ _compile(Compiler *c, Node n) {
                     append_return_if_not_present(c);
                 }
 
+                CompiledFunction *fn = c->cur_scope->function;
+                fn->num_locals = c->current_symbol_table->num_definitions;
+                fn->num_parameters = params.length;
+
+                // add to list of compiled functions
+                FunctionBufferPush(&c->functions, fn);
+
                 SymbolBuffer free_symbols =
                     c->current_symbol_table->free_symbols;
-                int num_locals =
-                    c->current_symbol_table->num_definitions;
-                Instructions *ins = leave_scope(c);
+
+                leave_scope(c);
 
                 // push free_symbols onto the stack, to go into [Closure].
                 for (int i = 0; i < free_symbols.length; i++) {
                     load_symbol(c, free_symbols.data[i]);
                 }
 
-                int pos = c->functions.length;
-                CompiledFunction *fn = new_function(c);
-                *fn = (CompiledFunction){
-                    .instructions = *ins,
-                    .num_locals = num_locals,
-                    .num_parameters = params.length,
-                    .literal = fl,
-                };
-
                 Constant fn_const = {
                     .type = c_Function,
-                    .data = { .function_index = pos }
+                    .data = { .function = fn }
                 };
                 int const_index = add_constant(c, fn_const);
                 emit(c, OpClosure, const_index, free_symbols.length);
@@ -584,9 +588,8 @@ add_constant(Compiler *c, Constant obj_const) {
 
 static void
 set_last_instruction(Compiler *c, Opcode op, int pos) {
-    CompilationScope *cur_scope = c->scopes.data + c->scope_index;
-    cur_scope->previous_instruction = cur_scope->last_instruction;
-    cur_scope->last_instruction =
+    c->cur_scope->previous_instruction = c->cur_scope->last_instruction;
+    c->cur_scope->last_instruction =
         (EmittedInstruction){ .opcode = op, .position = pos };
 }
 
@@ -601,52 +604,51 @@ int emit(Compiler *c, Opcode op, ...) {
 
 // create new compilation scope and enclosed symbol table
 void enter_scope(Compiler *c) {
-    int new_scope_idx = ++c->scope_index;
+    // allocate new [CompiledFunction]
+    CompiledFunction *fn = new_function();
 
-    // allocate new scope if necessary.
-    ScopeBufferPush(&c->scopes, (CompilationScope){0});
-    c->current_instructions =
-        &c->scopes.data[new_scope_idx].instructions;
+    int new_scope_idx = ++c->cur_scope_index;
+
+    CompilationScope new_scope = {
+        .function = fn
+    };
+    ScopeBufferPush(&c->scopes, new_scope);
+
+    c->cur_scope = &c->scopes.data[new_scope_idx];
+    c->current_instructions = &fn->instructions;
 
     SymbolTable *new = new_symbol_table(c);
     enclosed_symbol_table(new, c->current_symbol_table);
     c->current_symbol_table = new;
 }
 
-// return to previous compilation scope and symbol table
-Instructions *leave_scope(Compiler *c) {
-    // instructions is copied into [c.constants] as [Function], see
-    // [_compile(n_FunctionLiteral)]
-    Instructions *ins = c->current_instructions;
+// return to previous compilation scope and symbol table, and return
+// current scope [Instructions]
+void leave_scope(Compiler *c) {
+    int prev_scope_idx = --c->cur_scope_index;
 
-    int prev_scope_idx = --c->scope_index;
-    c->current_instructions =
-        &c->scopes.data[prev_scope_idx].instructions;
-    c->scopes.length--; // remove from [c.scopes], to be replaced at next
-                        // [enter_scope()] call.
+    c->cur_scope = &c->scopes.data[prev_scope_idx];
+    c->current_instructions = &c->cur_scope->function->instructions;
+
+    // remove from [c.scopes], to be replaced at next [enter_scope()]
+    // call.
+    --c->scopes.length;
 
     c->current_symbol_table = c->current_symbol_table->outer;
-    return ins;
 }
 
 Error *compile(Compiler *c, Program *prog) {
-    Error *err = NULL;
+    Error *err;
     for (int i = 0; i < prog->stmts.length; i++) {
         err = _compile(c, prog->stmts.data[i]);
-        if (err) { break; }
+        if (err) { return err; }
     }
-
-    // if compilation ended in main function.
-    if (c->scope_index == 0) {
-        // set main [Function] [Instructions].
-        c->functions.data[0]->instructions = *c->current_instructions;
-    }
-    return err;
+    return 0;
 }
 
 Bytecode bytecode(Compiler *c) {
     return (Bytecode) {
-        .functions = &c->functions,
+        .main_function = c->cur_scope->function,
         .constants = &c->constants,
         .num_globals = c->symbol_tables.data[0]->num_definitions,
     };
@@ -661,11 +663,20 @@ new_symbol_table(Compiler *c) {
 }
 
 static CompiledFunction *
-new_function(Compiler *c) {
-    CompiledFunction *fn = malloc(sizeof(CompiledFunction));
+new_function() {
+    CompiledFunction *fn = calloc(1, sizeof(CompiledFunction));
     if (fn == NULL) { die("malloc"); }
-    FunctionBufferPush(&c->functions, fn);
     return fn;
+}
+
+static void
+source_map_statement(Compiler *c, Node stmt) {
+    SourceMapping mapping = {
+        .position = c->current_instructions->length,
+        .statement = stmt
+    };
+    // TODO: [c.cur_function]
+    SourceMappingBufferPush(&c->cur_scope->function->mappings, mapping);
 }
 
 static Error *

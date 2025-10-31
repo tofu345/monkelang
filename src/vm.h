@@ -56,7 +56,6 @@ typedef struct {
     // `Compound Data Type` objects.
     Allocation *last;
 
-    FunctionBuffer *functions;
     Closure *main_cl;
 } VM;
 

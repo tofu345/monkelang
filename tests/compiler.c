@@ -457,8 +457,8 @@ void test_compiler_scopes(void) {
     Compiler c;
     compiler_init(&c);
 
-    if (c.scope_index != 0) {
-        printf("scope_index wrong. got=%d, want=%d\n", c.scope_index, 0);
+    if (c.cur_scope_index != 0) {
+        printf("scope_index wrong. got=%d, want=%d\n", c.cur_scope_index, 0);
         TEST_FAIL();
     }
 
@@ -467,20 +467,20 @@ void test_compiler_scopes(void) {
     emit(&c, OpMul);
 
     enter_scope(&c);
-    if (c.scope_index != 1) {
-        printf("scope_index wrong. got=%d, want=%d\n", c.scope_index, 1);
+    if (c.cur_scope_index != 1) {
+        printf("scope_index wrong. got=%d, want=%d\n", c.cur_scope_index, 1);
         TEST_FAIL();
     }
 
     emit(&c, OpSub);
 
-    if (c.scopes.data[c.scope_index].instructions.length != 1) {
+    if (c.current_instructions->length != 1) {
         printf("instructions length wrong. got=%d\n",
-                c.scopes.data[c.scope_index].instructions.length);
+                c.current_instructions->length);
         TEST_FAIL();
     }
 
-    EmittedInstruction last = c.scopes.data[c.scope_index].last_instruction;
+    EmittedInstruction last = c.scopes.data[c.cur_scope_index].last_instruction;
     if (last.opcode != OpSub) {
         printf("last_instruction Opcode wrong. got=%d, want=%d\n",
                 last.opcode, OpSub);
@@ -491,11 +491,12 @@ void test_compiler_scopes(void) {
         TEST_FAIL_MESSAGE("compiler did not enclose symbol_table");
     }
 
-    Instructions *ins = leave_scope(&c);
-    free(ins->data); // instructions of nested scope
+    free_function(c.cur_scope->function);
 
-    if (c.scope_index != 0) {
-        printf("scope_index wrong. got=%d, want=%d\n", c.scope_index, 0);
+    leave_scope(&c);
+
+    if (c.cur_scope_index != 0) {
+        printf("scope_index wrong. got=%d, want=%d\n", c.cur_scope_index, 0);
         TEST_FAIL();
     }
 
@@ -509,27 +510,26 @@ void test_compiler_scopes(void) {
 
     emit(&c, OpAdd);
 
-    if (c.scopes.data[c.scope_index].instructions.length != 2) {
+    if (c.current_instructions->length != 2) {
         printf("instructions length wrong. got=%d\n",
-                c.scopes.data[c.scope_index].instructions.length);
+                c.current_instructions->length);
         TEST_FAIL();
     }
 
-    last = c.scopes.data[c.scope_index].last_instruction;
+    last = c.scopes.data[c.cur_scope_index].last_instruction;
     if (last.opcode != OpAdd) {
         printf("last_instruction Opcode wrong. got=%d, want=%d\n",
                 last.opcode, OpAdd);
         TEST_FAIL();
     }
 
-    EmittedInstruction previous = c.scopes.data[c.scope_index].previous_instruction;
+    EmittedInstruction previous = c.scopes.data[c.cur_scope_index].previous_instruction;
     if (previous.opcode != OpMul) {
         printf("previous_instruction Opcode wrong. got=%d, want=%d\n",
                 previous.opcode, OpMul);
         TEST_FAIL();
     }
 
-    free(c.current_instructions->data); // instructions of main scope
     compiler_free(&c);
 }
 
@@ -1012,8 +1012,7 @@ void test_compiler_errors(void) {
 }
 
 static int test_instructions(Instructions *expected, Instructions *actual);
-static int test_constants(Constants expected, ConstantBuffer *actual,
-                          FunctionBuffer *functions);
+static int test_constants(Constants expected, ConstantBuffer *actual);
 
 static void
 c_test_error(const char *input, const char *expected_error) {
@@ -1042,8 +1041,8 @@ cleanup:
     if (err) { free_error(err); }
 
     if (fail) {
-        TEST_FAIL();
         printf("in test: '%s'\n\n", input);
+        TEST_FAIL();
     }
 }
 
@@ -1070,15 +1069,15 @@ c_test(
     };
 
     Bytecode code = bytecode(&c);
-    CompiledFunction *main_fn = code.functions->data[0];
-    int res = test_instructions(expectedInstructions, &main_fn->instructions);
+    int res = test_instructions(expectedInstructions,
+            &code.main_function->instructions);
 
     if (res != 0) {
         fail = true;
         goto cleanup;
     }
 
-    res = test_constants(expectedConstants, code.constants, code.functions);
+    res = test_constants(expectedConstants, code.constants);
     if (res != 0) {
         fail = true;
     }
@@ -1165,9 +1164,7 @@ test_integer_constant(long expected, Constant actual) {
 }
 
 static int
-test_constants(Constants expected, ConstantBuffer *actual,
-               FunctionBuffer *functions) {
-
+test_constants(Constants expected, ConstantBuffer *actual) {
     if (actual->length != expected.length) {
         printf("wrong constants length.\nwant=%d\ngot =%d\n",
                 expected.length, actual->length);
@@ -1203,8 +1200,7 @@ test_constants(Constants expected, ConstantBuffer *actual,
                     return -1;
                 }
 
-                CompiledFunction *func =
-                    functions->data[cur.data.function_index];
+                CompiledFunction *func = cur.data.function;
                 err = test_instructions(exp.val._ins, &func->instructions);
                 if (err != 0) {
                     printf("constant %d - test_instructions failed\n", i);

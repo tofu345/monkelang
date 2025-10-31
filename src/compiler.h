@@ -12,7 +12,7 @@ typedef struct {
 } EmittedInstruction;
 
 typedef struct {
-    Instructions instructions;
+    CompiledFunction *function;
     EmittedInstruction last_instruction;
     EmittedInstruction previous_instruction;
 } CompilationScope;
@@ -25,14 +25,14 @@ typedef struct {
     ConstantBuffer constants;
 
     SymbolTable *current_symbol_table;
+    // TODO: cleanup [SymbolTables] when [leave_scope()].
     SymbolTableBuffer symbol_tables;
 
-    // functions currently being compiled.
+    // all functions currently being compiled.
     ScopeBuffer scopes;
-    // index of current [CompilationScope]
-    int scope_index;
-    // instructions of current [CompilationScope]
-    Instructions *current_instructions;
+    CompilationScope *cur_scope;
+    int cur_scope_index; // index of [cur_scope]
+    Instructions *current_instructions; // instructions of [cur_scope]
 
     // compiled functions.
     FunctionBuffer functions;
@@ -47,10 +47,10 @@ Error *compile(Compiler *c, Program *prog);
 int emit(Compiler *c, Opcode op, ...);
 
 void enter_scope(Compiler *c);
-Instructions *leave_scope(Compiler *c);
+void leave_scope(Compiler *c);
 
 typedef struct {
-    FunctionBuffer *functions;
+    CompiledFunction *main_function;
     ConstantBuffer *constants;
     int num_globals; // [num_definitions] of global symbol table
 } Bytecode;
