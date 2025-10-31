@@ -8,14 +8,6 @@
 #include <stdio.h>
 
 CharBuffer *create_string(VM *vm, const char *text, int length) {
-#ifdef DEBUG_PRINT
-    printf("creating %s", show_object_type(o_String));
-    if (text) {
-        printf(": '%s'", text);
-    }
-    putc('\n', stdout);
-#endif
-
     char *data = vm_allocate(vm, length + 1);
     if (text) {
         memcpy(data, text, length);
@@ -32,10 +24,6 @@ CharBuffer *create_string(VM *vm, const char *text, int length) {
 }
 
 ObjectBuffer *create_array(VM *vm, Object *data, int length) {
-#ifdef DEBUG_PRINT
-    printf("creating %s with %d elems\n", show_object_type(o_Array), length);
-#endif
-
     int capacity = length;
     Object *objs = NULL;
 
@@ -55,10 +43,6 @@ ObjectBuffer *create_array(VM *vm, Object *data, int length) {
 }
 
 table *create_table(VM *vm) {
-#ifdef DEBUG_PRINT
-    printf("creating %s\n", show_object_type(o_Table));
-#endif
-
     table *tbl = new_allocation(vm, o_Table, sizeof(table));
     void *err = table_init(tbl);
     if (err == NULL) { die("create_table"); }
@@ -83,6 +67,12 @@ create_closure(VM *vm, CompiledFunction *func, Object *free, int num_free) {
 }
 
 Object object_copy(VM* vm, Object obj) {
+#ifdef DEBUG_PRINT
+    printf("copying: ");
+    object_fprint(obj, stdout);
+    putc('\n', stdout);
+#endif
+
     switch (obj.type) {
         case o_Null:
         case o_Integer:

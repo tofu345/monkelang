@@ -458,10 +458,19 @@ vm_push_constant(VM *vm, Constant c) {
 
         case c_String:
             {
+
                 Token *str_tok = c.data.string;
                 CharBuffer *new_str =
                     create_string(vm, str_tok->start, str_tok->length);
-                return vm_push(vm, OBJ(o_String, .string = new_str));
+                Object obj = OBJ(o_String, .string = new_str);
+
+#ifdef DEBUG_PRINT
+                printf("create: ");
+                object_fprint(obj, stdout);
+                putc('\n', stdout);
+#endif
+
+                return vm_push(vm, obj);
             }
 
         default:
@@ -472,25 +481,26 @@ vm_push_constant(VM *vm, Constant c) {
 
 static Object
 build_array(VM *vm, int start_index, int end_index) {
-#ifdef DEBUG_PRINT
-    puts("build_array");
-#endif
-
     int length = end_index - start_index;
     Object *data = NULL;
 
     if (length > 0) {
         data = vm->stack + start_index;
     }
-    return OBJ(o_Array, .array = create_array(vm, data, length));
+
+    Object array = OBJ(o_Array, .array = create_array(vm, data, length));
+
+#ifdef DEBUG_PRINT
+    printf("create: ");
+    object_fprint(array, stdout);
+    putc('\n', stdout);
+#endif
+
+    return array;
 }
 
 static Object
 build_table(VM *vm, int start_index, int end_index) {
-#ifdef DEBUG_PRINT
-    puts("build_table");
-#endif
-
     table *tbl = create_table(vm);
 
     Object key, val;
@@ -516,7 +526,15 @@ build_table(VM *vm, int start_index, int end_index) {
         }
     }
 
-    return OBJ(o_Table, .table = tbl);
+    Object obj = OBJ(o_Table, .table = tbl);
+
+#ifdef DEBUG_PRINT
+    printf("create: ");
+    object_fprint(obj, stdout);
+    putc('\n', stdout);
+#endif
+
+    return obj;
 }
 
 static error
@@ -579,7 +597,15 @@ execute_call(VM *vm, int num_args) {
 #ifdef DEBUG_PRINT
     printf("call: ");
     object_fprint(callee, stdout);
-    putc('\n', stdout);
+    Object *args = vm->stack + vm->sp - num_args;
+    printf(" (");
+    for (int i = 0; i < num_args; i++) {
+        object_fprint(args[i], stdout);
+        if (i != num_args - 1) {
+            printf(", ");
+        }
+    }
+    puts(")");
 #endif
 
     switch (callee.type) {
@@ -603,11 +629,18 @@ vm_push_closure(VM *vm, int const_index, int num_free) {
     CompiledFunction *func = constant.data.function;
     Object *free_variables = &vm->stack[vm->sp - num_free];
     Closure *closure = create_closure(vm, func, free_variables, num_free);
+    Object obj = OBJ(o_Closure, .closure = closure);
+
+#ifdef DEBUG_PRINT
+    printf("create: ");
+    object_fprint(obj, stdout);
+    putc('\n', stdout);
+#endif
 
     // remove free variables from stack
     vm->sp -= num_free;
 
-    return vm_push(vm, OBJ(o_Closure, .closure = closure));
+    return vm_push(vm, obj);
 }
 
 error vm_run(VM *vm, Bytecode bytecode) {

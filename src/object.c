@@ -91,7 +91,7 @@ fprint_closure(Closure *cl, FILE *fp) {
 
 static int
 fprint_builtin_function(Builtin *builtin, FILE *fp) {
-    FPRINTF(fp, "<builtin function: %s>", builtin->name);
+    FPRINTF(fp, "<builtin: %s>", builtin->name);
     return 0;
 }
 
