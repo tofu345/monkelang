@@ -186,9 +186,9 @@ const Builtin builtins[] = {
     BUILTIN(push),
     BUILTIN(exit),
     BUILTIN(copy),
-    { NULL, NULL },
 };
 
-const Builtin *get_builtins() {
-    return builtins;
+Builtins get_builtins() {
+    static int len = sizeof(builtins) / sizeof(builtins[0]);
+    return (Builtins){ .data = builtins, .length = len };
 }

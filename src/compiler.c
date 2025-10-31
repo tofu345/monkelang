@@ -16,9 +16,6 @@
 
 static int add_constant(Compiler *c, Constant obj_const);
 
-// malloc [SymbolTable], add to [c.symbol_tables].
-static SymbolTable *new_symbol_table(Compiler *c);
-
 // calloc new [CompiledFunction].
 static CompiledFunction *new_function();
 
@@ -30,34 +27,28 @@ static void source_map_statement(Compiler *c, Node stmt);
 static Error *compiler_error(Node n, char* format, ...);
 
 DEFINE_BUFFER(Scope, CompilationScope)
-DEFINE_BUFFER(SymbolTable, SymbolTable *)
 DEFINE_BUFFER(Function, CompiledFunction *)
 
 void compiler_init(Compiler *c) {
     memset(c, 0, sizeof(Compiler));
 
-    // init global symbol table
-    SymbolTable *global_symbol_table = new_symbol_table(c);
-    symbol_table_init(global_symbol_table);
-    c->current_symbol_table = global_symbol_table;
+    // global symbol table
+    c->current_symbol_table = symbol_table_new();
 
-    // add builtin functions to global symbol table
-    const Builtin *builtin = get_builtins();
-    int i = 0;
-    while (builtin->name != NULL) {
-        sym_builtin(global_symbol_table, i, builtin->name);
-        builtin++;
-        i++;
+    // define builtin function [Symbols]
+    Builtins builtins = get_builtins();
+    for (int i = 0; i < builtins.length; i++) {
+        sym_builtin(c->current_symbol_table, i, builtins.data[i].name);
     }
 
-    // main function
     CompiledFunction *main_fn = new_function();
 
     ScopeBufferPush(&c->scopes, (CompilationScope){
         .function = main_fn
     });
-    c->cur_scope = &c->scopes.data[0];
+    c->cur_scope = c->scopes.data;
     c->current_instructions = &main_fn->instructions;
+    c->cur_mapping = &main_fn->mappings;
 }
 
 void compiler_free(Compiler *c) {
@@ -69,12 +60,12 @@ void compiler_free(Compiler *c) {
     }
     free(c->scopes.data);
 
-    for (i = 0; i < c->symbol_tables.length; i++) {
-        SymbolTable *cur = c->symbol_tables.data[i];
+    SymbolTable *next, *cur = c->current_symbol_table;
+    while (cur) {
+        next = cur->outer;
         symbol_table_free(cur);
-        free(cur);
+        cur = next;
     }
-    free(c->symbol_tables.data);
 
     free(c->constants.data);
 
@@ -556,15 +547,15 @@ _compile(Compiler *c, Node n) {
                 // add to list of compiled functions
                 FunctionBufferPush(&c->functions, fn);
 
-                SymbolBuffer free_symbols =
-                    c->current_symbol_table->free_symbols;
-
-                leave_scope(c);
+                SymbolTable *tbl = leave_scope(c);
+                SymbolBuffer free_symbols = tbl->free_symbols;
 
                 // push free_symbols onto the stack, to go into [Closure].
                 for (int i = 0; i < free_symbols.length; i++) {
                     load_symbol(c, free_symbols.data[i]);
                 }
+
+                symbol_table_free(tbl);
 
                 Constant fn_const = {
                     .type = c_Function,
@@ -616,25 +607,29 @@ void enter_scope(Compiler *c) {
 
     c->cur_scope = &c->scopes.data[new_scope_idx];
     c->current_instructions = &fn->instructions;
+    c->cur_mapping = &fn->mappings;
 
-    SymbolTable *new = new_symbol_table(c);
-    enclosed_symbol_table(new, c->current_symbol_table);
-    c->current_symbol_table = new;
+    c->current_symbol_table = enclosed_symbol_table(c->current_symbol_table);
 }
 
-// return to previous compilation scope and symbol table, and return
-// current scope [Instructions]
-void leave_scope(Compiler *c) {
+// return to previous compilation scope and [SymbolTable], return current
+// [SymbolTable]
+SymbolTable *leave_scope(Compiler *c) {
     int prev_scope_idx = --c->cur_scope_index;
 
     c->cur_scope = &c->scopes.data[prev_scope_idx];
-    c->current_instructions = &c->cur_scope->function->instructions;
+
+    CompiledFunction *prev = c->cur_scope->function;
+    c->current_instructions = &prev->instructions;
+    c->cur_mapping = &prev->mappings;
 
     // remove from [c.scopes], to be replaced at next [enter_scope()]
     // call.
     --c->scopes.length;
 
+    SymbolTable *tbl = c->current_symbol_table;
     c->current_symbol_table = c->current_symbol_table->outer;
+    return tbl;
 }
 
 Error *compile(Compiler *c, Program *prog) {
@@ -650,16 +645,8 @@ Bytecode bytecode(Compiler *c) {
     return (Bytecode) {
         .main_function = c->cur_scope->function,
         .constants = &c->constants,
-        .num_globals = c->symbol_tables.data[0]->num_definitions,
+        .num_globals = c->current_symbol_table->num_definitions,
     };
-}
-
-static SymbolTable *
-new_symbol_table(Compiler *c) {
-    SymbolTable *new = malloc(sizeof(SymbolTable));
-    if (new == NULL) { die("malloc"); }
-    SymbolTableBufferPush(&c->symbol_tables, new);
-    return new;
 }
 
 static CompiledFunction *
@@ -675,8 +662,7 @@ source_map_statement(Compiler *c, Node stmt) {
         .position = c->current_instructions->length,
         .statement = stmt
     };
-    // TODO: [c.cur_function]
-    SourceMappingBufferPush(&c->cur_scope->function->mappings, mapping);
+    SourceMappingBufferPush(c->cur_mapping, mapping);
 }
 
 static Error *

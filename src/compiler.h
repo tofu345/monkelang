@@ -18,21 +18,20 @@ typedef struct {
 } CompilationScope;
 
 BUFFER(Scope, CompilationScope)
-BUFFER(SymbolTable, SymbolTable *)
 BUFFER(Function, CompiledFunction *)
 
 typedef struct {
     ConstantBuffer constants;
 
     SymbolTable *current_symbol_table;
-    // TODO: cleanup [SymbolTables] when [leave_scope()].
-    SymbolTableBuffer symbol_tables;
 
     // all functions currently being compiled.
     ScopeBuffer scopes;
+
     CompilationScope *cur_scope;
-    int cur_scope_index; // index of [cur_scope]
+    int cur_scope_index;                // index of [cur_scope]
     Instructions *current_instructions; // instructions of [cur_scope]
+    SourceMappingBuffer *cur_mapping;   // [SourceMapping]s of [cur_scope.function]
 
     // compiled functions.
     FunctionBuffer functions;
@@ -46,8 +45,13 @@ Error *compile(Compiler *c, Program *prog);
 // append [Instruction] with [Opcode] and [int] operands
 int emit(Compiler *c, Opcode op, ...);
 
+// enter new [CompilationScope], creating now [CompiledFunction] and
+// [SymbolTable].
 void enter_scope(Compiler *c);
-void leave_scope(Compiler *c);
+
+// enter previous [CompilationScope] and [SymbolTable],
+// Return value: previous value of current [SymbolTable]
+SymbolTable *leave_scope(Compiler *c);
 
 typedef struct {
     CompiledFunction *main_function;

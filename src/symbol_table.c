@@ -8,15 +8,21 @@
 
 DEFINE_BUFFER(Symbol, Symbol *)
 
-void symbol_table_init(SymbolTable *st) {
-    memset(st, 0, sizeof(SymbolTable));
+SymbolTable *
+symbol_table_new() {
+    SymbolTable *st = calloc(1, sizeof(SymbolTable));
+    if (st == NULL) { die("malloc"); }
+
     st->store = ht_create();
     if (st->store == NULL) { die("symbol_table_init"); }
+    return st;
 }
 
-void enclosed_symbol_table(SymbolTable *st, SymbolTable *outer) {
-    symbol_table_init(st);
+SymbolTable *
+enclosed_symbol_table(SymbolTable *outer) {
+    SymbolTable *st = symbol_table_new();
     st->outer = outer;
+    return st;
 }
 
 void symbol_table_free(SymbolTable *st) {
@@ -26,6 +32,7 @@ void symbol_table_free(SymbolTable *st) {
     }
     ht_destroy(st->store);
     free(st->free_symbols.data);
+    free(st);
 }
 
 static Symbol *

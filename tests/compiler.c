@@ -492,8 +492,8 @@ void test_compiler_scopes(void) {
     }
 
     free_function(c.cur_scope->function);
-
-    leave_scope(&c);
+    SymbolTable *inner = leave_scope(&c);
+    symbol_table_free(inner);
 
     if (c.cur_scope_index != 0) {
         printf("scope_index wrong. got=%d, want=%d\n", c.cur_scope_index, 0);

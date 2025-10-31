@@ -39,8 +39,8 @@ typedef struct SymbolTable {
     SymbolBuffer free_symbols;
 } SymbolTable;
 
-void symbol_table_init(SymbolTable *st);
-void enclosed_symbol_table(SymbolTable *st, SymbolTable *outer);
+SymbolTable *symbol_table_new();
+SymbolTable *enclosed_symbol_table(SymbolTable *outer);
 
 void symbol_table_free(SymbolTable *st);
 

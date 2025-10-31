@@ -11,5 +11,9 @@ struct Builtin {
     BuiltinFn *fn;
 };
 
-// NULL-terminated array of builtin functions
-const Builtin *get_builtins();
+typedef struct {
+    const Builtin *data;
+    int length;
+} Builtins;
+
+Builtins get_builtins();

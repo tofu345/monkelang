@@ -7,27 +7,26 @@
 
 struct Keyword {
     char* name;
+    int length;
     TokenType tok_typ;
 } const keywords[] = {
-    {"fn", t_Function},
-    {"let", t_Let},
-    {"true", t_True},
-    {"false", t_False},
-    {"null", t_Null},
-    {"if", t_If},
-    {"else", t_Else},
-    {"return", t_Return},
+    {"fn", 2, t_Function},
+    {"let", 3, t_Let},
+    {"true", 4, t_True},
+    {"false", 5, t_False},
+    {"null", 4, t_Null},
+    {"if", 2, t_If},
+    {"else", 4, t_Else},
+    {"return", 6, t_Return},
 };
 
 // TODO: replace with hashmap
 TokenType lookup_ident(const char* ident, int ident_len) {
-    static size_t num_keywords = sizeof(keywords) / sizeof(keywords[0]);
-    char *keyword;
-    int len;
-    for (size_t i = 0; i < num_keywords; i++) {
-        keyword = keywords[i].name;
-        len = strlen(keyword);
-        if (len == ident_len && strncmp(keyword, ident, len) == 0) {
+    static int num_keywords = sizeof(keywords) / sizeof(keywords[0]);
+    int i, len;
+    for (i = 0; i < num_keywords; i++) {
+        len = keywords[i].length;
+        if (len == ident_len && strncmp(keywords[i].name, ident, len) == 0) {
             return keywords[i].tok_typ;
         }
     }
