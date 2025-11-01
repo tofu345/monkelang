@@ -20,12 +20,19 @@ typedef struct {
 } Error;
 
 BUFFER(Error, Error)
+void free_error(Error *err);
 
-// print [err.message] if not NULL and [highlight_token(err.token)]
+const char *start_of_line(Token *tok, int *distance);
+const char *end_of_line(Token *tok, int *distance);
+
+// print [err.message] if not NULL,
+// and [highlight_token_with_line_number(err.token)].
 void print_error(Error *err);
 
-// print line of [tok].
-// highlight [tok.start] to [tok.start + tok.length].
-void highlight_token(Token tok);
+void print_token(Token *tok, int leftpad);
+void print_token_line_number(Token *tok);
 
-void free_error(Error *err);
+void highlight_token(Token *tok, int leftpad);
+void highlight_token_with_line_number(Token *tok);
+
+void highlight_line_with_line_number(Token *tok);

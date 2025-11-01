@@ -2,7 +2,6 @@
 #include "ast.h"
 #include "builtin.h"
 #include "code.h"
-#include "compiler.h"
 #include "constants.h"
 #include "errors.h"
 #include "object.h"
@@ -278,19 +277,20 @@ execute_comparison(VM *vm, Opcode op) {
         return execute_float_comparison(vm, op, left, right);
     }
 
-    Object eq;
+    Object res = object_eq(left, right);
+    if (IS_NULL(res)) {
+        return new_error("cannot compare: '%s' with '%s'",
+                show_object_type(left.type),
+                show_object_type(right.type));
+    }
+
     switch (op) {
         case OpEqual:
-            eq = object_eq(left, right);
-            if (IS_ERR(eq)) { return eq.data.err; }
-            return vm_push(vm, eq);
+            return vm_push(vm, res);
 
         case OpNotEqual:
-            eq = object_eq(left, right);
-            if (IS_ERR(eq)) { return eq.data.err; }
-
-            eq.data.boolean = !eq.data.boolean;
-            return vm_push(vm, eq);
+            res.data.boolean = !res.data.boolean;
+            return vm_push(vm, res);
 
         default:
             return error_unknown_operation(op, left, right);
@@ -419,7 +419,7 @@ execute_set_index(VM *vm) {
         return execute_set_table_index(left, index, right);
 
     } else {
-        return new_error("index assignment operator not supported: %s[%s]",
+        return new_error("index assignment not supported for %s[%s]",
                 show_object_type(left.type), show_object_type(index.type));
     }
 }
@@ -922,6 +922,7 @@ find_mapping(Frame f) {
     }
 
     if (maps.data[low].position > f.ip) {
+        assert(low > 0);
         return &maps.data[low - 1];
     }
     return &maps.data[low];
@@ -932,22 +933,30 @@ void print_vm_stack_trace(VM *vm) {
         Frame frame = vm->frames[i];
         CompiledFunction *func = frame.cl->func;
 
-        SourceMapping *mapping = find_mapping(frame);
-        Token *tok = node_token(mapping->statement);
-        highlight_token(*tok);
-
-        // the main function does not have a [FunctionLiteral].
         if (i == 0) {
-            printf("in <main function>\n");
-            continue;
+            // main function does not have a [FunctionLiteral].
+            printf("<main function>");
+        } else {
+            FunctionLiteral *lit = func->literal;
+            if (lit->name) {
+                Identifier *id = lit->name;
+                printf("<function: %.*s>", LITERAL(id->tok));
+            } else {
+                printf("<anonymous function>");
+            }
         }
 
-        FunctionLiteral *lit = func->literal;
-        if (lit->name) {
-            Identifier *id = lit->name;
-            printf("in <function: %.*s>\n", LITERAL(id->tok));
+        SourceMapping *mapping = find_mapping(frame);
+        Token *tok;
+        if (mapping->statement.typ == n_LetStatement) {
+            // highlight_token on [LetStatement.value].
+            LetStatement *ls = mapping->statement.obj;
+            tok = node_token(ls->value);
         } else {
-            printf("in <anonymous function>\n");
+            tok = node_token(mapping->statement);
         }
+
+        printf(", line %d\n", tok->line);
+        highlight_token(tok, 2);
     }
 }
