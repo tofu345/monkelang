@@ -11,6 +11,7 @@ typedef enum __attribute__ ((__packed__)) {
     // literals
     t_String,
     t_Digit, // integer and floating point numbers.
+             // TODO: separate integer and floats tokens.
 
     // Operators
     t_Assign,

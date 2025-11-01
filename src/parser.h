@@ -31,7 +31,7 @@ void parser_init(Parser* p);
 void parser_free(Parser* p);
 
 // Create AST from [program].
-// Errors are added to [p.errors].
+// Parses [program] until an error is encountered and stored in [p.errors].
 Program parse(Parser* p, const char *program);
 void program_free(Program* p);
 

@@ -48,7 +48,7 @@ Token *node_token(Node n);
 // Returns -1 on write to FILE err
 int node_fprint(const Node n, FILE* fp);
 
-// free `n.obj`
+// free [n.obj] if [n.obj] not NULL.
 void node_free(Node n);
 
 BUFFER(Node, Node)

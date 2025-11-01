@@ -76,7 +76,7 @@ static int
 read_while(Lexer *l, check_function *check) {
     int pos = l->position;
 
-    while (check(l->ch)) {
+    while (l->ch != 0 && check(l->ch)) {
         read_char(l);
     }
 

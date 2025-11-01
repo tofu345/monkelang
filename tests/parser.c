@@ -1137,6 +1137,80 @@ void test_parsing_null_literals(void) {
     parser_free(&p);
 }
 
+void test_parser_errors(void) {
+    struct Test {
+        const char* input;
+        const char* error;
+    } tests[] = {
+        {"let x = =;", "unexpected token '='"},
+        {"let = = 1;", "expected next token to be 'Identifier', got '=' instead"},
+        {"return let;", "expected next token to be 'Identifier', got ';' instead"},
+
+        {"1..5", "could not parse '1..5' as float"},
+        {
+            "15189704987123048718947",
+            "could not parse '15189704987123048718947' as integer"
+        },
+
+        {"10 + + 5", "unexpected token '+'"},
+        {"1 === 1", "unexpected token '='"},
+
+        {"if ()", "empty if statement"},
+        {"if (}", "unexpected token '}'"},
+        {"if (true) }", "expected next token to be '{', got '}' instead"},
+        {"if (true) {", "expected token to be '}', got 'Eof' instead"},
+        {
+            // TODO: plan to add this eventually
+            "if (x < y) { x } else if { y }",
+            "expected next token to be '{', got 'if' instead"
+        },
+
+        {"fn (1)", "expected token to be 'Identifier', got 'Digit' instead"},
+        {"add(4 5);", "expected next token to be ')', got 'Digit' instead"},
+
+        {"\"hello world\"\";", "missing closing '\"' for string"},
+        {"[1 2]", "expected next token to be ']', got 'Digit' instead"},
+        {"[1, 1 2]", "expected next token to be ']', got 'Digit' instead"},
+
+        {"array[1 2]", "expected next token to be ']', got 'Digit' instead"},
+
+        {"{ return; }", "unexpected token 'return'"},
+        {"{1, 3}", "expected next token to be ':', got ',' instead"},
+        {"{1: 2, 3}", "expected next token to be ':', got '}' instead"},
+        {"{:}", "unexpected token ':'"},
+        {"{,}", "unexpected token ','"},
+    };
+    int tests_len = sizeof(tests) / sizeof(tests[0]);
+
+    Parser p;
+    parser_init(&p);
+
+    bool fail = false;
+    for (int i = 0; i < tests_len; ++i) {
+        struct Test test = tests[i];
+        Program prog = parse(&p, test.input);
+
+        if (p.errors.length == 0) {
+            printf("expected parser error for test: %s\n", test.input);
+            fail = true;
+            goto cleanup;
+        }
+
+        if (test.error && strcmp(test.error, p.errors.data[0].message) != 0) {
+            printf("wrong parser error for test: %s\nwant= %s\ngot = %s\n",
+                    test.input, test.error, p.errors.data[0].message);
+            fail = true;
+        }
+
+cleanup:
+        program_free(&prog);
+        parser_free(&p);
+        p.errors = (ErrorBuffer){0};
+    }
+
+    if (fail) { TEST_FAIL(); }
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_let_statements);
@@ -1163,5 +1237,6 @@ int main(void) {
     RUN_TEST(test_parsing_assign_expressions);
     RUN_TEST(test_parsing_index_assign_expressions);
     RUN_TEST(test_parsing_null_literals);
+    RUN_TEST(test_parser_errors);
     return UNITY_END();
 }

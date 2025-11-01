@@ -77,7 +77,7 @@ static void
 cur_tok_error(Parser* p, TokenType t) {
     parser_error(p,
             "expected token to be '%s', got '%s' instead",
-            show_token_type(t), show_token_type(p->peek_token.type));
+            show_token_type(t), show_token_type(p->cur_token.type));
 }
 
 static void
@@ -141,7 +141,7 @@ parse_expression(Parser* p, enum Precedence precedence) {
         if (IS_INVALID(left_exp)) {
             return INVALID;
         }
-    };
+    }
 
     return left_exp;
 }
@@ -151,28 +151,28 @@ parse_identifier(Parser* p) {
     Identifier* id = allocate(sizeof(Identifier));
     id->tok = p->cur_token;
 
-    // avoid recomputing hash
+    // avoid recomputing hash, does not gain much.
     id->hash = hash_string_fnv1a(p->cur_token.start, p->cur_token.length);
     return NODE(n_Identifier, id);
 }
 
 static Node
 parse_float(Parser* p) {
-    FloatLiteral* fl = allocate(sizeof(FloatLiteral));
-    fl->tok = p->cur_token;
-
-    const char *end = fl->tok.start + fl->tok.length;
-
+    Token tok = p->cur_token;
+    const char *end = tok.start + tok.length;
     char *endptr;
-    double value = strtod(fl->tok.start, &endptr);
+
+    errno = 0; // must reset errno
+    double value = strtod(tok.start, &endptr);
     if (endptr != end || errno == ERANGE) {
-        free(fl);
         parser_error(p,
                 "could not parse '%.*s' as float",
                 LITERAL(p->cur_token));
         return INVALID;
     }
 
+    FloatLiteral* fl = allocate(sizeof(FloatLiteral));
+    fl->tok = p->cur_token;
     fl->value = value;
     return NODE(n_FloatLiteral, fl);
 }
@@ -185,28 +185,21 @@ parse_digit(Parser* p) {
         }
     }
 
-    IntegerLiteral* il = allocate(sizeof(IntegerLiteral));
-    il->tok = p->cur_token;
-
-    const char *literal = p->cur_token.start;
-    const char *end = literal + p->cur_token.length;
+    Token tok = p->cur_token;
+    const char *end = tok.start + tok.length;
     char* endptr;
-    int base = 0;
 
-    if ('b' == literal[1]) {
-        base = 2; // skip '0b',
-                  // [strtol] infers base 16 or 8 not base 2.
-    }
-
-    long value = strtol(literal + base, &endptr, base);
+    errno = 0; // must reset errno
+    long value = strtol(tok.start, &endptr, 0);
     if (endptr != end || errno == ERANGE) {
-        free(il);
         parser_error(p,
                 "could not parse '%.*s' as integer",
                 LITERAL(p->cur_token));
         return INVALID;
     }
 
+    IntegerLiteral* il = allocate(sizeof(IntegerLiteral));
+    il->tok = p->cur_token;
     il->value = value;
     return NODE(n_IntegerLiteral, il);
 }
@@ -350,6 +343,10 @@ parse_function_literal(Parser* p) {
 
 static Node
 parse_string_literal(Parser* p) {
+    if (p->cur_token.start[p->cur_token.length] != '\"') {
+        parser_error(p, "missing closing '\"' for string");
+    }
+
     StringLiteral* sl = allocate(sizeof(StringLiteral));
     sl->tok = p->cur_token;
     return NODE(n_StringLiteral, sl);
@@ -431,17 +428,20 @@ parse_call_expression(Parser* p, Node function) {
 
 static Node
 parse_index_expression(Parser* p, Node left) {
-    IndexExpression* ie = allocate(sizeof(IndexExpression));
-    ie->tok = p->cur_token;
-    ie->left = left;
+    Token tok = p->cur_token;
+
     next_token(p);
-    ie->index = parse_expression(p, p_Lowest);
-    if (IS_INVALID(ie->index) || !expect_peek(p, t_Rbracket)) {
+    Node index = parse_expression(p, p_Lowest);
+    if (IS_INVALID(index) || !expect_peek(p, t_Rbracket)) {
+        node_free(index);
         node_free(left);
-        free(ie);
         return INVALID;
     }
 
+    IndexExpression* ie = allocate(sizeof(IndexExpression));
+    ie->tok = tok;
+    ie->left = left;
+    ie->index = index;
     return NODE(n_IndexExpression, ie);
 }
 
@@ -495,31 +495,40 @@ parse_expression_list(Parser* p, TokenType end) {
 
 static Node
 parse_if_expression(Parser* p) {
-    IfExpression* ie = allocate(sizeof(IfExpression));
-    ie->tok = p->cur_token;
+    Token tok = p->cur_token;
 
     if (!expect_peek(p, t_Lparen)) {
-        free(ie);
         return INVALID;
     }
 
     next_token(p);
-    ie->condition = parse_expression(p, p_Lowest);
-    if (IS_INVALID(ie->condition) || !expect_peek(p, t_Rparen)) {
-        free(ie);
+
+    if (cur_token_is(p, t_Rparen)) {
+        parser_error(p, "empty if statement");
         return INVALID;
     }
 
-    if (!expect_peek(p, t_Lbrace)) {
-        node_free(NODE(n_IfExpression, ie));
+    Node condition = parse_expression(p, p_Lowest);
+    if (IS_INVALID(condition) 
+            || !expect_peek(p, t_Rparen)
+            || !expect_peek(p, t_Lbrace)) {
+
+        node_free(condition);
         return INVALID;
     }
 
-    ie->consequence = parse_block_statement(p);
-    if (ie->consequence == NULL) {
-        node_free(NODE(n_IfExpression, ie));
+    BlockStatement *consequence = parse_block_statement(p);
+    if (consequence == NULL) {
+        node_free(condition);
         return INVALID;
     }
+
+    IfExpression* ie = allocate(sizeof(IfExpression));
+    *ie = (IfExpression) {
+        .tok = tok,
+        .condition = condition,
+        .consequence = consequence
+    };
 
     if (peek_token_is(p, t_Else)) {
         next_token(p);
@@ -636,7 +645,7 @@ parse_expression_or_assign_statement(Parser* p) {
         stmt = NODE(n_AssignStatement, as);
 
     } else {
-        ExpressionStatement* es = allocate(sizeof(ExpressionStatement));
+        ExpressionStatement *es = allocate(sizeof(ExpressionStatement));
         es->tok = *node_token(left);
         es->expression = left;
         stmt = NODE(n_ExpressionStatement, es);
@@ -712,14 +721,11 @@ Program parse(Parser* p, const char *input) {
 
     while (p->cur_token.type != t_Eof) {
         Node stmt = parse_statement(p);
-        if (!IS_INVALID(stmt)) {
-            NodeBufferPush(&prog.stmts, stmt);
-
-        } else if (p->errors.length >= MAX_ERRORS) {
-            parser_error(p, "too many errors, stopping now\n");
-            break;
+        if (IS_INVALID(stmt)) {
+            return prog;
         }
 
+        NodeBufferPush(&prog.stmts, stmt);
         next_token(p);
     }
     return prog;
