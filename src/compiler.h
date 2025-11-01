@@ -1,10 +1,8 @@
 #pragma once
 
 #include "constants.h"
-#include "object.h"
-#include "parser.h"
-#include "code.h"
 #include "symbol_table.h"
+#include "errors.h"
 
 typedef struct {
     Opcode opcode;

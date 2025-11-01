@@ -199,6 +199,7 @@ Token lexer_next_token(Lexer *l) {
         tok.type = t_String;
         // exclude quotes
         ++tok.start;
+        ++tok.position;
         tok.length = read_while(l, not_closing_quote);
         break;
 

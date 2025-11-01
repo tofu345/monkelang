@@ -1,10 +1,8 @@
 #include "compiler.h"
-#include "ast.h"
 #include "builtin.h"
 #include "code.h"
 #include "constants.h"
 #include "errors.h"
-#include "object.h"
 #include "symbol_table.h"
 #include "utils.h"
 

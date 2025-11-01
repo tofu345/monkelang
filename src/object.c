@@ -175,7 +175,7 @@ Object object_eq(Object left, Object right) {
             }
 
         default:
-            return ERR("cannot compare %s", show_object_type(left.type));
+            return NULL_OBJ;
     }
 }
 

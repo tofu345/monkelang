@@ -71,7 +71,7 @@ struct Object {
 
 const char* show_object_type(ObjectType t);
 
-// compare [left] and [right]. returns error otherwise
+// compare [left] and [right]. returns [Null Object] otherwise
 Object object_eq(Object left, Object right);
 
 // print [Object] to [fp], returns -1 on error

@@ -599,11 +599,13 @@ execute_call(VM *vm, int num_args) {
     object_fprint(callee, stdout);
     Object *args = vm->stack + vm->sp - num_args;
     printf(" (");
-    for (int i = 0; i < num_args; i++) {
+    int last = num_args - 1;
+    for (int i = 0; i < last; i++) {
         object_fprint(args[i], stdout);
-        if (i != num_args - 1) {
-            printf(", ");
-        }
+        printf(", ");
+    }
+    if (num_args >= 1) {
+        object_fprint(args[last], stdout);
     }
     puts(")");
 #endif

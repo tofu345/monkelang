@@ -73,7 +73,7 @@ typedef struct {
 } LetStatement;
 
 typedef struct {
-    Token tok; // the 't_Assign' token
+    Token tok; // the token of [right]
     Node left; // [Identifier] or [IndexExpression]
     Node right;
 } AssignStatement;
@@ -84,7 +84,7 @@ typedef struct {
 } ReturnStatement;
 
 typedef struct {
-    Token tok; // the first token of the expression
+    Token tok; // the token of [expression]
     Node expression;
 } ExpressionStatement;
 

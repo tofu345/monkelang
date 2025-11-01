@@ -607,7 +607,6 @@ parse_return_statement(Parser* p) {
 
 static Node
 parse_expression_or_assign_statement(Parser* p) {
-    Token tok = p->cur_token; // the same token as left.tok
     Node left = parse_expression(p, p_Lowest);
     if (IS_INVALID(left)) {
         return INVALID;
@@ -615,9 +614,9 @@ parse_expression_or_assign_statement(Parser* p) {
 
     Node stmt;
     if (peek_token_is(p, t_Assign)) {
-        next_token(p);
-        tok = p->cur_token; // the '=' token
-        next_token(p);
+        // (x2) next_token()
+        p->cur_token = lexer_next_token(&p->l);
+        p->peek_token = lexer_next_token(&p->l);
 
         Node right = parse_expression(p, p_Lowest);
         if (IS_INVALID(right)) {
@@ -632,13 +631,13 @@ parse_expression_or_assign_statement(Parser* p) {
 
         AssignStatement *as = allocate(sizeof(AssignStatement));
         as->left = left;
-        as->tok = tok;
+        as->tok = *node_token(right);
         as->right = right;
         stmt = NODE(n_AssignStatement, as);
 
     } else {
         ExpressionStatement* es = allocate(sizeof(ExpressionStatement));
-        es->tok = tok;
+        es->tok = *node_token(left);
         es->expression = left;
         stmt = NODE(n_ExpressionStatement, es);
     }
