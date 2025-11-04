@@ -90,9 +90,12 @@ Object object_copy(VM* vm, Object obj) {
 
         case o_Array:
             {
-                ObjectBuffer *old = obj.data.array;
-                ObjectBuffer *new_arr =
-                    create_array(vm, old->data, old->length);
+                ObjectBuffer old = *obj.data.array,
+                            *new_arr = create_array(vm, NULL, old.length);
+                Object *new_buf = new_arr->data;
+                for (int i = 0; i < old.length; i++) {
+                    new_buf[i] = object_copy(old.data[i]);
+                }
                 return OBJ(o_Array, .array = new_arr);
             }
 
