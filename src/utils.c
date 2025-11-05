@@ -17,7 +17,6 @@ uint64_t hash_string_fnv1a(const char *string, int length) {
     return hash;
 }
 
-
 void die(const char *fmt, ...) {
     va_list ap;
     int saved_errno;

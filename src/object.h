@@ -1,5 +1,20 @@
 #pragma once
 
+// This module defines types for Object.  A C variable of that type contains an
+// ObjectType and ObjectData of the following categories:
+//
+// Primitive data types: null, numbers and booleans are stored entirely
+// in ObjectData, copying them copies their value.
+//
+// Compound data types: strings, arrays, tables (hashmaps) and closures contain
+// pointers.  Copying them only copies their pointer.
+//
+// All functions are Closures and all Closures contain a list of Objects
+// representing its free variables, variables defined outside the
+// current function that are not global variables.  Because of this,
+// assignments to free variables of primitive types only change the
+// value in the free variable list.
+
 #include "ast.h"
 #include "code.h"
 #include "constants.h"
@@ -11,8 +26,6 @@
 // TODO:
 // - char datatype
 // - support Unicode and emoji's
-// - stack tracing
-// - store [Node] in [Symbol] instead of name?
 
 #define OBJ(t, d) (Object){ .type = t, .data = { d } }
 #define ERR(...) OBJ(o_Error, .err = new_error(__VA_ARGS__))
@@ -32,12 +45,13 @@ BUFFER(Char, char)
 
 typedef enum __attribute__ ((__packed__)) {
     // Primitive data types:
-    // Data types that do not need garbage collection
     o_Null,
     o_Integer,
     o_Float,
     o_Boolean,
     o_BuiltinFunction,
+
+    // A wrapper around [error], which is simply a [char *]
     o_Error,
 
     // Compound data types:
@@ -58,7 +72,6 @@ typedef union {
     Closure *closure;
     const Builtin *builtin;
 
-    // TODO: user [Error]s
     error err;
 
     void *ptr;
@@ -81,5 +94,5 @@ struct Closure {
     CompiledFunction *func;
 
     int num_free;
-    Object free[]; // free variables, see [symbol_table.h/FreeScope]
+    Object free[];
 };

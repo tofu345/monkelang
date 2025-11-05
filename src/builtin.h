@@ -3,7 +3,8 @@
 #include "object.h"
 #include "vm.h"
 
-// returns 0 on success
+// This module contains builtin functions.
+
 typedef Object BuiltinFn(VM *vm, Object *args, int num_args);
 
 struct Builtin {

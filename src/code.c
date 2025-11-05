@@ -11,48 +11,59 @@
 #define DEF_EMPTY(code) { #code, { NULL, 0 } }
 
 const int _two_widths[] = { 2 };
-const Operands _two = { .widths = (int *)_two_widths, .length = 1 };
+const Operands _two_bytes = { .widths = (int *)_two_widths, .length = 1 };
 
 const int _one_widths[] = { 1 };
-const Operands _one = { .widths = (int *)_one_widths, .length = 1 };
+const Operands _one_byte = { .widths = (int *)_one_widths, .length = 1 };
 
 const int _closure_widths[] = { 2, 1 };
 const Operands _closure = { .widths = (int *)_closure_widths, .length = 2 };
 
 const Definition definitions[] = {
-    DEF(OpConstant, two), // constant index
+    DEF(OpConstant, two_bytes), // constant index
     DEF_EMPTY(OpPop),
+
     DEF_EMPTY(OpAdd),
     DEF_EMPTY(OpSub),
     DEF_EMPTY(OpMul),
     DEF_EMPTY(OpDiv),
-    DEF_EMPTY(OpTrue),
-    DEF_EMPTY(OpFalse),
     DEF_EMPTY(OpEqual),
     DEF_EMPTY(OpNotEqual),
     DEF_EMPTY(OpGreaterThan),
+
     DEF_EMPTY(OpMinus),
     DEF_EMPTY(OpBang),
-    DEF(OpJumpNotTruthy, two), // instruction index
-    DEF(OpJump, two),          // instruction index
+
+    DEF_EMPTY(OpTrue),
+    DEF_EMPTY(OpFalse),
     DEF_EMPTY(OpNull),
-    DEF(OpGetGlobal, two),    // globals index
-    DEF(OpSetGlobal, two),    // globals index
-    DEF(OpArray, two), // num elements
-    DEF(OpTable, two),  // num pairs
+
+    DEF(OpJumpNotTruthy, two_bytes), // instruction index
+    DEF(OpJump, two_bytes),          // instruction index
+
+    DEF(OpGetGlobal, two_bytes), // globals index
+    DEF(OpSetGlobal, two_bytes), // globals index
+
+    DEF(OpGetLocal, one_byte),  // locals index
+    DEF(OpSetLocal, one_byte),  // locals index
+
+    DEF(OpGetFree, one_byte),   // free variable index
+    DEF(OpSetFree, one_byte),   // free variable index
+
+    DEF(OpArray, two_bytes), // num elements
+    DEF(OpTable, two_bytes),  // num pairs
+
     DEF_EMPTY(OpIndex),
     DEF_EMPTY(OpSetIndex),
-    DEF(OpCall, one), // num arguments
+
+    DEF(OpCall, one_byte), // num arguments
     DEF_EMPTY(OpReturnValue),
     DEF_EMPTY(OpReturn),
-    DEF(OpGetLocal, one),    // locals index
-    DEF(OpSetLocal, one),    // locals index
-    DEF(OpGetBuiltin, one), // builtin fn index
+
+    DEF(OpGetBuiltin, one_byte), // builtin fn index
 
     // constant index of Function and number of free variables
     DEF(OpClosure, closure),
-    DEF(OpGetFree, one), // free variable index
-    DEF(OpSetFree, one), // free variable index
     DEF_EMPTY(OpCurrentClosure),
 };
 

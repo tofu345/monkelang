@@ -1,7 +1,8 @@
 #pragma once
 
-// specialized hash-table (from https://github.com/tofu345/hash-table)
-// for [Object]'s
+// This module contains a the definition for Table Objects, a specialized
+// hash-table with Object keys and values from
+// https://github.com/tofu345/hash-table.
 
 #include <stddef.h>
 #include <stdint.h>
@@ -64,7 +65,7 @@ typedef struct {
 // Initialize new iterator (for use with table_next).
 void tbl_iterator(tbl_it *it, table *tbl);
 
-// Move iterator to next item in table, update iterator's current
-// [table_entry] to current item, and return true. If there are no more items,
-// return false. Do not mutate the table during iteration.
+// Move iterator to next item in table, update iterator's [cur_key] and
+// [cur_val] current item, and return true.  If there are no more items, return
+// false.  Do not mutate the table during iteration.
 bool tbl_next(tbl_it *it);

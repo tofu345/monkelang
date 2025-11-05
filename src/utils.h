@@ -1,5 +1,7 @@
 #pragma once
 
+// This module contains utility functions.
+
 #include <stddef.h>
 #include <errno.h>
 #include <stdint.h>

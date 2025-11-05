@@ -1,17 +1,16 @@
 #pragma once
 
+// This module contains the definitions for the AST produced by the
+// Parser.
+
 #include "utils.h"
 #include "token.h"
 #include "hash-table/ht.h"
 
 #include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
 
 #define NODE(t, p) (Node){ t, p }
 
-// no interfaces, so.. everything is a node, separated by order
 enum NodeType {
     // Expressions
     n_Identifier = 1,

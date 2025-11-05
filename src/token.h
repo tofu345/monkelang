@@ -1,5 +1,7 @@
 #pragma once
 
+// The module contains the definition for Token.
+
 #include <stddef.h>
 
 typedef enum __attribute__ ((__packed__)) {
@@ -58,10 +60,11 @@ typedef struct {
     // the number of characters of the source code the [Token] represents.
     int length;
 
-    // the offset of [start] from the start of the source code.
+    // the index of [start] in the source code.
     int position;
 } Token;
 
+// for printf("%.*s") of Tokens
 #define LITERAL(t) t.length, t.start
 
 TokenType lookup_ident(const char* ident, int ident_len);

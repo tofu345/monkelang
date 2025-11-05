@@ -424,8 +424,7 @@ execute_set_index(VM *vm) {
     }
 }
 
-static bool
-is_truthy(Object obj) {
+bool is_truthy(Object obj) {
     switch (obj.type) {
         case o_Boolean:
             return obj.data.boolean;
@@ -948,12 +947,12 @@ void print_vm_stack_trace(VM *vm) {
 
         SourceMapping *mapping = find_mapping(frame);
         Token *tok;
-        if (mapping->statement.typ == n_LetStatement) {
+        if (mapping->node.typ == n_LetStatement) {
             // highlight_token on [LetStatement.value].
-            LetStatement *ls = mapping->statement.obj;
+            LetStatement *ls = mapping->node.obj;
             tok = node_token(ls->value);
         } else {
-            tok = node_token(mapping->statement);
+            tok = node_token(mapping->node);
         }
 
         printf(", line %d\n", tok->line);

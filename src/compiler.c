@@ -18,8 +18,8 @@ static int add_constant(Compiler *c, Constant obj_const);
 static CompiledFunction *new_function();
 
 // append new [SourceMapping] with [c.current_instructions.length] and
-// [stmt.token] to [c.cur_scope.mappings].
-static void source_map_statement(Compiler *c, Node stmt);
+// [node.token] to [c.cur_scope.mappings].
+static void source_map_statement(Compiler *c, Node node);
 
 // create [Error] with [n.token]
 static Error *compiler_error(Node n, char* format, ...);
@@ -656,10 +656,10 @@ new_function() {
 }
 
 static void
-source_map_statement(Compiler *c, Node stmt) {
+source_map_statement(Compiler *c, Node node) {
     SourceMapping mapping = {
         .position = c->current_instructions->length,
-        .statement = stmt
+        .node = node
     };
     SourceMappingBufferPush(c->cur_mapping, mapping);
 }

@@ -1,29 +1,35 @@
 #pragma once
 
+// This module contains definitions for constants created by the
+// Compiler.
+
 #include "ast.h"
 #include "code.h"
 #include "token.h"
 #include "utils.h"
 
-// Contains information needed for later printing the source code of
-// which statement an error occured in the VM.
+// Contains information needed for mapping a Node in the AST to a position in a
+// Functions bytecode.  It is used for printing which line of the source code
+// an error occured in the VM.
 typedef struct {
-    // the position in bytes in a [CompiledFunction]s [Instructions].
+    // the position in bytes in a Functions Instructions.
     int position;
 
-    // The statement in the AST with a Token which points to the source code.
-    Node statement;
+    // The node in the AST with a Token which points to the source code.
+    Node node;
 } SourceMapping;
 
 BUFFER(SourceMapping, SourceMapping)
 
-// A successfully compiled [FunctionLiteral].
+// A Compiled FunctionLiteral.
 typedef struct {
     Instructions instructions;
+    // The number of local variables.
     int num_locals;
+    // The number of parameters.
     int num_parameters;
 
-    // where in the source code the function was defined.
+    // Where in the source code the function was defined.
     FunctionLiteral *literal;
 
     // [SourceMapping] for all statements in [literal.body].

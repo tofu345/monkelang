@@ -7,6 +7,9 @@
 #include <assert.h>
 #include <stdio.h>
 
+// [vm_allocate()] and prepend [Allocation] with [type].
+static void *new_allocation(VM *vm, ObjectType type, size_t size);
+
 CharBuffer *create_string(VM *vm, const char *text, int length) {
     char *data = vm_allocate(vm, length + 1);
     if (text) {
@@ -94,7 +97,7 @@ Object object_copy(VM* vm, Object obj) {
                             *new_arr = create_array(vm, NULL, old.length);
                 Object *new_buf = new_arr->data;
                 for (int i = 0; i < old.length; i++) {
-                    new_buf[i] = object_copy(old.data[i]);
+                    new_buf[i] = object_copy(vm, old.data[i]);
                 }
                 return OBJ(o_Array, .array = new_arr);
             }
@@ -287,7 +290,8 @@ void *vm_allocate(VM *vm, size_t size) {
     return ptr;
 }
 
-void *new_allocation(VM *vm, ObjectType type, size_t size) {
+static void *
+new_allocation(VM *vm, ObjectType type, size_t size) {
     // prepend [Alloc] object.
     Allocation *ptr = vm_allocate(vm, size + sizeof(Allocation));
     *ptr = (Allocation){

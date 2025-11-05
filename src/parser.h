@@ -1,10 +1,11 @@
 #pragma once
 
+// The modules contains the Parser, it constructs and AST (Program) from the
+// source code.
+
 #include "ast.h"
 #include "lexer.h"
 #include "errors.h"
-
-#define MAX_ERRORS 16
 
 typedef struct Parser Parser;
 
@@ -30,8 +31,10 @@ struct Parser {
 void parser_init(Parser* p);
 void parser_free(Parser* p);
 
-// Create AST from [program].
-// Parses [program] until an error is encountered and stored in [p.errors].
+// Create AST from [program]. Parses until an error is encountered and stored
+// in [p.errors].
+//
+// [p.errors.length] is 0 on success.
 Program parse(Parser* p, const char *program);
 void program_free(Program* p);
 

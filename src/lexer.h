@@ -1,5 +1,7 @@
 #pragma once
 
+// The Lexer, converts the source code into Tokens.
+
 #include "token.h"
 
 #include <stddef.h>
