@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/poll.h>
 
 BUFFER(Input, char *)
 DEFINE_BUFFER(Input, char *)
@@ -199,8 +200,19 @@ int multigetline(char **input, size_t *input_cap, FILE *in, FILE *out) {
     char *line = NULL;
     size_t line_cap = 0,
            capacity = *input_cap;
+
+    int ret;
+    struct pollfd fds;
+    fds.fd = fileno(in); // fileno gets file descr of FILE *
+    fds.events = POLLIN; // check if there is data to read.
+
     while (1) {
-        fprintf(out, ".. ");
+        // Skip printing '.. ' when a multiline string is pasted.
+        ret = poll(&fds, 1, 0);
+        // ret is 1 if there is data to read.
+        if (ret != 1) {
+            fprintf(out, ".. ");
+        }
 
         int line_len = getline(&line, &line_cap, in);
         if (line_len == -1) {

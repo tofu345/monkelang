@@ -81,29 +81,47 @@ hello("dear, future Reader!"); // => Hello dear, future Reader!
 
 ### Differences
 
-Assignment Statements.
+Index assignments.
 
 ```javascript
-let hash = {};
-let insertInHash = fn(n) {
-  hash[n] = true; // assigning to global variable
+let fibonacci = fn(num) {
+  let seen = {0: 0, 1: 1};
+  let fib = fn(num) {
+    let res = seen[num];
+    if (res != null) {
+      return res;
+    }
+
+    res = fib(num - 1) + fib(num - 2);
+    seen[num] = res;
+    return res;
+  };
+  fib(num);
 };
-let untilZero = fn(i, func) {
-  if (i > 0) {
-    func(i);
-    untilZero(i - 1, func);
-  }
-};
-untilZero(5, fn(i) { insertInHash(i) });
-puts("assert:", len(hash) == 5)
+puts("fibonacci(50):", fibonacci(50));
 
 let array = [1, 2, 3];
 array[0] = 5;
 puts("array is [5, 2, 3]", array == [5, 2, 3]);
+```
 
+Assignments to global variables.
+
+```javascript
+let global = 1;
+fn() {
+  global = 2;
+}()
+```
+
+Assignments to free variables.
+
+```javascript
 fn() {
   let num = 1;
-  fn() { num = 2; }()
+  fn() {
+    num = 2;
+  }()
   puts("num is", num); // num is 1
 }()
 ```
