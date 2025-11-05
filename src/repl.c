@@ -19,7 +19,8 @@ DEFINE_BUFFER(Program, Program)
 static void print_parser_errors(FILE* out, Parser *p);
 
 // getline() but if first line ends with '{' or '(', read and append multiple
-// lines to [input] until a blank line is encountered.
+// lines to [input] until a blank line is encountered and there is no more data
+// to read in [in].
 int multigetline(char **input, size_t *input_cap, FILE *in, FILE *out);
 
 // TODO: repl tests
@@ -220,8 +221,8 @@ int multigetline(char **input, size_t *input_cap, FILE *in, FILE *out) {
             return -1;
         }
 
-        // blank line
-        if (line_len == 1) {
+        // blank line and no data to read.
+        if (line_len == 1 && ret != 1) {
             (*input)[len] = '\0';
             break;
         }

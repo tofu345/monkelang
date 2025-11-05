@@ -81,19 +81,18 @@ hello("dear, future Reader!"); // => Hello dear, future Reader!
 
 ### Differences
 
-Index assignments.
-
 ```javascript
 let fibonacci = fn(num) {
   let seen = {0: 0, 1: 1};
   let fib = fn(num) {
     let res = seen[num];
+    // null
     if (res != null) {
       return res;
     }
 
     res = fib(num - 1) + fib(num - 2);
-    seen[num] = res;
+    seen[num] = res; // index assignments expressions.
     return res;
   };
   fib(num);
@@ -103,24 +102,17 @@ puts("fibonacci(50):", fibonacci(50));
 let array = [1, 2, 3];
 array[0] = 5;
 puts("array is [5, 2, 3]", array == [5, 2, 3]);
-```
 
-Assignments to global variables.
-
-```javascript
 let global = 1;
 fn() {
-  global = 2;
+  global = 2; // assignments to global variables.
 }()
-```
+puts("global is", global) // global is 2
 
-Assignments to free variables.
-
-```javascript
 fn() {
   let num = 1;
   fn() {
-    num = 2;
+    num = 2; // assignments to free variables.
   }()
   puts("num is", num); // num is 1
 }()
