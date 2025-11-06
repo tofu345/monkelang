@@ -2,7 +2,7 @@
 
 ## Syntax
 
-Similar syntax to the [the monkey programming language](https://interpreterbook.com/#the-monkey-programming-language)
+Similar syntax to the [the Monkey programming language](https://interpreterbook.com/#the-monkey-programming-language)
 
 ```javascript
 // Copied from: https://interpreterbook.com/#the-monkey-programming-language
@@ -82,39 +82,53 @@ hello("dear, future Reader!"); // => Hello dear, future Reader!
 ### Differences
 
 ```javascript
+// Index Assignments.
 let fibonacci = fn(num) {
   let seen = {0: 0, 1: 1};
   let fib = fn(num) {
     let res = seen[num];
-    // null
-    if (res != null) {
+    if (res != null) { // null literals
       return res;
     }
 
     res = fib(num - 1) + fib(num - 2);
-    seen[num] = res; // index assignments expressions.
+    seen[num] = res;
     return res;
   };
   fib(num);
 };
-puts("fibonacci(50):", fibonacci(50));
+puts("fibonacci(50):", fibonacci(50)); // => fibonacci(50): 12586269025
 
 let array = [1, 2, 3];
 array[0] = 5;
-puts("array is [5, 2, 3]", array == [5, 2, 3]);
+puts("array is", array); // => array is [5, 2, 3]
 
+// Assignment to global variables.
 let global = 1;
 fn() {
-  global = 2; // assignments to global variables.
+  global = 2;
 }()
-puts("global is", global) // global is 2
+puts("global is", global) // => global is 2
 
+// Assignment to free variables.
 fn() {
   let num = 1;
+  let array = [];
   fn() {
-    num = 2; // assignments to free variables.
+    // A free variable is non-global variable not defined in the current
+    // function.  All functions create shallow copies of their free variables.
+
+    // no effect outside this function, only changes the value in the free
+    // variable list.
+    num = 2;
+
+    // has an effect, because the free variable list contains a shallow copy.
+    push(array, 1);
+
+    array = {}; // no effect
   }()
   puts("num is", num); // num is 1
+  puts("array is", array); // array is [1]
 }()
 ```
 

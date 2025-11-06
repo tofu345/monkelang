@@ -45,8 +45,14 @@ start_of_line(Token *tok, int *distance) {
 
 // returns pointer to end of line of [token.start] and set [distance].
 const char *
-end_of_line(Token *tok, int* distance) {
+end_of_line(Token *tok, int *distance) {
     const char *cur = tok->start + tok->length;
+
+    if (tok->type == t_Eof) {
+        *distance = 0;
+        return cur;
+    }
+
     int dist = 0;
     while (true) {
         // walk right until end of source code or end of current line.

@@ -26,16 +26,27 @@ read_char(Lexer *l) {
     }
 }
 
+void lexer_with(Lexer *l, const char *input, uint64_t length) {
+    l->input = input;
+    l->input_len = length;
+    l->position = 0;
+    l->read_position = 0;
+    read_char(l);
+}
+
 void lexer_init(Lexer *l, const char *input) {
     *l = (Lexer) {
-        .input = input,
-        .input_len = strlen(input),
+        .input = NULL,
+        .input_len = 0,
         .ch = 0,
-        .line = 1,
         .position = 0,
         .read_position = 0,
+        .line = 1,
     };
-    read_char(l);
+
+    if (input) {
+        lexer_with(l, input, strlen(input));
+    }
 }
 
 static char peek_char(Lexer *l) {
@@ -76,13 +87,8 @@ static int
 read_while(Lexer *l, check_function *check) {
     int pos = l->position;
 
-    while (l->ch != 0 && check(l->ch)) {
+    while (l->position < l->input_len && check(l->ch)) {
         read_char(l);
-    }
-
-    // if EOF include last character before '\0'
-    if (l->ch == 0) {
-        return l->read_position - pos;
     }
 
     return l->position - pos;

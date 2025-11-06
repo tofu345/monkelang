@@ -31,11 +31,11 @@ struct Parser {
 void parser_init(Parser* p);
 void parser_free(Parser* p);
 
-// Create AST from [program]. Parses until an error is encountered and stored
-// in [p.errors].
-//
-// [p.errors.length] is 0 on success.
+// Create AST from [program], parsing until an error is encountered and stored
+// in [p.errors].  On success, [p.errors.length] is 0.
 Program parse(Parser* p, const char *program);
+Program parse_(Parser* p, const char *program, uint64_t length);
+
 void program_free(Program* p);
 
 enum Precedence {

@@ -64,7 +64,7 @@ void repl(FILE* in, FILE* out) {
             continue;
         }
 
-        prog = parse(&p, input);
+        prog = parse_(&p, input, len);
         if (p.errors.length > 0) {
             print_parser_errors(out, &p);
             program_free(&prog);
@@ -191,8 +191,11 @@ int multigetline(char **input, size_t *input_cap, FILE *in, FILE *out) {
     int len = getline(input, input_cap, in);
     if (len == -1) { return -1; }
 
-    // blank line, only '\n'
-    if (len == 1) { return len; }
+    if (len == 1) {
+        // remove ending '\n'
+        (*input)[0] = '\0';
+        return len;
+    }
 
     // last character before '\n'
     char last_th = (*input)[len - 2];

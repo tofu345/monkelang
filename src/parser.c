@@ -509,7 +509,7 @@ parse_if_expression(Parser* p) {
     }
 
     Node condition = parse_expression(p, p_Lowest);
-    if (IS_INVALID(condition) 
+    if (IS_INVALID(condition)
             || !expect_peek(p, t_Rparen)
             || !expect_peek(p, t_Lbrace)) {
 
@@ -679,6 +679,8 @@ parse_statement(Parser* p) {
 void parser_init(Parser* p) {
     memset(p, 0, sizeof(Parser));
 
+    lexer_init(&p->l, NULL);
+
     p->prefix_parse_fns[t_Ident] = parse_identifier;
     p->prefix_parse_fns[t_Digit] = parse_digit;
     p->prefix_parse_fns[t_Bang] = parse_prefix_expression;
@@ -712,8 +714,9 @@ void parser_free(Parser* p) {
     free(p->errors.data);
 }
 
-Program parse(Parser* p, const char *input) {
-    lexer_init(&p->l, input);
+inline static Program
+_parse(Parser *p, const char *program, uint64_t length) {
+    lexer_with(&p->l, program, length);
     p->cur_token = lexer_next_token(&p->l);
     p->peek_token = lexer_next_token(&p->l);
 
@@ -729,6 +732,14 @@ Program parse(Parser* p, const char *input) {
         next_token(p);
     }
     return prog;
+}
+
+Program parse(Parser* p, const char *program) {
+    return _parse(p, program, strlen(program));
+}
+
+Program parse_(Parser* p, const char *program, uint64_t length) {
+    return _parse(p, program, length);
 }
 
 void program_free(Program* p) {
