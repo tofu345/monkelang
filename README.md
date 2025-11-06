@@ -115,7 +115,7 @@ fn() {
   let num = 1;
   let array = [];
   fn() {
-    // A free variable is non-global variable not defined in the current
+    // A free variable is a non-global variable not defined in the current
     // function.  All functions create shallow copies of their free variables.
 
     // no effect outside this function, only changes the value in the free
