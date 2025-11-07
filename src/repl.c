@@ -50,7 +50,6 @@ void repl(FILE* in, FILE* out) {
     ProgramBuffer programs = {0};
 
     while (1) {
-        fprintf(out, ">> ");
         input = NULL;
         cap = 0;
         len = multigetline(&input, &cap, in, out);
@@ -187,6 +186,8 @@ print_parser_errors(FILE* out, Parser *p) {
 }
 
 int multigetline(char **input, size_t *input_cap, FILE *in, FILE *out) {
+    fprintf(out, ">> ");
+
     // [len] is number of chars read.
     int len = getline(input, input_cap, in);
     if (len == -1) { return -1; }

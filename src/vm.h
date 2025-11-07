@@ -5,21 +5,26 @@
 #include "compiler.h"
 #include "object.h"
 #include "utils.h"
+
 #include <stdint.h>
 
-// When defined, prints allocations, function calls and garbage collection.
-// #define DEBUG_PRINT
-
 // TODO: check for integer overflow, underflow.
+
+// - Perform garbage collection before every allocation to ensure all objects
+//   needed are kept in scope.
+// - Print allocations, function calls and garbage collection.
+#define DEBUG
 
 static const int StackSize = 2048;
 static const int GlobalsSize = 2048;
 static const int MaxFraxes = 1024;
 
 // from wren: Number of bytes allocated before triggering GC.
-static const int NextGC = 1; // FIXME: currently set to trigger GC after every
-                             // allocation to ensure all objects needed are
-                             // kept in scope.
+#ifndef DEBUG
+static const int NextGC = 1024;
+#else
+static const int NextGC = 1;
+#endif
 
 // see [allocation.h]
 typedef struct Allocation {

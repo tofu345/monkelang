@@ -67,7 +67,7 @@ void vm_init(VM *vm, Object *stack, Object *globals, Frame *frames) {
 }
 
 void vm_free(VM *vm) {
-#ifdef DEBUG_PRINT
+#ifdef DEBUG
     if (vm->last) { puts("\ncleaning up:"); }
 #endif
 
@@ -93,8 +93,9 @@ pop_frame(VM *vm) {
 // increment [vm.frames_index] if less than [MaxFraxes]
 static error
 new_frame(VM *vm) {
-    vm->frames_index++;
+    ++vm->frames_index;
     if (vm->frames_index >= MaxFraxes) {
+        --vm->frames_index;
         return new_error("exceeded maximum function call stack");
     }
     return 0;
@@ -463,7 +464,7 @@ vm_push_constant(VM *vm, Constant c) {
                     create_string(vm, str_tok->start, str_tok->length);
                 Object obj = OBJ(o_String, .string = new_str);
 
-#ifdef DEBUG_PRINT
+#ifdef DEBUG
                 printf("create: ");
                 object_fprint(obj, stdout);
                 putc('\n', stdout);
@@ -489,7 +490,7 @@ build_array(VM *vm, int start_index, int end_index) {
 
     Object array = OBJ(o_Array, .array = create_array(vm, data, length));
 
-#ifdef DEBUG_PRINT
+#ifdef DEBUG
     printf("create: ");
     object_fprint(array, stdout);
     putc('\n', stdout);
@@ -527,7 +528,7 @@ build_table(VM *vm, int start_index, int end_index) {
 
     Object obj = OBJ(o_Table, .table = tbl);
 
-#ifdef DEBUG_PRINT
+#ifdef DEBUG
     printf("create: ");
     object_fprint(obj, stdout);
     putc('\n', stdout);
@@ -589,14 +590,10 @@ call_builtin(VM *vm, Builtin *builtin, int num_args) {
     }
 }
 
-static error
-execute_call(VM *vm, int num_args) {
-    Object callee = vm->stack[vm->sp - 1 - num_args];
-
-#ifdef DEBUG_PRINT
-    printf("call: ");
-    object_fprint(callee, stdout);
-    Object *args = vm->stack + vm->sp - num_args;
+#ifdef DEBUG
+static void
+debug_print_args(Object function, Object *args, int num_args) {
+    object_fprint(function, stdout);
     printf(" (");
     int last = num_args - 1;
     for (int i = 0; i < last; i++) {
@@ -607,6 +604,17 @@ execute_call(VM *vm, int num_args) {
         object_fprint(args[last], stdout);
     }
     puts(")");
+}
+#endif
+
+static error
+execute_call(VM *vm, int num_args) {
+    Object callee = vm->stack[vm->sp - 1 - num_args];
+
+#ifdef DEBUG
+    printf("call: ");
+    Object *args = vm->stack + vm->sp - num_args;
+    debug_print_args(callee, args, num_args);
 #endif
 
     switch (callee.type) {
@@ -632,7 +640,7 @@ vm_push_closure(VM *vm, int const_index, int num_free) {
     Closure *closure = create_closure(vm, func, free_variables, num_free);
     Object obj = OBJ(o_Closure, .closure = closure);
 
-#ifdef DEBUG_PRINT
+#ifdef DEBUG
     printf("create: ");
     object_fprint(obj, stdout);
     putc('\n', stdout);
@@ -805,6 +813,14 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 // remove arguments and [Function] from stack.
                 vm->sp = current_frame->base_pointer - 1;
 
+#ifdef DEBUG
+                printf("return: ");
+                debug_print_args(
+                        OBJ(o_Closure, .closure = current_frame->cl),
+                        vm->stack + vm->sp + 1,
+                        current_frame->cl->func->num_parameters);
+#endif
+
                 current_frame = pop_frame(vm);
                 ins = instructions(current_frame);
 
@@ -815,6 +831,14 @@ error vm_run(VM *vm, Bytecode bytecode) {
             case OpReturn:
                 // remove arguments and [Function] from stack.
                 vm->sp = current_frame->base_pointer - 1;
+
+#ifdef DEBUG
+                printf("return: ");
+                debug_print_args(
+                        OBJ(o_Closure, .closure = current_frame->cl),
+                        vm->stack + vm->sp + 1,
+                        current_frame->cl->func->num_parameters);
+#endif
 
                 current_frame = pop_frame(vm);
                 ins = instructions(current_frame);
@@ -894,14 +918,13 @@ Object vm_last_popped(VM *vm) {
     return vm->stack[vm->sp];
 }
 
-// find source code mapping [f.ip] occurs at.
+// Find [SourceMapping] [f.ip] occurs at. The source mapping with highest
+// [position] that is less than [f.ip] with binary search.
 static SourceMapping *
 find_mapping(Frame f) {
     SourceMappingBuffer maps = f.cl->func->mappings;
     assert(maps.length > 0);
 
-    // uses binary search to find [SourceMapping] with highest [position] less
-    // than [f.ip].
     int low = 0,
         high = maps.length - 1;
 
@@ -927,35 +950,74 @@ find_mapping(Frame f) {
     return &maps.data[low];
 }
 
-void print_vm_stack_trace(VM *vm) {
-    for (int i = 0; i <= vm->frames_index; i++) {
-        Frame frame = vm->frames[i];
-        CompiledFunction *func = frame.cl->func;
-
-        if (i == 0) {
-            // main function does not have a [FunctionLiteral].
-            printf("<main function>");
-        } else {
-            FunctionLiteral *lit = func->literal;
-            if (lit->name) {
-                Identifier *id = lit->name;
-                printf("<function: %.*s>", LITERAL(id->tok));
-            } else {
-                printf("<anonymous function>");
-            }
-        }
-
-        SourceMapping *mapping = find_mapping(frame);
-        Token *tok;
-        if (mapping->node.typ == n_LetStatement) {
-            // highlight_token on [LetStatement.value].
-            LetStatement *ls = mapping->node.obj;
-            tok = node_token(ls->value);
-        } else {
-            tok = node_token(mapping->node);
-        }
-
-        printf(", line %d\n", tok->line);
-        highlight_token(tok, 2);
+static void
+_print_function_name(Closure *cl) {
+    FunctionLiteral *lit = cl->func->literal;
+    if (lit == NULL) {
+        printf("<main function>");
+    } else if (lit->name) {
+        Identifier *id = lit->name;
+        printf("<function: %.*s>", LITERAL(id->tok));
+    } else {
+        printf("<anonymous function>");
     }
+}
+
+static Token *
+_token(SourceMapping *mapping) {
+    switch (mapping->node.typ) {
+        case n_LetStatement:
+            {
+                LetStatement *ls = mapping->node.obj;
+                return node_token(ls->value);
+            }
+        default:
+            return node_token(mapping->node);
+    }
+}
+
+static void
+_print_repeats(int first_idx, int cur_idx) {
+    int repeats = cur_idx - first_idx - 1;
+    if (repeats > 1) {
+        printf("[Previous line repeated %d more times]\n", repeats);
+    }
+}
+
+void print_vm_stack_trace(VM *vm) {
+    // Similar to Python, only print a position in the source where recursion
+    // repeats only once.
+
+    Closure *prev = NULL;
+    int prev_ip = -1,
+        prev_idx = 0;
+
+    int idx;
+    SourceMapping *mapping = NULL;
+    for (idx = 0; idx <= vm->frames_index; ++idx) {
+        Frame frame = vm->frames[idx];
+
+        if (frame.cl == prev && frame.ip == prev_ip) {
+            // [frame] stopped at the same position as previous.
+            continue;
+
+        } else {
+            // previous Frame if present, stopped at the same position as
+            // current.
+            mapping = find_mapping(frame);
+
+            _print_repeats(prev_idx, idx);
+            prev = frame.cl;
+            prev_idx = idx;
+            prev_ip = frame.ip;
+        }
+
+        _print_function_name(frame.cl);
+
+        Token *tok = _token(mapping);
+        printf(", line %d\n", tok->line);
+        highlight_token(tok, /* leftpad */ 2);
+    }
+
+    _print_repeats(prev_idx, idx);
 }

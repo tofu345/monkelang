@@ -70,7 +70,7 @@ create_closure(VM *vm, CompiledFunction *func, Object *free, int num_free) {
 }
 
 Object object_copy(VM* vm, Object obj) {
-#ifdef DEBUG_PRINT
+#ifdef DEBUG
     printf("copying: ");
     object_fprint(obj, stdout);
     putc('\n', stdout);
@@ -126,7 +126,7 @@ Object object_copy(VM* vm, Object obj) {
 void mark(Object obj) {
     assert(obj.type >= o_String);
 
-#ifdef DEBUG_PRINT
+#ifdef DEBUG
     printf("mark: ");
     object_fprint(obj, stdout);
     putc('\n', stdout);
@@ -185,7 +185,7 @@ void free_allocation(Allocation *alloc) {
 
     void *obj_data = alloc->object_data;
 
-#ifdef DEBUG_PRINT
+#ifdef DEBUG
     printf("free: ");
     object_fprint(OBJ(alloc->type, .ptr = alloc + 1), stdout);
     putc('\n', stdout);
@@ -220,7 +220,7 @@ void mark_objs(Object *objs, int len) {
             trace_mark_object(objs[i]);
         }
 
-#ifdef DEBUG_PRINT
+#ifdef DEBUG
         if (objs[i].type < o_String) {
             printf("skip: ");
             object_fprint(objs[i], stdout);
@@ -231,19 +231,19 @@ void mark_objs(Object *objs, int len) {
 }
 
 void mark_and_sweep(VM *vm) {
-#ifdef DEBUG_PRINT
+#ifdef DEBUG
     puts("stack:");
 #endif
 
     mark_objs(vm->stack, vm->sp);
 
-#ifdef DEBUG_PRINT
+#ifdef DEBUG
     puts("\nglobals:");
 #endif
 
     mark_objs(vm->globals, vm->num_globals);
 
-#ifdef DEBUG_PRINT
+#ifdef DEBUG
     puts("\nsweep:");
 #endif
 
@@ -266,7 +266,7 @@ void mark_and_sweep(VM *vm) {
     }
     vm->last = prev_marked;
 
-#ifdef DEBUG_PRINT
+#ifdef DEBUG
     putc('\n', stdout);
 #endif
 }
@@ -274,7 +274,7 @@ void mark_and_sweep(VM *vm) {
 void *vm_allocate(VM *vm, size_t size) {
     vm->bytesTillGC -= size;
     if (vm->bytesTillGC <= 0) {
-#ifdef DEBUG_PRINT
+#ifdef DEBUG
         if (vm->last) {
             putc('\n', stdout);
             printf("starting mark_and_sweep\n");
