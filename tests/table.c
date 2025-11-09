@@ -10,7 +10,7 @@ void setUp(void) {}
 void tearDown(void) {}
 
 static void
-expect_set(table *tbl, Object key, Object val) {
+expect_set(Table *tbl, Object key, Object val) {
     Object res = table_set(tbl, key, val);
     if (res.type == o_Null) {
         printf("table_set fail: ");
@@ -23,7 +23,7 @@ expect_set(table *tbl, Object key, Object val) {
 }
 
 static void
-expect_get(table *tbl, Object key, Object expected_val) {
+expect_get(Table *tbl, Object key, Object expected_val) {
     Object res = table_get(tbl, key);
     bool equal =
         res.type == expected_val.type
@@ -42,7 +42,7 @@ expect_get(table *tbl, Object key, Object expected_val) {
 
 static void
 test_table_set(void) {
-    table tbl;
+    Table tbl;
     if (table_init(&tbl) == NULL) die("malloc");
 
     Object one = OBJ(o_Integer, 1);
@@ -70,7 +70,7 @@ test_table_set(void) {
 
 static void
 test_table_iterator(void) {
-    table tbl;
+    Table tbl;
     if (table_init(&tbl) == NULL) die("malloc");
 
     int num = 15;
@@ -102,7 +102,7 @@ test_table_iterator(void) {
 
 static void
 test_table_expand(void) {
-    table tbl;
+    Table tbl;
     if (table_init(&tbl) == NULL) die("malloc");
 
     int num = 129;

@@ -27,7 +27,8 @@ typedef struct {
     ConstantBuffer constants;
 
     // The Symbol Table of the current CompilationScope.  A new SymbolTable is
-    // created for the each function encountered and destroyed when completed.
+    // created for the each function encountered and destroyed when its
+    // compilation is completed.
     SymbolTable *current_symbol_table;
 
     // List of Functions currently being compiled.
