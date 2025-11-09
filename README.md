@@ -96,21 +96,17 @@ let fibonacci = fn(num) {
 
     // Assignment to Table Keys.
     seen[num] = res;
-
     return res;
   };
   fib(num);
 };
 puts("fibonacci(50):", fibonacci(50)); // => fibonacci(50): 12586269025
 
-
 let array = [1, 2, 3];
 
 // Assignment at array indices.
 array[0] = 5;
-
 puts("array is", array); // => array is [5, 2, 3]
-
 
 // Assignment to global variables inside functions.
 let global = 1;
@@ -118,7 +114,6 @@ fn() {
   global = 2;
 }()
 puts("global is", global) // => global is 2
-
 
 // Assignment to free variables.
 fn() {
