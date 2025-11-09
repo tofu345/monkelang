@@ -7,15 +7,15 @@
 #include <stdio.h>
 
 typedef enum {
-    // `OpConstant N`: push the constant at index `N` in the constant buffer
+    // OpConstant: push the constant at specified index in the constant buffer
     // onto the stack.
     OpConstant = 1,
 
-    // `OpPop`: remove the value at the top of the stack.
+    // OpPop: remove the value at the top of the stack.
     OpPop,
 
-    // These Opcodes pop two Objects off the stack, perform a binary operation
-    // on them and push the result back onto on the stack.
+    // Pop two Objects off the stack, perform a binary operation and push the
+    // result back onto on the stack.
     OpAdd,
     OpSub,
     OpMul,
@@ -24,8 +24,8 @@ typedef enum {
     OpNotEqual,
     OpGreaterThan,
 
-    // These Opcodes pop an Object off the stack, perform an operation and then
-    // push the result onto the stack.
+    // Pop an Object off the stack, perform an operation and push the result
+    // onto the stack.
     OpMinus,
     OpBang,
 
@@ -33,69 +33,79 @@ typedef enum {
     OpFalse, // Push a [false] Boolean Object.
     OpNull, // Push a Null Object.
 
-    // `OpJumpNotTruthy N`: pop an Object, and jump to position `N` in the
+    // OpJumpNotTruthy: pop an Object, and jump to specified position in the
     // current functions instructions if the Object [is_truthy], see vm.h.
     OpJumpNotTruthy,
 
-    // `OpJump N`: jump to position `N` in the current functions instructions.
+    // OpJump: jump to specified position in the current functions
+    // instructions.
     OpJump,
 
-    // Get or set the Object in the global variable list.
+    // Get or set the Object at the specified index in the global variable list.
     OpGetGlobal,
     OpSetGlobal,
 
-    // Get or set the Object in the current function local variables.
+    // Get or set the Object at the specified index in the current function
+    // local variables.
     OpGetLocal,
     OpSetLocal,
 
-    // Get or set the Object in the current function free variable list.
+    // Get or set the Object at the specified index in the current function
+    // free variable list.
     OpGetFree,
     OpSetFree,
 
-    // `OpArray N`: create an Array Object with `N` elements on the stack.
+    // OpArray: create an Array Object with specified number of elements on the
+    // stack.
     OpArray,
 
-    // `OpTable N`: create a Table Object with `N` elements on the stack,
-    // stored in key-value pairs.
+    // OpTable: create a Table Object with specified number of elements on the
+    // stack, stored in key-value pairs.
     OpTable,
 
-    // `OpIndex` Pop two Objects `A` and `B`. Get:
+    // OpIndex:
     //
-    // - the value of array `A` at index `B`, or
-    // - the value of table `A` at key `B`.
+    // Pop two Objects `A` and `B`.
+    // - get the value of array `A` at index `B`, or
+    // - get the value of table `A` at key `B`.
     OpIndex,
 
-    // `OpSetIndex` Pop three Objects `A`, `B` and `C`. Set:
+    // OpSetIndex:
     //
-    // - the value of array `A` at index `B` to `C`, or
-    // - the value of table `A` at key `B` to `C`.
-    //   NOTE: if `C` is null the key `B` is removed from the table.
+    // Pop three Objects `A`, `B` and `C`.
+    //
+    // - set the value of array `A` at index `B` to `C`, or
+    //
+    // - set the value of table `A` at key `B` to `C`.
+    //   NOTE: if `C` is null the key `B` is removed from table `A`.
     OpSetIndex,
 
-    // `OpCall N`: call a Compiled or Builtin function with `N` arguments.
+    // OpCall: call a Compiled or Builtin function with specified number of
+    // arguments.
     //
     // The calling convention for a function is as follows: the Object
     // containing the function is pushed onto the stack, followed by its
     // arguments and an OpCall with `N` arguments.
     OpCall,
 
-    // `OpReturnValue`: pop an Object of the top of stack, return to the
-    // previous Frame and push the popped Object onto the stack.
+    // OpReturnValue: pop an Object of the top of stack, return to the previous
+    // Frame and push the popped Object onto the stack.
     OpReturnValue,
 
-    // `OpReturn`: return to the previous Frame and push a Null Object onto the
+    // OpReturn: return to the previous Frame and push a Null Object onto the
     // stack.
     OpReturn,
 
-    // `OpGetBuiltin N`: Push the Builtin Function with index `N` onto the
+    // OpGetBuiltin: Push the Builtin Function with specified index onto the
     // stack.
     OpGetBuiltin,
 
-    // `OpClosure M N`: Create a Closure with the Compiled Function at index
-    // `M` in the constants list with `N` free variable on the stack.
+    // OpClosure: Create a Closure with the Compiled Function at specified
+    // index in the constants list with specified number of free variable on
+    // the stack.
     OpClosure,
 
-    // `OpCurrentClosure`: Push an Object containing the Closure of the current
+    // OpCurrentClosure: Push an Object containing the Closure of the current
     // Frame.
     OpCurrentClosure,
 } Opcode;

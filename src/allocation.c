@@ -132,7 +132,7 @@ void mark(Object obj) {
     putc('\n', stdout);
 #endif
 
-    // access [Alloc] prepended to ptr with [vm_allocate]
+    // access Allocation prepended to ptr with [vm_allocate]
     Allocation *alloc = ((Allocation *)obj.data.ptr) - 1;
     alloc->is_marked = true;
 }
@@ -187,7 +187,7 @@ void free_allocation(Allocation *alloc) {
 
 #ifdef DEBUG
     printf("free: ");
-    object_fprint(OBJ(alloc->type, .ptr = alloc + 1), stdout);
+    object_fprint(OBJ(alloc->type, .ptr = obj_data), stdout);
     putc('\n', stdout);
 #endif
 
