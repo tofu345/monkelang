@@ -7,7 +7,7 @@
 #include <assert.h>
 #include <stdio.h>
 
-// [vm_allocate()] and prepend [Allocation] with [type].
+// [vm_allocate()], memset 0 and create [Allocation] with [type].
 static void *new_allocation(VM *vm, ObjectType type, size_t size);
 
 CharBuffer *create_string(VM *vm, const char *text, int length) {
@@ -45,8 +45,8 @@ ObjectBuffer *create_array(VM *vm, Object *data, int length) {
     return buf;
 }
 
-table *create_table(VM *vm) {
-    table *tbl = new_allocation(vm, o_Table, sizeof(table));
+Table *create_table(VM *vm) {
+    Table *tbl = new_allocation(vm, o_Table, sizeof(Table));
     void *err = table_init(tbl);
     if (err == NULL) { die("create_table"); }
     return tbl;
@@ -104,7 +104,7 @@ Object object_copy(VM* vm, Object obj) {
 
         case o_Table:
             {
-                table *new_tbl = create_table(vm);
+                Table *new_tbl = create_table(vm);
                 tbl_it it;
                 tbl_iterator(&it, obj.data.table);
                 while (tbl_next(&it)) {
@@ -301,7 +301,5 @@ new_allocation(VM *vm, ObjectType type, size_t size) {
     };
     vm->last = ptr;
 
-    void *obj_data = ptr->object_data;
-    memset(obj_data, 0, size);
-    return obj_data;
+    return ptr->object_data;
 }

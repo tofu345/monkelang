@@ -82,33 +82,43 @@ hello("dear, future Reader!"); // => Hello dear, future Reader!
 ### Differences
 
 ```javascript
-// Index Assignments.
 let fibonacci = fn(num) {
   let seen = {0: 0, 1: 1};
   let fib = fn(num) {
     let res = seen[num];
-    if (res != null) { // null literals
+
+    // null literals
+    if (res != null) {
       return res;
     }
 
     res = fib(num - 1) + fib(num - 2);
+
+    // Assignment to Table Keys.
     seen[num] = res;
+
     return res;
   };
   fib(num);
 };
 puts("fibonacci(50):", fibonacci(50)); // => fibonacci(50): 12586269025
 
+
 let array = [1, 2, 3];
+
+// Assignment at array indices.
 array[0] = 5;
+
 puts("array is", array); // => array is [5, 2, 3]
 
-// Assignment to global variables.
+
+// Assignment to global variables inside functions.
 let global = 1;
 fn() {
   global = 2;
 }()
 puts("global is", global) // => global is 2
+
 
 // Assignment to free variables.
 fn() {

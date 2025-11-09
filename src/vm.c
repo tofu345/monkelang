@@ -345,7 +345,7 @@ execute_array_index(VM *vm, Object array, Object index) {
 
 static error
 execute_table_index(VM *vm, Object obj, Object index) {
-    table *tbl = obj.data.table;
+    Table *tbl = obj.data.table;
     if (!hashable(index)) {
         return new_error("unusable as table key: %s",
                 show_object_type(index.type));
@@ -388,7 +388,7 @@ execute_set_array_index(Object array, Object index,
 
 static error
 execute_set_table_index(Object obj, Object index, Object val) {
-    table *tbl = obj.data.table;
+    Table *tbl = obj.data.table;
     if (!hashable(index)) {
         return new_error("unusable as table key: %s",
                 show_object_type(index.type));
@@ -422,28 +422,6 @@ execute_set_index(VM *vm) {
     } else {
         return new_error("index assignment not supported for %s[%s]",
                 show_object_type(left.type), show_object_type(index.type));
-    }
-}
-
-bool is_truthy(Object obj) {
-    switch (obj.type) {
-        case o_Boolean:
-            return obj.data.boolean;
-        case o_Null:
-            return false;
-
-        case o_Array:
-            return obj.data.array->length > 0;
-        case o_Table:
-            return obj.data.table->length > 0;
-
-        case o_Integer:
-            return obj.data.integer != 0;
-        case o_Float:
-            return obj.data.floating != 0;
-
-        default:
-            return true;
     }
 }
 
@@ -501,7 +479,7 @@ build_array(VM *vm, int start_index, int end_index) {
 
 static Object
 build_table(VM *vm, int start_index, int end_index) {
-    table *tbl = create_table(vm);
+    Table *tbl = create_table(vm);
 
     Object key, val;
     for (int i = start_index; i < end_index; i += 2) {
@@ -603,7 +581,7 @@ debug_print_args(Object function, Object *args, int num_args) {
     if (num_args >= 1) {
         object_fprint(args[last], stdout);
     }
-    puts(")");
+    printf(")");
 }
 #endif
 
@@ -615,6 +593,7 @@ execute_call(VM *vm, int num_args) {
     printf("call: ");
     Object *args = vm->stack + vm->sp - num_args;
     debug_print_args(callee, args, num_args);
+    putc('\n', stdout);
 #endif
 
     switch (callee.type) {
@@ -819,6 +798,9 @@ error vm_run(VM *vm, Bytecode bytecode) {
                         OBJ(o_Closure, .closure = current_frame->cl),
                         vm->stack + vm->sp + 1,
                         current_frame->cl->func->num_parameters);
+                printf(" -> ");
+                object_fprint(obj, stdout);
+                putc('\n', stdout);
 #endif
 
                 current_frame = pop_frame(vm);
@@ -838,6 +820,8 @@ error vm_run(VM *vm, Bytecode bytecode) {
                         OBJ(o_Closure, .closure = current_frame->cl),
                         vm->stack + vm->sp + 1,
                         current_frame->cl->func->num_parameters);
+                printf(" -> null");
+                putc('\n', stdout);
 #endif
 
                 current_frame = pop_frame(vm);

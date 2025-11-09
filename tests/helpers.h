@@ -17,7 +17,7 @@ typedef struct {
 #define NO_CONSTANTS (Constants){0}
 #define _I(...) concat(__VA_ARGS__, NULL)
 
-Instructions *concat(Instructions cur, ...);
+Instructions concat(Instructions first, ...);
 Constants constants(Test *t, ...);
 
 Program test_parse(const char *input);

@@ -36,7 +36,7 @@
 #define IS_NULL(obj) (obj.type == o_Null)
 
 typedef struct Object Object;
-typedef struct table table;
+typedef struct Table Table;
 typedef struct Closure Closure;
 typedef struct Builtin Builtin;
 
@@ -68,7 +68,7 @@ typedef union {
 
     CharBuffer* string;
     ObjectBuffer* array;
-    table* table;
+    Table* table;
     Closure *closure;
     const Builtin *builtin;
 
@@ -82,7 +82,19 @@ struct Object {
     ObjectData data;
 };
 
-const char* show_object_type(ObjectType t);
+struct Closure {
+    CompiledFunction *func;
+
+    int num_free;
+    Object free[];
+};
+
+// Truthy:
+// - boolean true
+// - numbers not 0 (C-like)
+// - arrays and tables with any number of elements
+// - everything else except null.
+bool is_truthy(Object obj);
 
 // compare [left] and [right]. returns [Null Object] otherwise
 Object object_eq(Object left, Object right);
@@ -90,9 +102,4 @@ Object object_eq(Object left, Object right);
 // print [Object] to [fp], returns -1 on error
 int object_fprint(Object o, FILE* fp);
 
-struct Closure {
-    CompiledFunction *func;
-
-    int num_free;
-    Object free[];
-};
+const char* show_object_type(ObjectType t);

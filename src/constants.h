@@ -1,7 +1,6 @@
 #pragma once
 
-// This module contains definitions for constants created by the
-// Compiler.
+// This module contains definitions for constants created by the Compiler.
 
 #include "ast.h"
 #include "code.h"

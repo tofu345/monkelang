@@ -1,6 +1,7 @@
 #include "unity/unity.h"
 #include "helpers.h"
 
+#include <stdint.h>
 #include <string.h>
 
 void print_parser_errors(Parser *p) {
@@ -16,34 +17,39 @@ void print_parser_errors(Parser *p) {
 Program test_parse(const char *input) {
     Parser p;
     parser_init(&p);
+
     Program prog = parse(&p, input);
     if (p.errors.length > 0) {
         printf("test %s\n", input);
         print_parser_errors(&p);
+
+        program_free(&prog);
         parser_free(&p);
         TEST_FAIL();
     }
+
     parser_free(&p);
     return prog;
 }
 
-Instructions *
-concat(Instructions cur, ...) {
-    Instructions *concatted = malloc(sizeof(Instructions));
-    if (concatted == NULL) { die("malloc"); }
-    memcpy(concatted, &cur, sizeof(Instructions));
+Instructions concat(Instructions first, ...) {
+    Instructions concatted = first;
+    uint8_t *data;
+    int length, offset;
 
     va_list ap;
-    int offset;
-    va_start(ap, cur);
+    va_start(ap, first);
     while (1) {
-        cur = va_arg(ap, Instructions);
-        if (cur.data == NULL) break;
+        offset = concatted.length;
 
-        offset = concatted->length;
-        instructions_allocate(concatted, cur.length);
-        memcpy(concatted->data + offset, cur.data, cur.length * sizeof(uint8_t));
-        free(cur.data);
+        // read data and length of Instructions
+        data = va_arg(ap, uint8_t *); // read first 8 bytes.
+        if (data == NULL) break;
+        length = va_arg(ap, int); // read remaining 8 bytes, ignoring capacity.
+
+        instructions_allocate(&concatted, length);
+        memcpy(concatted.data + offset, data, length);
+        free(data);
     }
     va_end(ap);
     return concatted;
@@ -51,21 +57,22 @@ concat(Instructions cur, ...) {
 
 Constants
 constants(Test *t, ...) {
-    va_list ap;
-    int length = 0, capacity = 8;
-    Test *buf = malloc(capacity * sizeof(Constant));
-    if (buf == NULL) { die("malloc"); }
+    Constants c = {0};
+    int capacity = 0;
 
+    va_list ap;
     va_start(ap, t);
     do {
-        if (length >= capacity) {
-            buf = realloc(buf, capacity *= 2);
-            if (buf == NULL) die("realloc");
+        if (c.length == capacity) {
+            capacity = power_of_2_ceil(c.length + 1);
+            c.data = realloc(c.data, capacity * sizeof(Test));
+            if (c.data == NULL) die("realloc");
         }
 
-        buf[length++] = *t;
+        c.data[c.length++] = *t;
         t = va_arg(ap, Test *);
     } while (t);
     va_end(ap);
-    return (Constants){ buf, length };
+
+    return c;
 }

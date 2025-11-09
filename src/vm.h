@@ -13,7 +13,7 @@
 // - Perform garbage collection before every allocation to ensure all objects
 //   needed are kept in scope.
 // - Print allocations, function calls and garbage collection.
-#define DEBUG
+// #define DEBUG
 
 static const int StackSize = 2048;
 static const int GlobalsSize = 2048;
@@ -25,15 +25,6 @@ static const int NextGC = 1024;
 #else
 static const int NextGC = 1;
 #endif
-
-// see [allocation.h]
-typedef struct Allocation {
-    ObjectType type;
-    bool is_marked;
-    struct Allocation *next;
-
-    void *object_data[]; // used to access data after struct.
-} Allocation;
 
 // A Function call.
 typedef struct {
@@ -48,6 +39,8 @@ typedef struct {
     // objects from scope.
     int base_pointer;
 } Frame;
+
+typedef struct Allocation Allocation;
 
 typedef struct {
     // A copy of the Bytecode Constants for (hopefully) faster retrieval.
@@ -75,7 +68,7 @@ typedef struct {
     Closure *main_cl;
 } VM;
 
-// if [stack], [globals] or [frames] are NULL, allocate.
+// Initialize VM. if [stack], [globals] or [frames] are NULL, allocate.
 void vm_init(VM *vm, Object *stack, Object *globals, Frame *frames);
 
 error vm_run(VM *vm, Bytecode bytecode);
@@ -88,10 +81,3 @@ Object vm_last_popped(VM *vm);
 // Print where an error occured when [vm_run] exited, using instruction
 // pointers and SourceMapping of Frames in the Function call stack.
 void print_vm_stack_trace(VM *vm);
-
-// Truthy:
-// - boolean true
-// - numbers not 0 (C-like)
-// - arrays and tables with more than 1 element
-// - everything else except null.
-bool is_truthy(Object obj);

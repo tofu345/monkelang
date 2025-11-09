@@ -94,8 +94,8 @@ test_string_expressions(void) {
     vm_test("\"mon\" + \"key\" + \"banana\"", TEST(str, "monkeybanana"));
 }
 
-// create *NULL-terminated* array of integers.
-static TestArray *make_test_array(int n, ...);
+// create NULL-terminated (0-terminated) array of integers.
+static TestArray make_test_array(int n, ...);
 #define TEST_ARR(...) TEST(arr, make_test_array(__VA_ARGS__, 0))
 
 static void
@@ -249,7 +249,7 @@ test_calling_functions_without_bindings(void) {
         "\
             let globalSeed = 50;\
             let minusOne = fn() {\
-            let num = 1;\
+                let num = 1;\
                 globalSeed - num;\
             }\
             let minusTwo = fn() {\
@@ -519,6 +519,8 @@ test_assign_expressions(void) {
 
     // assign index expressions
     vm_test("let arr = [1, 2, 3]; arr[0] = 5; arr[0]", TEST(int, 5));
+
+    // table key removal
     vm_test(
         "\
         let hash = {1: 2, 3: 4};\
@@ -545,32 +547,85 @@ test_assign_expressions(void) {
     );
 }
 
-static TestArray *
+static void
+test_free_variable_list(void) {
+    // has effect
+    vm_test(
+        "\
+        fn() {\
+            let arr = [];\
+            fn() { push(arr, 1); }()\
+            arr\
+        }()\
+        ",
+        TEST_ARR(1)
+    );
+    vm_test(
+        "\
+        fn() {\
+            let arr = [1, 2, 3];\
+            fn() { arr[0] = 4; }()\
+            arr\
+        }()\
+        ",
+        TEST_ARR(4, 2, 3)
+    );
+    vm_test(
+        "\
+        fn() {\
+            let tbl = {1: 2, 3: 4}\
+            fn() { tbl[1] = true; }()\
+            tbl[1]\
+        }()\
+        ",
+        TEST(bool, true)
+    );
+
+    // no effect
+    vm_test(
+        "\
+        fn() {\
+            let arr = [];\
+            fn() { arr = [1]; }()\
+            arr\
+        }()\
+        ",
+        TEST_ARR(0) // empty
+    );
+    vm_test(
+        "\
+        fn() {\
+            let num = 1;\
+            fn() { num = 2; }()\
+            num\
+        }()\
+        ",
+        TEST(int, 1) // empty
+    );
+}
+
+static TestArray
 make_test_array(int n, ...) {
+    TestArray arr = {0};
+    int capacity = 0;
+
+    if (n == 0) { return arr; }
+
     va_list ap;
-    int length = 0, capacity = 8;
-    TestArray *nums = malloc(sizeof(TestArray));
-    if (nums == NULL) { die("test_array: malloc"); }
-    nums->data = malloc(capacity * sizeof(int));
-    if (nums->data == NULL) { die("test_array: malloc arr data"); }
-
-    if (n == 0) {
-        nums->length = 0;
-        return nums;
-    }
-
     va_start(ap, n);
     do {
-        if (length >= capacity) {
-            nums = realloc(nums, capacity *= 2);
-            if (nums == NULL) die("realloc");
+        if (arr.length == capacity) {
+            capacity = power_of_2_ceil(arr.length + 1);
+            arr.data = realloc(arr.data, capacity * sizeof(int));
+            if (arr.data == NULL) die("realloc");
         }
-        nums->data[length++] = n;
+
+        arr.data[arr.length++] = n;
         n = va_arg(ap, int);
     } while (n != 0);
     va_end(ap);
-    nums->length = length;
-    return nums;
+
+    return arr;
 }
 
 static bool
@@ -671,23 +726,23 @@ test_expected_object(Test expected, Object actual) {
                 }
 
                 ObjectBuffer *arr = actual.data.ptr;
-                if (expected.val._arr->length != arr->length) {
+                TestArray exp_arr = expected.val._arr;
+
+                if (exp_arr.length != arr->length) {
                     printf("wrong number of elements. want=%d, got=%d\n",
-                            expected.val._arr->length, arr->length);
+                            exp_arr.length, arr->length);
                     return -1;
                 }
 
                 int err;
-                for (int i = 0; i < expected.val._arr->length; i++) {
-                    err = test_integer_object(expected.val._arr->data[i],
-                            arr->data[i]);
+                for (int i = 0; i < exp_arr.length; i++) {
+                    err = test_integer_object(exp_arr.data[i], arr->data[i]);
                     if (err != 0) {
                         printf("test array element %d: test_integer_object failed", i);
                         return -1;
                     }
                 }
-                free(expected.val._arr->data);
-                free(expected.val._arr);
+                free(expected.val._arr.data);
                 return 0;
             }
 
@@ -697,9 +752,10 @@ test_expected_object(Test expected, Object actual) {
                     return -1;
                 }
 
-                table *tbl = actual.data.table;
-                TestArray *exp = expected.val._arr;
-                size_t num_pairs = exp->length / 2;
+                Table *tbl = actual.data.table;
+                TestArray exp_pairs = expected.val._arr;
+
+                size_t num_pairs = exp_pairs.length / 2;
                 if (num_pairs != tbl->length) {
                     printf("wrong number of elements. want=%zu, got=%zu\n",
                             num_pairs, tbl->length);
@@ -708,22 +764,23 @@ test_expected_object(Test expected, Object actual) {
 
                 // test `tbl[expected key]` == `expected value`
                 int err;
-                for (int i = 0; i + 1 < exp->length; i += 2) {
-                    Object value = table_get(tbl, OBJ(o_Integer, exp->data[i]));
+                for (int i = 0; i + 1 < exp_pairs.length; i += 2) {
+                    Object value =
+                        table_get(tbl, OBJ(o_Integer, exp_pairs.data[i]));
+
                     if (value.type == o_Null) {
                         printf("no pair for key %d", i);
                         return -1;
                     }
 
-                    err = test_integer_object(exp->data[i + 1], value);
+                    err = test_integer_object(exp_pairs.data[i + 1], value);
                     if (err != 0) {
                         printf("test table element %d failed", i);
                         return -1;
                     }
                 }
 
-                free(exp->data);
-                free(exp);
+                free(exp_pairs.data);
                 return 0;
             }
 
@@ -738,9 +795,12 @@ static void
 vm_test(char *input, Test *expected) {
     bool fail = false;
 
+    Program prog = test_parse(input);
+
     Compiler c;
     compiler_init(&c);
-    Program prog = test_parse(input);
+    VM vm;
+    vm_init(&vm, NULL, NULL, NULL);
 
     Error *err = compile(&c, &prog);
     if (err) {
@@ -773,9 +833,6 @@ vm_test(char *input, Test *expected) {
     // }
     // putc('\n', stdout);
 
-    VM vm;
-    vm_init(&vm, NULL, NULL, NULL);
-
     error e = vm_run(&vm, bytecode(&c));
     if (e) {
         printf("vm error: %s\n", e);
@@ -790,9 +847,8 @@ vm_test(char *input, Test *expected) {
         fail = true;
     }
 
-    vm_free(&vm);
-
 cleanup:
+    vm_free(&vm);
     program_free(&prog);
     compiler_free(&c);
 
@@ -806,9 +862,10 @@ static void
 vm_test_error(char *input, char *expected_error) {
     bool fail = false;
 
+    Program prog = test_parse(input);
+
     Compiler c;
     compiler_init(&c);
-    Program prog = test_parse(input);
 
     Error *err = compile(&c, &prog);
     if (err) {
@@ -866,5 +923,6 @@ int main(void) {
     RUN_TEST(test_recursive_functions);
     RUN_TEST(test_recursive_fibonacci);
     RUN_TEST(test_assign_expressions);
+    RUN_TEST(test_free_variable_list);
     return UNITY_END();
 }

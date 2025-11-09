@@ -14,7 +14,7 @@ void tearDown(void) {}
 static void c_test(
     char *input,
     Constants expectedConstants,
-    Instructions *expectedInstructions
+    Instructions expectedInstructions
 );
 static void c_test_error(const char *input, const char *expected_error);
 
@@ -1011,7 +1011,7 @@ void test_compiler_errors(void) {
     );
 }
 
-static int test_instructions(Instructions *expected, Instructions *actual);
+static int test_instructions(Instructions expected, Instructions actual);
 static int test_constants(Constants expected, ConstantBuffer *actual);
 
 static void
@@ -1036,8 +1036,8 @@ c_test_error(const char *input, const char *expected_error) {
     }
 
 cleanup:
-    program_free(&prog);
     compiler_free(&c);
+    program_free(&prog);
     if (err) { free_error(err); }
 
     if (fail) {
@@ -1050,7 +1050,7 @@ static void
 c_test(
     char *input,
     Constants expectedConstants,
-    Instructions *expectedInstructions
+    Instructions expectedInstructions
 ) {
     bool fail = false;
 
@@ -1070,7 +1070,7 @@ c_test(
 
     Bytecode code = bytecode(&c);
     int res = test_instructions(expectedInstructions,
-            &code.main_function->instructions);
+            code.main_function->instructions);
 
     if (res != 0) {
         fail = true;
@@ -1083,18 +1083,15 @@ c_test(
     }
 
 cleanup:
+    compiler_free(&c);
     program_free(&prog);
-    free(expectedInstructions->data);
-    free(expectedInstructions);
+    free(expectedInstructions.data);
     for (int i = 0; i < expectedConstants.length; i++) {
         if (expectedConstants.data[i].typ == test_ins) {
-            Instructions *ins = expectedConstants.data[i].val._ins;
-            free(ins->data);
-            free(ins);
+            free(expectedConstants.data[i].val._ins.data);
         }
     }
     free(expectedConstants.data);
-    compiler_free(&c);
 
     if (fail) {
         printf("in test: '%s'\n\n", input);
@@ -1103,23 +1100,23 @@ cleanup:
 }
 
 static int
-test_instructions(Instructions *expected, Instructions *actual) {
-    if (actual->length != expected->length) {
+test_instructions(Instructions expected, Instructions actual) {
+    if (actual.length != expected.length) {
         printf("wrong instructions length.\nwant=\n");
-        fprint_instructions(stdout, *expected);
+        fprint_instructions(stdout, expected);
         printf("got=\n");
-        fprint_instructions(stdout, *actual);
+        fprint_instructions(stdout, actual);
         return -1;
     }
 
-    for (int i = 0; i < expected->length; i++) {
-        if (actual->data[i] != expected->data[i]) {
+    for (int i = 0; i < expected.length; i++) {
+        if (actual.data[i] != expected.data[i]) {
             printf("wrong instruction at %d. want=%d, got=%d\n",
-                    i, expected->data[i], actual->data[i]);
+                    i, expected.data[i], actual.data[i]);
             printf("want=\n");
-            fprint_instructions(stdout, *expected);
+            fprint_instructions(stdout, expected);
             printf("got=\n");
-            fprint_instructions(stdout, *actual);
+            fprint_instructions(stdout, actual);
             return -1;
         }
     }
@@ -1201,7 +1198,7 @@ test_constants(Constants expected, ConstantBuffer *actual) {
                 }
 
                 CompiledFunction *func = cur.data.function;
-                err = test_instructions(exp.val._ins, &func->instructions);
+                err = test_instructions(exp.val._ins, func->instructions);
                 if (err != 0) {
                     printf("constant %d - test_instructions failed\n", i);
                     return -1;

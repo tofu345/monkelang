@@ -60,7 +60,7 @@ fprint_array(ObjectBuffer *array, FILE* fp) {
 }
 
 static int
-fprint_table(table *tbl, FILE* fp) {
+fprint_table(Table *tbl, FILE* fp) {
     FPRINTF(fp, "{");
     tbl_it it;
     tbl_iterator(&it, tbl);
@@ -132,6 +132,28 @@ int object_fprint(Object o, FILE* fp) {
             fprintf(stderr, "object_fprint: object type not handled %d\n",
                     o.type);
             exit(1);
+    }
+}
+
+bool is_truthy(Object obj) {
+    switch (obj.type) {
+        case o_Boolean:
+            return obj.data.boolean;
+        case o_Null:
+            return false;
+
+        case o_Array:
+            return obj.data.array->length > 0;
+        case o_Table:
+            return obj.data.table->length > 0;
+
+        case o_Integer:
+            return obj.data.integer != 0;
+        case o_Float:
+            return obj.data.floating != 0;
+
+        default:
+            return true;
     }
 }
 

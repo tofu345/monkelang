@@ -24,8 +24,8 @@ typedef union {
     double _float;
     char* _str;
     bool _bool;
-    TestArray *_arr;
-    Instructions *_ins;
+    TestArray _arr;
+    Instructions _ins;
 } Value;
 
 typedef struct {

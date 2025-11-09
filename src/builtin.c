@@ -55,7 +55,7 @@ builtin_len(__attribute__ ((unused)) VM *vm, Object *args, int num_args) {
 
         case o_Table:
             {
-                table* tbl = args[0].data.table;
+                Table* tbl = args[0].data.table;
                 return OBJ(o_Integer, tbl->length);
             }
 

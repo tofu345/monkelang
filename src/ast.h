@@ -1,7 +1,6 @@
 #pragma once
 
-// This module contains the definitions for the AST produced by the
-// Parser.
+// This module contains the definitions for the AST produced by the Parser.
 
 #include "utils.h"
 #include "token.h"
