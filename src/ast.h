@@ -58,7 +58,6 @@ typedef struct {
 // Returns -1 on write to FILE err
 int program_fprint(Program* p, FILE* fp);
 
-// TODO: store [Identifiers] in hashmap
 typedef struct {
     Token tok; // the 't_Ident' token
     uint64_t hash;

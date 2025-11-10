@@ -44,7 +44,6 @@ typedef enum {
     c_Function,
 } ConstantType;
 
-// TODO: remove duplicate constants
 typedef struct {
     ConstantType type;
     union {

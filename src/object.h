@@ -23,10 +23,6 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-// TODO:
-// - char datatype
-// - support Unicode and emoji's
-
 #define OBJ(t, d) (Object){ .type = t, .data = { d } }
 #define ERR(...) OBJ(o_Error, .err = new_error(__VA_ARGS__))
 #define BOOL(b) OBJ(o_Boolean, .boolean = b)

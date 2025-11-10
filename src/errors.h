@@ -9,7 +9,6 @@ typedef char *error;
 error new_error(const char* format, ...);
 error error_num_args(const char *name, int expected, int actual);
 
-// TODO
 // typedef enum {
 //     SyntaxError,
 //     CompilationError,

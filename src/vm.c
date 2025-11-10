@@ -29,7 +29,6 @@ instructions(Frame *f) {
     return f->cl->func->instructions;
 }
 
-// TODO: better error message
 static error
 error_unknown_operation(Opcode op, Object left, Object right) {
     return new_error("unkown operation: %s %s %s",

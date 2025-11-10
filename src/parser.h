@@ -20,8 +20,6 @@ struct Parser {
 
     ErrorBuffer errors;
 
-    // TODO: change and reduce array size.
-
     // [t_Return] must remain the last [TokenType].
     // It cannot have a [PrefixParseFn] or [InfixParseFn].
     PrefixParseFn *prefix_parse_fns[t_Return];

@@ -23,7 +23,6 @@ static void print_parser_errors(FILE* out, Parser *p);
 // to read in [in].
 int multigetline(char **input, size_t *input_cap, FILE *in, FILE *out);
 
-// TODO: repl tests
 void repl(FILE* in, FILE* out) {
     Parser p;
     parser_init(&p);
@@ -37,7 +36,6 @@ void repl(FILE* in, FILE* out) {
 
     Error *e;
 
-    // TODO: append all inputs into one string and parse incrementally
     char *input;
     size_t cap;
     int len;

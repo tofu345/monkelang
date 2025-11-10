@@ -1160,7 +1160,6 @@ void test_parser_errors(void) {
         {"if (true) }", "expected next token to be '{', got '}' instead"},
         {"if (true) {", "expected token to be '}', got 'Eof' instead"},
         {
-            // TODO: plan to add this eventually
             "if (x < y) { x } else if { y }",
             "expected next token to be '{', got 'if' instead"
         },

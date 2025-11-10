@@ -8,8 +8,6 @@
 
 #include <stdint.h>
 
-// TODO: check for integer overflow, underflow.
-
 // - Perform garbage collection before every allocation to ensure all objects
 //   needed are kept in scope.
 // - Print allocations, function calls and garbage collection.

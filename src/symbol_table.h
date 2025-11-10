@@ -25,8 +25,6 @@ typedef enum {
     BuiltinScope,
 } SymbolScope;
 
-// TODO: store [Node] in [Symbol] instead of name?
-
 typedef struct {
     // NOTE: [name] is not copied.
     const char *name;

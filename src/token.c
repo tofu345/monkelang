@@ -20,7 +20,6 @@ struct Keyword {
     {"return", 6, t_Return},
 };
 
-// TODO: replace with hashmap
 TokenType lookup_ident(const char* ident, int ident_len) {
     static int num_keywords = sizeof(keywords) / sizeof(keywords[0]);
     int i, len;
