@@ -139,6 +139,8 @@ void print_error(Error *err) {
 }
 
 void free_error(Error *err) {
-    free(err->message);
-    free(err);
+    if (err) {
+        free(err->message);
+        free(err);
+    }
 }

@@ -74,7 +74,6 @@ test_table_iterator_and_expand(void) {
     }
 
     bool found[num];
-    // don't know any other way to make it all zeros.
     memset(found, 0, num);
 
     tbl_it it;
@@ -97,7 +96,8 @@ static void
 test_table_remove(void) {
     int i, num = 50;
     for (i = 0; i < num; i++) {
-        expect_set(OBJ(o_Integer, i), OBJ(o_Integer, i));
+        Object obj = OBJ(o_Integer, i);
+        expect_get(obj, obj);
     }
 
     bool found[num];

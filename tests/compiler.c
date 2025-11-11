@@ -8,9 +8,6 @@
 
 #include <stdio.h>
 
-void setUp(void) {}
-void tearDown(void) {}
-
 static void c_test(
     char *input,
     Constants expectedConstants,
@@ -1014,33 +1011,45 @@ void test_compiler_errors(void) {
 static int test_instructions(Instructions expected, Instructions actual);
 static int test_constants(Constants expected, ConstantBuffer *actual);
 
+// Making use of setUp and tearDown for Program and Compiler initialization to
+// avoid extra code to cleanup after a test fails.
+//
+// But because each test contains multiple c_test() and c_test_error() which
+// have to reinitialize, there is a wasted call at the start of each test.
+
+Program prog;
+Compiler c;
+Error *err;
+
+void setUp(void) {
+    prog = (Program){0};
+    compiler_init(&c);
+    err = NULL;
+}
+
+void tearDown(void) {
+    compiler_free(&c);
+    program_free(&prog);
+    free_error(err);
+}
+
 static void
 c_test_error(const char *input, const char *expected_error) {
-    bool fail = false;
+    // reinitialize
+    tearDown(); setUp();
 
-    Program prog = test_parse(input);
+    prog = test_parse(input);
 
-    Compiler c;
-    compiler_init(&c);
-    Error *err = compile(&c, &prog);
+    err = compile(&c, &prog);
     if (!err) {
         printf("expected compiler error but received none\n");
-        fail = true;
-        goto cleanup;
+        printf("in test: '%s'\n\n", input);
+        TEST_FAIL();
     }
 
     if (strcmp(err->message, expected_error) != 0) {
         printf("wrong compiler error\nwant= '%s'\ngot = '%s'\n",
                 expected_error, err->message);
-        fail = true;
-    }
-
-cleanup:
-    compiler_free(&c);
-    program_free(&prog);
-    if (err) { free_error(err); }
-
-    if (fail) {
         printf("in test: '%s'\n\n", input);
         TEST_FAIL();
     }
@@ -1052,39 +1061,24 @@ c_test(
     Constants expectedConstants,
     Instructions expectedInstructions
 ) {
-    bool fail = false;
+    // reinitialize
+    tearDown(); setUp();
 
-    Program prog = test_parse(input);
+    prog = test_parse(input);
 
-    Compiler c;
-    compiler_init(&c);
-
-    Error *err = compile(&c, &prog);
+    err = compile(&c, &prog);
     if (err != 0) {
         print_error(err);
-        free_error(err);
-
-        fail = true;
-        goto cleanup;
+        TEST_FAIL();
     };
 
     Bytecode code = bytecode(&c);
-    int res = test_instructions(expectedInstructions,
-            code.main_function->instructions);
 
-    if (res != 0) {
-        fail = true;
-        goto cleanup;
-    }
+    int err1 = test_instructions(expectedInstructions,
+                code.main_function->instructions);
 
-    res = test_constants(expectedConstants, code.constants);
-    if (res != 0) {
-        fail = true;
-    }
+    int err2 = test_constants(expectedConstants, code.constants);
 
-cleanup:
-    compiler_free(&c);
-    program_free(&prog);
     free(expectedInstructions.data);
     for (int i = 0; i < expectedConstants.length; i++) {
         if (expectedConstants.data[i].typ == test_ins) {
@@ -1093,7 +1087,7 @@ cleanup:
     }
     free(expectedConstants.data);
 
-    if (fail) {
+    if (err1 || err2) {
         printf("in test: '%s'\n\n", input);
         TEST_FAIL();
     }
