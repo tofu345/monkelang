@@ -3,15 +3,147 @@
 #include "../src/object.h"
 #include "../src/table.h"
 
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
-void setUp(void) {}
-void tearDown(void) {}
+static void expect_set(Object key, Object val);
+static void expect_get(Object key, Object expected_val);
+static void expect_remove(Object key);
+
+Table tbl;
+
+void setUp(void) {
+    if (table_init(&tbl) == NULL) {
+        die("malloc");
+    }
+}
+
+void tearDown(void) {
+    table_free(&tbl);
+}
 
 static void
-expect_set(Table *tbl, Object key, Object val) {
-    Object res = table_set(tbl, key, val);
+test_table_set_get(void) {
+    CharBuffer *string = &(CharBuffer){ .data = "test"};
+    Object objs[] = {
+        // These have the same ObjectData
+        OBJ(o_Integer, 1), OBJ(o_Boolean, true),
+        OBJ(o_Integer, 0), OBJ(o_Boolean, false),
+
+        // test other types
+        OBJ(o_Float, .floating = 1.5),
+        OBJ(o_String, .string = string),
+    };
+    int i, len = sizeof(objs) / sizeof(objs[0]);
+
+    for (i = 0; i < len; ++i) {
+        expect_set(objs[i], objs[i]);
+    }
+
+    if (tbl.length != (size_t) len) {
+        printf("wrong table length, want=%d, got=%zu", len, tbl.length);
+        TEST_FAIL();
+    }
+
+    for (i = 0; i < len; ++i) {
+        expect_get(objs[i], objs[i]);
+    }
+}
+
+// Tests:
+// - tbl_iterator returns all values in Table.
+// - table_expand() copies all data.
+static void
+test_table_iterator_and_expand(void) {
+    int i,
+        num = 129; // This should call table_expand() three times.
+
+    for (i = 0; i < num; i++) {
+        expect_set(OBJ(o_Integer, i), OBJ(o_Integer, i));
+    }
+
+    for (i = 0; i < num; ++i) {
+        Object obj = OBJ(o_Integer, i);
+        expect_get(obj, obj);
+    }
+
+    if (tbl.length != (size_t) num) {
+        printf("wrong table length, want=%d, got=%zu", num, tbl.length);
+        TEST_FAIL();
+    }
+
+    bool found[num];
+    // don't know any other way to make it all zeros.
+    memset(found, 0, num);
+
+    tbl_it it;
+    tbl_iterator(&it, &tbl);
+    while (tbl_next(&it)) {
+        found[it.cur_key.data.integer] = true;
+    }
+
+    bool all_found = true;
+    for (i = 0; i < num; i++) {
+        if (!found[i]) {
+            all_found = false;
+            printf("iterator could not find object %d\n", i);
+        }
+    }
+    TEST_ASSERT(all_found);
+}
+
+static void
+test_table_remove(void) {
+    int i, num = 50;
+    for (i = 0; i < num; i++) {
+        expect_set(OBJ(o_Integer, i), OBJ(o_Integer, i));
+    }
+
+    bool found[num];
+    memset(found, 0, num);
+
+    tbl_it it;
+
+    // starting from the last number, remove and check if all other numbers are
+    // still present.
+    for (i = num - 1; i >= 0; --i) {
+        expect_remove(OBJ(o_Integer, i));
+
+        tbl_iterator(&it, &tbl);
+        while (tbl_next(&it)) {
+            found[it.cur_key.data.integer] = true;
+        }
+
+        bool all_found = true;
+        for (int j = 0; j < i; ++j) {
+            if (!found[j]) {
+                all_found = false;
+                printf("iterator could not find object %d\n", j);
+            }
+        }
+        TEST_ASSERT(all_found);
+    }
+
+    // table_remove() on empty table
+    Object res = table_remove(&tbl, OBJ(o_Integer, 0));
+    if (res.type != o_Null) {
+        printf("got object: ");
+        object_fprint(res, stdout);
+        printf("after table_remove() on empty table\n");
+        TEST_FAIL();
+    }
+
+    if (tbl.length != 0) {
+        printf("expected table length of 0 after table_remove() on empty table, got=%zu",
+                tbl.length);
+        TEST_FAIL();
+    }
+}
+
+static void
+expect_set(Object key, Object val) {
+    Object res = table_set(&tbl, key, val);
     if (res.type == o_Null) {
         printf("table_set fail: ");
         object_fprint(key, stdout);
@@ -23,11 +155,13 @@ expect_set(Table *tbl, Object key, Object val) {
 }
 
 static void
-expect_get(Table *tbl, Object key, Object expected_val) {
-    Object res = table_get(tbl, key);
+expect_get(Object key, Object expected_val) {
+    Object res = table_get(&tbl, key);
+
     bool equal =
         res.type == expected_val.type
         && memcmp(&res.data, &expected_val.data, sizeof(ObjectData)) == 0;
+
     if (!equal) {
         printf("table_get fail: ");
         object_fprint(key, stdout);
@@ -41,117 +175,32 @@ expect_get(Table *tbl, Object key, Object expected_val) {
 }
 
 static void
-test_table_set(void) {
-    Table tbl;
-    if (table_init(&tbl) == NULL) die("malloc");
+expect_remove(Object key) {
+    int expected_length = tbl.length;
+    if (expected_length > 0) { --expected_length; }
 
-    Object one = OBJ(o_Integer, 1);
-    Object two = OBJ(o_Integer, 2);
-    Object _true = OBJ(o_Boolean, true);
-    Object _false = OBJ(o_Boolean, false);
+    Object res = table_remove(&tbl, key);
 
-    expect_set(&tbl, one, one);
-    expect_set(&tbl, two, one);
-    expect_set(&tbl, _true, two);
-    expect_set(&tbl, _false, two);
-
-    if (tbl.length != 4) {
-        table_free(&tbl);
-        TEST_FAIL_MESSAGE("wrong table length");
+    if (res.type == o_Null) {
+        printf("could not assign object: ");
+        object_fprint(res, stdout);
+        putc('\n', stdout);
+        TEST_FAIL();
     }
 
-    expect_get(&tbl, one, one);
-    expect_get(&tbl, two, one);
-    expect_get(&tbl, _true, two);
-    expect_get(&tbl, _false, two);
-
-    table_free(&tbl);
-}
-
-static void
-test_table_iterator(void) {
-    Table tbl;
-    if (table_init(&tbl) == NULL) die("malloc");
-
-    int num = 15;
-    for (int i = 0; i < num; i++) {
-        table_set(&tbl, OBJ(o_Integer, i), OBJ(o_Integer, i));
+    if (tbl.length != (size_t) expected_length) {
+        printf("after ");
+        object_fprint(res, stdout);
+        printf(" is removed, length is incorrect, want=%d, got=%zu\n",
+                expected_length, tbl.length);
+        TEST_FAIL();
     }
-
-    bool is_found[num];
-    memset(is_found, 0, num);
-
-    tbl_it it;
-    tbl_iterator(&it, &tbl);
-    while (tbl_next(&it)) {
-        int idx = it.cur_key.data.integer;
-        if (idx < 0 || idx >= num) continue;
-        is_found[idx] = true;
-    }
-
-    bool all_found = true;
-    for (int i = 0; i < num; i++) {
-        if (!is_found[i]) {
-            all_found = false;
-            printf("could not find %d\n", i);
-        }
-    }
-    table_free(&tbl);
-    TEST_ASSERT(all_found);
-}
-
-static void
-test_table_expand(void) {
-    Table tbl;
-    if (table_init(&tbl) == NULL) die("malloc");
-
-    int num = 129;
-    for (int i = 0; i < num; i++) {
-        table_set(&tbl, OBJ(o_Integer, i), OBJ(o_Integer, i));
-    }
-
-    Object obj;
-    for (int i = 0; i < num; i++) {
-        obj = table_get(&tbl, OBJ(o_Integer, i));
-        if (obj.data.integer != i) {
-            printf("could not find number %d\n", i);
-            table_free(&tbl);
-            TEST_FAIL();
-        }
-    }
-
-    if (tbl.length != (size_t)num) {
-        table_free(&tbl);
-        TEST_FAIL_MESSAGE("wrong table length");
-    }
-
-    bool is_found[num];
-    memset(is_found, 0, num);
-
-    tbl_it it;
-    tbl_iterator(&it, &tbl);
-    while (tbl_next(&it)) {
-        int idx = it.cur_key.data.integer;
-        if (idx < 0 || idx >= num) continue;
-        is_found[idx] = true;
-    }
-
-    bool all_found = true;
-    for (int i = 0; i < num; i++) {
-        if (!is_found[i]) {
-            all_found = false;
-            printf("could not find %d\n", i);
-        }
-    }
-
-    table_free(&tbl);
-    TEST_ASSERT(all_found);
 }
 
 int main(void) {
     UNITY_BEGIN();
-    RUN_TEST(test_table_set);
-    RUN_TEST(test_table_iterator);
-    RUN_TEST(test_table_expand);
+    RUN_TEST(test_table_set_get);
+    RUN_TEST(test_table_iterator_and_expand);
+    RUN_TEST(test_table_remove);
     return UNITY_END();
 }

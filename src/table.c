@@ -10,6 +10,7 @@ bool hashable(Object key) {
         case o_String:
         case o_Boolean:
         case o_Integer:
+        case o_Float:
             return true;
         default:
             return false;
@@ -28,6 +29,8 @@ uint64_t object_hash(Object key) {
             return key.data.boolean;
         case o_Integer:
             return key.data.integer;
+        case o_Float:
+            return key.data.floating;
 
         default:
             die("object_hash: type %s (%d) not implemented",
@@ -180,6 +183,12 @@ table_expand(Table *tbl) {
 Object
 table_set(Table *tbl, Object key, Object value) {
     if (IS_NULL(key) || IS_NULL(value)) return NULL_OBJ;
+
+    // table_expand() is run when the table fills roughly half of its
+    // buckets, not taking into account bucket overflows.
+    //
+    // Its initial max number of elements is 64 (8 buckets with 8
+    // elements per bucket), will expand when tbl.length is 32.
 
     size_t half_full = tbl->length >= (tbl->_buckets_length * N) / 2;
     if (half_full) {

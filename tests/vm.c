@@ -600,7 +600,7 @@ test_free_variable_list(void) {
             num\
         }()\
         ",
-        TEST(int, 1) // empty
+        TEST(int, 1)
     );
 }
 
