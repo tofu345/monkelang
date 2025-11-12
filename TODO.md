@@ -26,6 +26,7 @@
 
 # Other
 
+- highlight `[...]` in index expressions and `(...)` in call expressions
 - repl tests
 - append all inputs into one string and parse incrementally
 - ErrorType
