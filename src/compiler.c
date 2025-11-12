@@ -14,9 +14,6 @@
 
 static int add_constant(Compiler *c, Constant obj_const);
 
-// calloc new [CompiledFunction].
-static CompiledFunction *new_function();
-
 // new [SourceMapping] with [c.current_instructions.length] (will point to next
 // emitted instruction) and [node.token].
 static void source_map_statement(Compiler *c, Node node);
@@ -655,13 +652,6 @@ Bytecode bytecode(Compiler *c) {
         .constants = &c->constants,
         .num_globals = c->current_symbol_table->num_definitions,
     };
-}
-
-static CompiledFunction *
-new_function() {
-    CompiledFunction *fn = calloc(1, sizeof(CompiledFunction));
-    if (fn == NULL) { die("malloc"); }
-    return fn;
 }
 
 static void

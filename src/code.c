@@ -1,4 +1,5 @@
 #include "code.h"
+#include "errors.h"
 #include "utils.h"
 
 #include <assert.h>
@@ -225,7 +226,6 @@ int fprint_instructions(FILE *out, Instructions ins) {
         FPRINTF(out, "%04d ", i);
 
         err = fprint_definition_operands(out, def, operands);
-        putc('\n', out);
         free(operands.widths);
         if (err == -1) return -1;
 
@@ -260,4 +260,35 @@ SourceMapping *find_mapping(SourceMappingBuffer maps, int ip) {
         return &maps.data[low - 1];
     }
     return &maps.data[low];
+}
+
+int
+fprint_instructions_mappings(FILE *out, SourceMappingBuffer mappings,
+                             Instructions ins) {
+    int err, read, i = 0;
+    const Definition *def;
+    Operands operands;
+
+    int next_mapping = 0;
+
+    while (i < ins.length) {
+        if (next_mapping < mappings.length) {
+            if (mappings.data[next_mapping].position <= i) {
+                putc('\n', out);
+                highlight_token(node_token(mappings.data[next_mapping].node), 0);
+                next_mapping++;
+            }
+        }
+
+        def = lookup(ins.data[i]);
+        operands = read_operands(&read, def, ins.data + i);
+        FPRINTF(out, "%04d ", i);
+
+        err = fprint_definition_operands(out, def, operands);
+        free(operands.widths);
+        if (err == -1) return -1;
+
+        i += 1 + read;
+    }
+    return 0;
 }

@@ -11,22 +11,32 @@
 #include <string.h>
 #include <sys/poll.h>
 
-BUFFER(Input, char *)
-DEFINE_BUFFER(Input, char *)
-BUFFER(Program, Program)
-DEFINE_BUFFER(Program, Program)
+// A successfully compiled and run evaluation.
+typedef struct {
+    char *source;
+    int len;
 
+    Program program;
+
+    // main function
+    CompiledFunction *function;
+} Eval;
+
+BUFFER(Eval, Eval)
+DEFINE_BUFFER(Eval, Eval)
+
+static void free_eval(Eval *current);
 static void print_parser_errors(FILE* out, Parser *p);
 
 // getline() but if first line ends with '{' or '(', read and append multiple
 // lines to [input] until a blank line is encountered and there is no more data
-// to read in [in].
-int multigetline(char **input, size_t *input_cap, FILE *in, FILE *out);
+// to read in [in_stream].
+static int multigetline(char **input, size_t *input_cap,
+                        FILE *in_stream, FILE *out_stream);
 
-void repl(FILE* in, FILE* out) {
+void repl(FILE* in_stream, FILE* out_stream) {
     Parser p;
     parser_init(&p);
-    Program prog;
 
     Compiler c;
     compiler_init(&c);
@@ -34,50 +44,39 @@ void repl(FILE* in, FILE* out) {
     VM vm;
     vm_init(&vm, NULL, NULL, NULL);
 
-    Error *e;
+    EvalBuffer done = {0};
+    Eval eval = {0};
+    bool success = false;
 
-    char *input;
-    size_t cap;
-    int len;
-
-    Object stack_elem;
-
-    // Keep previous inputs and ASTs around because tokens point to the source
-    // code directly.
-    InputBuffer inputs = {0};
-    ProgramBuffer programs = {0};
-
+    size_t cap = 0;
     while (1) {
-        input = NULL;
-        cap = 0;
-        len = multigetline(&input, &cap, in, out);
-        if (len == -1) {
-            free(input);
+        eval.len = multigetline(&eval.source, &cap, in_stream, out_stream);
+        if (eval.len == -1) {
+            free(eval.source);
             break;
 
-        // [input] only contains '\n'.
-        } else if (len == 1) {
-            free(input);
+        // only '\n' was entered.
+        } else if (eval.len == 1) {
+            free(eval.source);
+            eval.source = NULL;
             continue;
         }
 
-        prog = parse_(&p, input, len);
+        eval.program = parse_(&p, eval.source, eval.len);
         if (p.errors.length > 0) {
-            print_parser_errors(out, &p);
-            program_free(&prog);
-            free(input);
+            print_parser_errors(out_stream, &p);
             goto cleanup;
-        } else if (prog.stmts.length == 0) {
-            free(input);
+
+        } else if (eval.program.stmts.length == 0) {
+            free(eval.source);
+            eval.source = NULL;
             continue;
         }
 
-        InputBufferPush(&inputs, input);
-        ProgramBufferPush(&programs, prog);
-
-        e = compile(&c, &prog);
+        eval.function = c.cur_scope->function;
+        Error *e = compile(&c, &eval.program);
         if (e) {
-            fprintf(out, "Woops! Compilation failed!\n");
+            fprintf(out_stream, "Woops! Compilation failed!\n");
             print_error(e);
             free_error(e);
             goto cleanup;
@@ -85,32 +84,41 @@ void repl(FILE* in, FILE* out) {
 
         error err = vm_run(&vm, bytecode(&c));
         if (err) {
-            fprintf(out, "Woops! Executing bytecode failed!\n");
+            fprintf(out_stream, "Woops! Executing bytecode failed!\n");
             print_vm_stack_trace(&vm);
             puts(err);
             free(err);
             goto cleanup;
         }
 
-        stack_elem = vm_last_popped(&vm);
+        Object stack_elem = vm_last_popped(&vm);
         if (stack_elem.type != o_Null) {
-            object_fprint(stack_elem, out);
-            fputc('\n', out);
+            object_fprint(stack_elem, out_stream);
+            fputc('\n', out_stream);
         }
 
+        EvalBufferPush(&done, eval);
+        success = true;
+
 cleanup:
-        // free unsuccessfully [CompiledFunction]s and reset main function
-        // instructions.
-        if (c.cur_scope_index > 0) {
-            for (int i = c.cur_scope_index; i > 0; i--) {
-                free_function(c.scopes.data[i].function);
-            }
-            c.cur_scope_index = 0;
-            c.cur_scope = c.scopes.data;
-            c.current_instructions = &c.cur_scope->function->instructions;
+        if (!success) {
+            free_eval(&eval);
         }
-        c.current_instructions->length = 0;
-        c.cur_mapping->length = 0;
+        eval = (Eval){0};
+        success = false;
+
+        // free unsuccessfully [CompiledFunctions]
+        for (; c.cur_scope_index > 0; --c.cur_scope_index) {
+            free_function(c.scopes.data[c.cur_scope_index].function);
+        }
+        c.scopes.length = 1;
+
+        // new main function
+        CompiledFunction *main_fn = new_function();
+        c.scopes.data[0] = (CompilationScope){ .function = main_fn };
+        c.cur_scope = c.scopes.data;
+        c.current_instructions = &main_fn->instructions;
+        c.cur_mapping = &main_fn->mappings;
 
         // reset VM
         vm.sp = 0;
@@ -120,15 +128,11 @@ cleanup:
 
     vm_free(&vm);
     compiler_free(&c);
-
-    for (int i = 0; i < programs.length; i++)
-        program_free(&programs.data[i]);
-    free(programs.data);
     parser_free(&p);
-
-    for (int i = 0; i < inputs.length; i++)
-        free(inputs.data[i]);
-    free(inputs.data);
+    for (int i = 0; i < done.length; i++) {
+        free_eval(done.data + i);
+    }
+    free(done.data);
 }
 
 void run(char* program) {
@@ -136,7 +140,6 @@ void run(char* program) {
     Program prog;
     Compiler c;
     VM vm;
-    Error *e;
 
     parser_init(&p);
     compiler_init(&c);
@@ -150,7 +153,7 @@ void run(char* program) {
         goto cleanup;
     }
 
-    e = compile(&c, &prog);
+    Error *e = compile(&c, &prog);
     if (e) {
         fprintf(stdout, "Woops! Compilation failed!\n");
         print_error(e);
@@ -169,14 +172,25 @@ void run(char* program) {
 
 cleanup:
     vm_free(&vm);
+    compiler_free(&c);
     program_free(&prog);
     parser_free(&p);
-    compiler_free(&c);
 }
 
 static void
-print_parser_errors(FILE* out, Parser *p) {
-    fprintf(out, "Woops! We ran into some monkey business here!\n");
+free_eval(Eval *eval) {
+    free(eval->source);
+
+    program_free(&eval->program);
+
+    if (eval->function) {
+        free_function(eval->function);
+    }
+}
+
+static void
+print_parser_errors(FILE* out_stream, Parser *p) {
+    fprintf(out_stream, "Woops! We ran into some monkey business here!\n");
     for (int i = 0; i < p->errors.length; i++) {
         Error err = p->errors.data[i];
         print_error(&err);
@@ -185,11 +199,14 @@ print_parser_errors(FILE* out, Parser *p) {
     p->errors.length = 0;
 }
 
-int multigetline(char **input, size_t *input_cap, FILE *in, FILE *out) {
-    fprintf(out, ">> ");
+static int
+multigetline(char **input, size_t *input_cap,
+             FILE *in_stream, FILE *out_stream) {
+
+    fprintf(out_stream, ">> ");
 
     // [len] is number of chars read.
-    int len = getline(input, input_cap, in);
+    int len = getline(input, input_cap, in_stream);
     if (len == -1) { return -1; }
 
     if (len == 1) {
@@ -208,7 +225,7 @@ int multigetline(char **input, size_t *input_cap, FILE *in, FILE *out) {
 
     int ret;
     struct pollfd fds;
-    fds.fd = fileno(in); // fileno gets file descr of FILE *
+    fds.fd = fileno(in_stream);
     fds.events = POLLIN; // check if there is data to read.
 
     while (1) {
@@ -216,10 +233,10 @@ int multigetline(char **input, size_t *input_cap, FILE *in, FILE *out) {
         ret = poll(&fds, 1, 0);
         // ret is 1 if there is data to read.
         if (ret != 1) {
-            fprintf(out, ".. ");
+            fprintf(out_stream, ".. ");
         }
 
-        int line_len = getline(&line, &line_cap, in);
+        int line_len = getline(&line, &line_cap, in_stream);
         if (line_len == -1) {
             free(line);
             return -1;

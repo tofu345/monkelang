@@ -19,6 +19,7 @@ typedef struct {
     SourceMappingBuffer mappings;
 } CompiledFunction;
 
+CompiledFunction *new_function();
 void free_function(CompiledFunction *fn);
 
 typedef enum {

@@ -169,3 +169,7 @@ BUFFER(SourceMapping, SourceMapping)
 // Find [SourceMapping] [ip] occurs at, the source mapping with highest
 // [position] that is less than [ip] with binary search.
 SourceMapping *find_mapping(SourceMappingBuffer maps, int ip);
+
+// fprint_instructions() with SourceMapping of each Instruction.
+int fprint_instructions_mappings(FILE *out, SourceMappingBuffer mappings,
+                                 Instructions ins);
