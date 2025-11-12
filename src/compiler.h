@@ -70,3 +70,6 @@ typedef struct {
 } Bytecode;
 
 Bytecode bytecode(Compiler *c);
+
+void fprint_compiler_instructions(FILE *out_stream, Compiler *c,
+                                  bool print_mappings);

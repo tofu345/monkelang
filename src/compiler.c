@@ -678,3 +678,36 @@ compiler_error(Node n, char* format, ...) {
     };
     return err;
 }
+
+void fprint_compiler_instructions(FILE *out_stream, Compiler *c,
+                                  bool print_mappings) {
+
+    putc('\n', out_stream);
+    printf("<main function> instructions\n");
+    if (print_mappings) {
+        fprint_instructions_mappings(out_stream, *c->cur_mapping, *c->current_instructions);
+        putc('\n', out_stream);
+    } else {
+        fprint_instructions(out_stream, *c->current_instructions);
+    }
+
+    for (int i = 0; i < c->functions.length; ++i) {
+        CompiledFunction *fn = c->functions.data[i];
+        FunctionLiteral *lit = fn->literal;
+        printf("\n");
+        if (lit->name) {
+            Identifier *id = lit->name;
+            printf("<function: %.*s>", LITERAL(id->tok));
+        } else {
+            printf("<anonymous function>");
+        }
+        printf(" instructions\n");
+
+        if (print_mappings) {
+            fprint_instructions_mappings(out_stream, fn->mappings, fn->instructions);
+            putc('\n', out_stream);
+        } else {
+            fprint_instructions(out_stream, fn->instructions);
+        }
+    }
+}
