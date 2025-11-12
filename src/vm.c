@@ -901,38 +901,6 @@ Object vm_last_popped(VM *vm) {
     return vm->stack[vm->sp];
 }
 
-// Find [SourceMapping] [f.ip] occurs at. The source mapping with highest
-// [position] that is less than [f.ip] with binary search.
-static SourceMapping *
-find_mapping(Frame f) {
-    SourceMappingBuffer maps = f.cl->func->mappings;
-    assert(maps.length > 0);
-
-    int low = 0,
-        high = maps.length - 1;
-
-    while (low < high) {
-        int mid = low + (high - low) / 2,
-            position = maps.data[mid].position;
-
-        if (position == f.ip) {
-            return &maps.data[mid];
-
-        } else if (position > f.ip) {
-            high = mid - 1;
-
-        } else {
-            low = mid + 1;
-        }
-    }
-
-    if (maps.data[low].position > f.ip) {
-        assert(low > 0);
-        return &maps.data[low - 1];
-    }
-    return &maps.data[low];
-}
-
 static void
 _print_function_name(Closure *cl) {
     FunctionLiteral *lit = cl->func->literal;
@@ -987,7 +955,7 @@ void print_vm_stack_trace(VM *vm) {
         } else {
             // previous Frame if present, stopped at the same position as
             // current.
-            mapping = find_mapping(frame);
+            mapping = find_mapping(frame.cl->func->mappings, frame.ip);
 
             _print_repeats(prev_idx, idx);
             prev = frame.cl;

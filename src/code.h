@@ -2,6 +2,7 @@
 
 // This modules contains definitions for the Instructions in the Bytecode.
 
+#include "ast.h"
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -151,3 +152,20 @@ int read_big_endian_uint8(uint8_t *arr);
 Instructions make(Opcode op, ...);
 int make_into(Instructions *ins, Opcode op, ...);
 int make_valist_into(Instructions *ins, Opcode op, va_list operands);
+
+// Contains information needed for mapping a Node in the AST to a position in a
+// Functions bytecode.  It is used for printing which line of the source code
+// an error occured in the VM.
+typedef struct {
+    // the position in bytes in a Functions Instructions.
+    int position;
+
+    // The node in the AST with a Token which points to the source code.
+    Node node;
+} SourceMapping;
+
+BUFFER(SourceMapping, SourceMapping)
+
+// Find [SourceMapping] [ip] occurs at, the source mapping with highest
+// [position] that is less than [ip] with binary search.
+SourceMapping *find_mapping(SourceMappingBuffer maps, int ip);

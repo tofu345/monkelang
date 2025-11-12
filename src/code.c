@@ -7,6 +7,8 @@
 #include <stddef.h>
 #include <stdio.h>
 
+DEFINE_BUFFER(SourceMapping, SourceMapping)
+
 #define DEF(code, operands) { #code, _##operands }
 #define DEF_EMPTY(code) { #code, { NULL, 0 } }
 
@@ -218,12 +220,44 @@ int fprint_instructions(FILE *out, Instructions ins) {
     Operands operands;
     while (i < ins.length) {
         def = lookup(ins.data[i]);
+
         operands = read_operands(&read, def, ins.data + i);
         FPRINTF(out, "%04d ", i);
+
         err = fprint_definition_operands(out, def, operands);
+        putc('\n', out);
         free(operands.widths);
         if (err == -1) return -1;
+
         i += 1 + read;
     }
     return 0;
+}
+
+SourceMapping *find_mapping(SourceMappingBuffer maps, int ip) {
+    assert(maps.length > 0);
+
+    int low = 0,
+        high = maps.length - 1;
+
+    while (low < high) {
+        int mid = low + (high - low) / 2,
+            position = maps.data[mid].position;
+
+        if (position == ip) {
+            return &maps.data[mid];
+
+        } else if (position > ip) {
+            high = mid - 1;
+
+        } else {
+            low = mid + 1;
+        }
+    }
+
+    if (maps.data[low].position > ip) {
+        assert(low > 0);
+        return &maps.data[low - 1];
+    }
+    return &maps.data[low];
 }

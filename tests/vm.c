@@ -2,6 +2,7 @@
 #include "helpers.h"
 #include "tests.h"
 
+#include "../src/code.h"
 #include "../src/vm.h"
 #include "../src/table.h"
 
@@ -817,8 +818,17 @@ vm_test(char *input, Test *expected) {
     //     printf("CONSTANT %d ", i);
     //     switch (cn.type) {
     //         case c_Function:
-    //             printf("%s() Instructions:\n", cn.data.function->name);
-    //             fprint_instructions(stdout, cn.data.function->instructions);
+    //             {
+    //                 CompiledFunction *fn = cn.data.function;
+    //                 FunctionLiteral *lit = fn->literal;
+    //                 if (lit->name) {
+    //                     printf("%.*s", LITERAL(lit->tok));
+    //                 } else {
+    //                     printf("<anonymous function>");
+    //                 }
+    //                 puts(" Instructions:");
+    //                 fprint_instructions(stdout, fn->instructions);
+    //             }
     //             break;
     //         case c_Integer:
     //             printf("Value: %ld\n", cn.data.integer);
@@ -827,7 +837,8 @@ vm_test(char *input, Test *expected) {
     //             printf("Value: %f\n", cn.data.floating);
     //             break;
     //         case c_String:
-    //             printf("Value: \"%s\"\n", cn.data.string->data);
+    //             printf("Value: \"%.*s\"\n",
+    //                     cn.data.string->length, cn.data.string->start);
     //             break;
     //     }
     // }

@@ -17,8 +17,8 @@ static int add_constant(Compiler *c, Constant obj_const);
 // calloc new [CompiledFunction].
 static CompiledFunction *new_function();
 
-// append new [SourceMapping] with [c.current_instructions.length] and
-// [node.token] to [c.cur_scope.mappings].
+// new [SourceMapping] with [c.current_instructions.length] (will point to next
+// emitted instruction) and [node.token].
 static void source_map_statement(Compiler *c, Node node);
 
 // create [Error] with [n.token]
@@ -319,6 +319,8 @@ _compile(Compiler *c, Node n) {
                 err = _compile(c, ie->right);
                 if (err) { return err; }
 
+                source_map_statement(c, n);
+
                 if ('+' == ie->tok.start[0]) {
                     emit(c, OpAdd);
 
@@ -353,6 +355,8 @@ _compile(Compiler *c, Node n) {
                 err = _compile(c, pe->right);
                 if (err) { return err; }
 
+                source_map_statement(c, n);
+
                 if ('!' == pe->tok.start[0]) {
                     emit(c, OpBang);
 
@@ -363,6 +367,7 @@ _compile(Compiler *c, Node n) {
                     die("compiler: unknown prefix operator %.*s",
                             LITERAL(pe->tok));
                 }
+
                 return 0;
             }
 
@@ -416,6 +421,8 @@ _compile(Compiler *c, Node n) {
                 err = _compile(c, ie->index);
                 if (err) { return err; }
 
+                source_map_statement(c, n);
+
                 emit(c, OpIndex);
                 return 0;
             }
@@ -431,6 +438,8 @@ _compile(Compiler *c, Node n) {
                     err = _compile(c, args.data[i]);
                     if (err) { return err; }
                 }
+
+                source_map_statement(c, n);
 
                 emit(c, OpCall, args.length);
                 return 0;

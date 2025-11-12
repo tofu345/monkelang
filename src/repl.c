@@ -110,6 +110,8 @@ cleanup:
             c.current_instructions = &c.cur_scope->function->instructions;
         }
         c.current_instructions->length = 0;
+        c.cur_mapping->length = 0;
+
         // reset VM
         vm.sp = 0;
         vm.frames_index = 0;
