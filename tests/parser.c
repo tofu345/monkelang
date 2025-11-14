@@ -1,6 +1,4 @@
 #include "unity/unity.h"
-
-#include "tests.h"
 #include "helpers.h"
 
 #include "../src/ast.h"

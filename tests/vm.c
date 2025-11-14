@@ -1,8 +1,6 @@
 #include "unity/unity.h"
 #include "helpers.h"
-#include "tests.h"
 
-#include "../src/code.h"
 #include "../src/vm.h"
 #include "../src/table.h"
 
