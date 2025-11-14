@@ -1,8 +1,10 @@
 #pragma once
 
-// This modules contains definitions for the Instructions in the Bytecode.
+// This modules contains definitions for the Instructions in the Bytecode,
+// mapping for Instructions to Source code and relevant utilities.
 
 #include "ast.h"
+
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -148,9 +150,13 @@ int read_big_endian_uint16(uint8_t *arr);
 // read `arr[0]`
 int read_big_endian_uint8(uint8_t *arr);
 
-// Make Instructions from Opcode and [int] operands.
+// Make Instructions from Opcode and `int` operands.
 Instructions make(Opcode op, ...);
+
+// Append Instruction with Opcode and `int` operands to [ins].
 int make_into(Instructions *ins, Opcode op, ...);
+
+// Append Instruction with Opcode and `int` [operands] to [ins].
 int make_valist_into(Instructions *ins, Opcode op, va_list operands);
 
 // Contains information needed for mapping a Node in the AST to a position in a

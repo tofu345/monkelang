@@ -8,6 +8,11 @@
 
 #include <stdio.h>
 
+Compiler c;
+
+// initialize Program and Compiler.
+static void __init(void);
+
 static void c_test(
     char *input,
     Constants expectedConstants,
@@ -451,8 +456,7 @@ void test_functions_without_return_value(void) {
 }
 
 void test_compiler_scopes(void) {
-    Compiler c;
-    compiler_init(&c);
+    __init();
 
     if (c.cur_scope_index != 0) {
         printf("scope_index wrong. got=%d, want=%d\n", c.cur_scope_index, 0);
@@ -526,8 +530,6 @@ void test_compiler_scopes(void) {
                 previous.opcode, OpMul);
         TEST_FAIL();
     }
-
-    compiler_free(&c);
 }
 
 void test_function_calls(void) {
@@ -1011,32 +1013,42 @@ void test_compiler_errors(void) {
 static int test_instructions(Instructions expected, Instructions actual);
 static int test_constants(Constants expected, ConstantBuffer *actual);
 
-// Making use of setUp and tearDown for Program and Compiler initialization to
-// avoid extra code to cleanup after a test fails.
-//
-// But because each test contains multiple c_test() and c_test_error() which
-// have to reinitialize, there is a wasted call at the start of each test.
+// Because each test contains multiple c_test() and c_test_error() which must
+// reinitialize before running.
+bool initialized = false;
 
 Program prog;
-Compiler c;
 Error *err;
 
-void setUp(void) {
-    prog = (Program){0};
+static void
+__init(void) {
     compiler_init(&c);
+    prog = (Program){0};
     err = NULL;
+
+    initialized = true;
 }
 
-void tearDown(void) {
+static void
+__cleanup(void) {
     compiler_free(&c);
     program_free(&prog);
     free_error(err);
+
+    initialized = false;
+}
+
+void setUp(void) {}
+
+void tearDown(void) {
+    if (initialized) {
+        __cleanup();
+    }
 }
 
 static void
 c_test_error(const char *input, const char *expected_error) {
-    // reinitialize
-    tearDown(); setUp();
+    __init();
 
     prog = test_parse(input);
 
@@ -1053,6 +1065,8 @@ c_test_error(const char *input, const char *expected_error) {
         printf("in test: '%s'\n\n", input);
         TEST_FAIL();
     }
+
+    __cleanup();
 }
 
 static void
@@ -1061,8 +1075,7 @@ c_test(
     Constants expectedConstants,
     Instructions expectedInstructions
 ) {
-    // reinitialize
-    tearDown(); setUp();
+    __init();
 
     prog = test_parse(input);
 
@@ -1091,6 +1104,8 @@ c_test(
         printf("in test: '%s'\n\n", input);
         TEST_FAIL();
     }
+
+    __cleanup();
 }
 
 static int

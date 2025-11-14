@@ -17,7 +17,9 @@ char* read_file(char* filename) {
 
     char* buf = malloc((bufsize + 1) * sizeof(char));
     if (buf == NULL) {
-        fprintf(stderr, "error: could not allocate memory\n");
+        fprintf(stderr,
+                "error: could not allocate memory for file '%s' of size %ld\n",
+                filename, bufsize);
         fclose(fp);
         return NULL;
     }
