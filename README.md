@@ -1,8 +1,9 @@
-# [Writing an Compiler ~~in Go~~](https://interpreterbook.com/) in C.
+# [Writing an Compiler ~~in Go~~](https://compilerbook.com/) in C.
+
+A port of the book in C.  Takes a lot of inspiration from
+[wren](https://github.com/wren-lang/wren).
 
 ## Syntax
-
-Similar syntax to the [the Monkey programming language](https://interpreterbook.com/#the-monkey-programming-language)
 
 ```javascript
 // Copied from: https://interpreterbook.com/#the-monkey-programming-language
@@ -91,7 +92,6 @@ let fibonacci = fn(num) {
     if (res != null) {
       return res;
     }
-
     res = fib(num - 1) + fib(num - 2);
 
     // Assignment to Table Keys.
@@ -102,9 +102,8 @@ let fibonacci = fn(num) {
 };
 puts("fibonacci(50):", fibonacci(50)); // => fibonacci(50): 12586269025
 
-let array = [1, 2, 3];
-
 // Assignment at array indices.
+let array = [1, 2, 3];
 array[0] = 5;
 puts("array is", array); // => array is [5, 2, 3]
 
