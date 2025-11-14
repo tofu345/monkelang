@@ -152,10 +152,11 @@ if (5 < 10) {\
 	{t_Semicolon, ";", 1},
 	{t_Eof, "", 1},
     };
-
     size_t len_tests = sizeof(tests) / sizeof(tests[0]);
+
     Lexer l;
     lexer_init(&l, input);
+
     for (size_t i = 0; i < len_tests; i++) {
         struct Test test = tests[i];
         Token tok =
@@ -231,10 +232,11 @@ let add = fn(x, y) {\n\
 	{t_Semicolon, ";", 9},
 	{t_Eof, "", 10},
     };
-
     size_t len_tests = sizeof(tests) / sizeof(tests[0]);
+
     Lexer l;
     lexer_init(&l, input);
+
     for (size_t i = 0; i < len_tests; i++) {
         struct Test t = tests[i];
         Token tok = lexer_next_token(&l);

@@ -10,7 +10,7 @@
 
 typedef struct {
     int *data, length;
-} TestArray;
+} IntArray;
 
 typedef enum {
     test_null,
@@ -28,7 +28,7 @@ typedef union {
     double _float;
     char* _str;
     bool _bool;
-    TestArray _arr;
+    IntArray _arr;
     Instructions _ins;
 } Value;
 

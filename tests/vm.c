@@ -94,8 +94,8 @@ test_string_expressions(void) {
 }
 
 // create NULL-terminated (0-terminated) array of integers.
-static TestArray make_test_array(int n, ...);
-#define TEST_ARR(...) TEST(arr, make_test_array(__VA_ARGS__, 0))
+static IntArray make_int_array(int n, ...);
+#define TEST_ARR(...) TEST(arr, make_int_array(__VA_ARGS__, 0))
 
 static void
 test_array_literals(void) {
@@ -105,7 +105,7 @@ test_array_literals(void) {
 }
 
 #define TEST_TABLE(...) \
-    &(Test){ test_table, { ._arr = make_test_array(__VA_ARGS__, 0) }}
+    &(Test){ test_table, { ._arr = make_int_array(__VA_ARGS__, 0) }}
 
 static void
 test_table_literals(void) {
@@ -603,9 +603,9 @@ test_free_variable_list(void) {
     );
 }
 
-static TestArray
-make_test_array(int n, ...) {
-    TestArray arr = {0};
+static IntArray
+make_int_array(int n, ...) {
+    IntArray arr = {0};
     int capacity = 0;
 
     if (n == 0) { return arr; }
@@ -725,7 +725,7 @@ test_expected_object(Test expected, Object actual) {
                 }
 
                 ObjectBuffer *arr = actual.data.ptr;
-                TestArray exp_arr = expected.val._arr;
+                IntArray exp_arr = expected.val._arr;
 
                 if (exp_arr.length != arr->length) {
                     printf("wrong number of elements. want=%d, got=%d\n",
@@ -752,7 +752,7 @@ test_expected_object(Test expected, Object actual) {
                 }
 
                 Table *tbl = actual.data.table;
-                TestArray exp_pairs = expected.val._arr;
+                IntArray exp_pairs = expected.val._arr;
 
                 size_t num_pairs = exp_pairs.length / 2;
                 if (num_pairs != tbl->length) {

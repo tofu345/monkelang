@@ -16,16 +16,16 @@ void test_print(void) {
         {
             n_LetStatement,
             &(LetStatement){
-                .tok = { 
-                    .type = t_Let, 
+                .tok = {
+                    .type = t_Let,
                     .start = "let",
                     .length = 3
                 },
                 .name =
                     &(Identifier){
-                        .tok = { 
-                            .type = t_Ident, 
-                            .start = "myVar", 
+                        .tok = {
+                            .type = t_Ident,
+                            .start = "myVar",
                             .length = 5
                         },
                     },
@@ -33,8 +33,8 @@ void test_print(void) {
                     {
                         n_Identifier,
                         &(Identifier){
-                            .tok = { 
-                                .type = t_Ident, 
+                            .tok = {
+                                .type = t_Ident,
                                 .start = "anotherVar",
                                 .length = 10
                             },
@@ -56,14 +56,23 @@ void test_print(void) {
         exit(1);
     }
 
-    TEST_ASSERT_MESSAGE(program_fprint(&prog, fp) != -1, "program_fprint fail");
+    int err = program_fprint(&prog, fp);
+    if (err == -1) {
+        printf("program_fprint fail");
+        goto cleanup;
+    }
+
     fflush(fp);
+    if (strcmp(expected, buf) != 0) {
+        printf("program wrong.\nwant=%s\n got =%s", expected, buf);
+        err = -1;
+    }
 
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(
-            expected, buf, "program_fprint wrong");
-
+cleanup:
     fclose(fp);
     free(buf);
+
+    TEST_ASSERT(err != -1);
 }
 
 int main(void) {
