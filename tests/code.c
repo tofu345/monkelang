@@ -50,7 +50,8 @@ void test_instructions_string(void) {
     make_into(&test, OpConstant, 65535);
     make_into(&test, OpClosure, 65535, 255);
 
-    char *expected_body = "0000 OpAdd\n\
+    char *expected_body = "\
+0000 OpAdd\n\
 0001 OpGetLocal 1\n\
 0003 OpConstant 2\n\
 0006 OpConstant 65535\n\
@@ -91,10 +92,9 @@ void test_read_operands(void) {
     };
     int length = sizeof(tests) / sizeof(tests[0]);
 
-    struct Test tt;
     int n;
     for (int i = 0; i < length; i++) {
-        tt = tests[i];
+        struct Test tt = tests[i];
         const Definition *def = lookup(tt.bytecode[0]);
         Operands operands = read_operands(&n, def, tt.actual.data);
         if (n != tt.bytesRead) {

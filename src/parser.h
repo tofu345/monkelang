@@ -1,11 +1,12 @@
 #pragma once
 
 // The modules contains the Parser, it constructs and AST (Program) from the
-// source code.
+// source code using Pratt Parsing.
 
 #include "ast.h"
 #include "lexer.h"
 #include "errors.h"
+#include "token.h"
 
 typedef struct Parser Parser;
 
@@ -20,10 +21,11 @@ struct Parser {
 
     ErrorBuffer errors;
 
-    // [t_Return] must remain the last [TokenType].
-    // It cannot have a [PrefixParseFn] or [InfixParseFn].
-    PrefixParseFn *prefix_parse_fns[t_Return];
-    InfixParseFn *infix_parse_fns[t_Return];
+    // Instead of a hashmap, each token contains a pointer to a parser function
+    // for that token or NULL, which indicates it cannot be parsed.
+
+    PrefixParseFn *prefix_parse_fns[t_Return + 1];
+    InfixParseFn *infix_parse_fns[t_Return + 1];
 };
 
 void parser_init(Parser* p);

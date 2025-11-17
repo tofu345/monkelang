@@ -524,9 +524,9 @@ test_assign_expressions(void) {
         "\
         let hash = {1: 2, 3: 4};\
         hash[1] = null;\
-        hash[1]\
+        hash\
         ",
-        TEST_NULL
+        TEST_TABLE(3, 4)
     );
 
     // assign free variable
@@ -606,10 +606,10 @@ test_free_variable_list(void) {
 static IntArray
 make_int_array(int n, ...) {
     IntArray arr = {0};
-    int capacity = 0;
 
     if (n == 0) { return arr; }
 
+    int capacity = 0;
     va_list ap;
     va_start(ap, n);
     do {
@@ -798,6 +798,7 @@ vm_test(char *input, Test *expected) {
 
     Compiler c;
     compiler_init(&c);
+
     VM vm;
     vm_init(&vm, NULL, NULL, NULL);
 
@@ -851,15 +852,12 @@ vm_test(char *input, Test *expected) {
     }
 
     Object stack_elem = vm_last_popped(&vm);
-    int res = test_expected_object(*expected, stack_elem);
-    if (res != 0) {
-        fail = true;
-    }
+    fail = test_expected_object(*expected, stack_elem) == -1;
 
 cleanup:
     vm_free(&vm);
-    program_free(&prog);
     compiler_free(&c);
+    program_free(&prog);
 
     if (fail) {
         printf("in test: '%s'\n\n", input);
@@ -902,8 +900,8 @@ vm_test_error(char *input, char *expected_error) {
     vm_free(&vm);
 
 cleanup:
-    program_free(&prog);
     compiler_free(&c);
+    program_free(&prog);
 
     if (fail) {
         printf("in test: '%s'\n\n", input);

@@ -22,7 +22,7 @@ void tearDown(void) {
 
 // free and reset [prog]
 static void
-__program_free(void) {
+_program_free(void) {
     program_free(&prog);
     prog = (Program){0};
 }
@@ -50,36 +50,6 @@ static void test_let_statement(Node stmt, const char* exp_name) {
     if (strncmp(exp_name, let_stmt->name->tok.start, let_stmt->name->tok.length)) {
         puts("wrong LetStatement.Identifier.Value");
         TEST_FAIL();
-    }
-}
-
-void test_return_statements(void) {
-    char* input = "\
-return;\
-return 5;\
-return 10;\
-return 993322;\
-";
-
-    parser_init(&p);
-    prog = parse(&p, input);
-
-    check_parser_errors(&p);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-            4, prog.stmts.length, "wrong prog.statements length");
-
-    for (int i = 0; i < prog.stmts.length; i++) {
-        Node stmt = prog.stmts.data[i];
-
-        if (stmt.typ != n_ReturnStatement) {
-            printf("type not ReturnStatement got='%d'\n", stmt.typ);
-            TEST_FAIL();
-        }
-
-        if (strncmp("return", ((Token*)stmt.obj)->start, ((Token*)stmt.obj)->length)) {
-            puts("wrong ReturnStatement.Token.literal");
-            TEST_FAIL();
-        }
     }
 }
 
@@ -244,9 +214,52 @@ test_literal_expression(Node n, Test *test) {
         case test_bool:
             test_boolean_literal(n, test->val._bool);
             break;
+        case test_null:
+            TEST_ASSERT_NULL_MESSAGE(n.obj, "Node not Null");
+            break;
         default:
             fprintf(stderr, "type of exp not handled. got %d", test->typ);
             exit(1);
+    }
+}
+
+void test_return_statements(void) {
+    struct Test {
+        const char* input;
+        Test *expectedVal;
+    } tests[] = {
+        {"return;", TEST_NULL},
+        {"return 5;", TEST(int, 5)},
+        {"return 10;", TEST(int, 10)},
+        {"return 993322;", TEST(int, 993322)},
+    };
+    int tests_len = sizeof(tests) / sizeof(tests[0]);
+
+    parser_init(&p);
+
+    for (int i = 0; i < tests_len; i++) {
+        struct Test test = tests[i];
+
+        prog = parse(&p, test.input);
+
+        check_parser_errors(&p);
+
+        Node stmt = prog.stmts.data[0];
+
+        if (stmt.typ != n_ReturnStatement) {
+            printf("type not ReturnStatement got='%d'\n", stmt.typ);
+            TEST_FAIL();
+        }
+
+        if (strncmp("return", ((Token*)stmt.obj)->start, ((Token*)stmt.obj)->length)) {
+            puts("wrong ReturnStatement.Token.literal");
+            TEST_FAIL();
+        }
+
+        ReturnStatement *rs = stmt.obj;
+        test_literal_expression(rs->return_value, test.expectedVal);
+
+        _program_free();
     }
 }
 
@@ -278,10 +291,8 @@ void test_let_statements(void) {
         LetStatement* ls = stmt.obj;
         test_literal_expression(ls->value, test.expectedVal);
 
-        __program_free();
+        _program_free();
     }
-
-    prog = (Program){0};
 }
 
 void test_parsing_prefix_expressions(void) {
@@ -324,10 +335,8 @@ void test_parsing_prefix_expressions(void) {
 
         test_literal_expression(pe->right, test.value);
 
-        __program_free();
+        _program_free();
     }
-
-    prog = (Program){0};
 }
 
 void test_parsing_infix_expressions(void) {
@@ -382,10 +391,8 @@ void test_parsing_infix_expressions(void) {
 
         test_literal_expression(ie->right, test.right_value);
 
-        __program_free();
+        _program_free();
     }
-
-    prog = (Program){0};
 }
 
 void test_operator_precedence_parsing(void) {
@@ -543,10 +550,8 @@ void test_operator_precedence_parsing(void) {
 
         free(buf);
 
-        __program_free();
+        _program_free();
     }
-
-    prog = (Program){0};
 }
 
 static void
@@ -599,10 +604,8 @@ void test_boolean_expression(void) {
                 b->value == test.expected, "wrong BooleanLiteral.value");
 
 
-        __program_free();
+        _program_free();
     }
-
-    prog = (Program){0};
 }
 
 void test_if_expression(void) {
@@ -787,10 +790,8 @@ void test_function_parameter_parsing(void) {
                     TEST(str, test.expectedParams[i]));
         }
 
-        __program_free();
+        _program_free();
     }
-
-    prog = (Program){0};
 }
 
 void test_call_expression_parsing(void) {
@@ -1164,7 +1165,7 @@ void test_parser_errors(void) {
             pass = false;
         }
 
-        __program_free();
+        _program_free();
         parser_free(&p);
         p.errors = (ErrorBuffer){0};
     }

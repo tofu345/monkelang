@@ -9,13 +9,10 @@
 Compiler c;
 
 // initialize Program and Compiler.
-static void __init(void);
+static void init(void);
 
-static void c_test(
-    char *input,
-    Constants expectedConstants,
-    Instructions expectedInstructions
-);
+static void c_test(char *input, Constants expectedConstants,
+                   Instructions expectedInstructions);
 static void c_test_error(const char *input, const char *expected_error);
 
 #define INT(n) TEST(int, n)
@@ -454,7 +451,7 @@ void test_functions_without_return_value(void) {
 }
 
 void test_compiler_scopes(void) {
-    __init();
+    init();
 
     if (c.cur_scope_index != 0) {
         printf("scope_index wrong. got=%d, want=%d\n", c.cur_scope_index, 0);
@@ -1019,7 +1016,7 @@ Program prog;
 Error *err;
 
 static void
-__init(void) {
+init(void) {
     compiler_init(&c);
     prog = (Program){0};
     err = NULL;
@@ -1028,7 +1025,7 @@ __init(void) {
 }
 
 static void
-__cleanup(void) {
+cleanup(void) {
     compiler_free(&c);
     program_free(&prog);
     free_error(err);
@@ -1040,13 +1037,13 @@ void setUp(void) {}
 
 void tearDown(void) {
     if (initialized) {
-        __cleanup();
+        cleanup();
     }
 }
 
 static void
 c_test_error(const char *input, const char *expected_error) {
-    __init();
+    init();
 
     prog = test_parse(input);
 
@@ -1064,16 +1061,12 @@ c_test_error(const char *input, const char *expected_error) {
         TEST_FAIL();
     }
 
-    __cleanup();
+    cleanup();
 }
 
-static void
-c_test(
-    char *input,
-    Constants expectedConstants,
-    Instructions expectedInstructions
-) {
-    __init();
+static void c_test(char *input, Constants expectedConstants,
+                   Instructions expectedInstructions) {
+    init();
 
     prog = test_parse(input);
 
@@ -1103,7 +1096,7 @@ c_test(
         TEST_FAIL();
     }
 
-    __cleanup();
+    cleanup();
 }
 
 static int

@@ -11,6 +11,9 @@ typedef enum __attribute__ ((__packed__)) {
     t_Ident, // identifiers (variable names)
 
     // literals
+    t_Null,
+    t_True,
+    t_False,
     t_String,
     t_Digit, // integer and floating point numbers.
              // TODO: separate integer and floats tokens.
@@ -41,9 +44,6 @@ typedef enum __attribute__ ((__packed__)) {
     // Keywords
     t_Function,
     t_Let,
-    t_True,
-    t_False,
-    t_Null,
     t_If,
     t_Else,
     t_Return,

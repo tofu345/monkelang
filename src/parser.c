@@ -132,8 +132,9 @@ parse_expression(Parser* p, enum Precedence precedence) {
             && precedence < peek_precedence(p)) {
 
         InfixParseFn *infix = p->infix_parse_fns[p->peek_token.type];
-        if (infix == NULL)
+        if (infix == NULL) {
             return left_exp;
+        }
 
         next_token(p);
 
