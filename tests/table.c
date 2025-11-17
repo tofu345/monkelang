@@ -97,7 +97,7 @@ test_table_remove(void) {
     int i, num = 50;
     for (i = 0; i < num; i++) {
         Object obj = OBJ(o_Integer, i);
-        expect_get(obj, obj);
+        expect_set(obj, obj);
     }
 
     bool found[num];

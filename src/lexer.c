@@ -220,8 +220,16 @@ Token lexer_next_token(Lexer *l) {
             return tok;
 
         } else if (is_digit(l->ch)) {
-            tok.type = t_Digit;
-            tok.length = read_while(l, is_digit);
+            tok.type = t_Integer;
+
+            int pos = l->position;
+            while (l->position < l->input_len && is_digit(l->ch)) {
+                if (l->ch == '.') {
+                    tok.type = t_Float;
+                }
+                read_char(l);
+            }
+            tok.length = l->position - pos;
             return tok;
         }
     }

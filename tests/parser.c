@@ -1115,7 +1115,7 @@ void test_parser_errors(void) {
         {"1..5", "could not parse '1..5' as float"},
         {
             "15189704987123048718947",
-            "could not parse '15189704987123048718947' as integer"
+            "integer '15189704987123048718947' is out of range"
         },
 
         {"10 + + 5", "unexpected token '+'"},
@@ -1130,14 +1130,14 @@ void test_parser_errors(void) {
             "expected next token to be '{', got 'if' instead"
         },
 
-        {"fn (1)", "expected token to be 'Identifier', got 'Digit' instead"},
-        {"add(4 5);", "expected next token to be ')', got 'Digit' instead"},
+        {"fn (1)", "expected token to be 'Identifier', got 'Integer' instead"},
+        {"add(4 5);", "expected next token to be ')', got 'Integer' instead"},
 
         {"\"hello world\"\";", "missing closing '\"' for string"},
-        {"[1 2]", "expected next token to be ']', got 'Digit' instead"},
-        {"[1, 1 2]", "expected next token to be ']', got 'Digit' instead"},
+        {"[1 2]", "expected next token to be ']', got 'Integer' instead"},
+        {"[1, 1 2]", "expected next token to be ']', got 'Integer' instead"},
 
-        {"array[1 2]", "expected next token to be ']', got 'Digit' instead"},
+        {"array[1 2]", "expected next token to be ']', got 'Integer' instead"},
 
         {"{ return; }", "unexpected token 'return'"},
         {"{1, 3}", "expected next token to be ':', got ',' instead"},
@@ -1157,9 +1157,8 @@ void test_parser_errors(void) {
         if (p.errors.length == 0) {
             printf("expected parser error for test: %s\n", test.input);
             pass = false;
-        }
 
-        if (test.error && strcmp(test.error, p.errors.data[0].message) != 0) {
+        } else if (strcmp(test.error, p.errors.data[0].message) != 0) {
             printf("wrong parser error for test: %s\nwant= %s\ngot = %s\n",
                     test.input, test.error, p.errors.data[0].message);
             pass = false;

@@ -179,22 +179,22 @@ parse_float(Parser* p) {
 }
 
 static Node
-parse_digit(Parser* p) {
-    for (int i = 0; i < p->cur_token.length; i++) {
-        if (p->cur_token.start[i] == '.') {
-            return parse_float(p);
-        }
-    }
-
+parse_integer(Parser* p) {
     Token tok = p->cur_token;
     const char *end = tok.start + tok.length;
     char* endptr;
 
     errno = 0; // must reset errno
     long value = strtol(tok.start, &endptr, 0);
-    if (endptr != end || errno == ERANGE) {
+    if (endptr != end) {
         parser_error(p,
                 "could not parse '%.*s' as integer",
+                LITERAL(p->cur_token));
+        return INVALID;
+
+    } else if (errno == ERANGE) {
+        parser_error(p,
+                "integer '%.*s' is out of range",
                 LITERAL(p->cur_token));
         return INVALID;
     }
@@ -683,7 +683,8 @@ void parser_init(Parser* p) {
     lexer_init(&p->l, NULL);
 
     p->prefix_parse_fns[t_Ident] = parse_identifier;
-    p->prefix_parse_fns[t_Digit] = parse_digit;
+    p->prefix_parse_fns[t_Integer] = parse_integer;
+    p->prefix_parse_fns[t_Float] = parse_float;
     p->prefix_parse_fns[t_Bang] = parse_prefix_expression;
     p->prefix_parse_fns[t_Minus] = parse_prefix_expression;
     p->prefix_parse_fns[t_True] = parse_boolean;

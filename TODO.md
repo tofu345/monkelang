@@ -1,6 +1,5 @@
 # Lexer
 
-- separate integer and floats tokens.
 - support Unicode and emoji's
 
 # Parser
@@ -13,6 +12,7 @@
 # Object
 
 - char datatype
+- print more than four decimal places in floats
 - table_expand() move all elements in previous buckets gradually.
 
 # Compiler

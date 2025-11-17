@@ -539,8 +539,7 @@ call_closure(VM *vm, Closure *cl, int num_args) {
 
     if (fn->num_locals > 0) {
         // set local variables to [o_Null] to avoid use after free if GC is
-        // triggered and accesses Compound Data Types on the stack that are
-        // potentially freed.
+        // triggered and accesses freed Compound Data Types still on the stack.
         memset(vm->stack + vm->sp, 0, fn->num_locals * sizeof(Object));
     }
 
