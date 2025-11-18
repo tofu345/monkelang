@@ -1,6 +1,8 @@
 #pragma once
 
-// This module manages the allocation and freeing of Compound Data Types.
+// This module manages the allocation and garbage collection of Compound Data
+// Types.  GC algorithm based on Boot.dev memory management in C course
+// https://youtu.be/rJrd2QMVbGM and wren.
 
 #include "object.h"
 #include "vm.h"

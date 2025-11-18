@@ -243,6 +243,8 @@ void test_return_statements(void) {
         prog = parse(&p, test.input);
 
         check_parser_errors(&p);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(
+                1, prog.stmts.length, "wrong prog.statements length");
 
         Node stmt = prog.stmts.data[0];
 
@@ -284,6 +286,8 @@ void test_let_statements(void) {
         prog = parse(&p, test.input);
 
         check_parser_errors(&p);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(
+                1, prog.stmts.length, "wrong prog.statements length");
 
         Node stmt = prog.stmts.data[0];
         test_let_statement(stmt, test.expectedIdent);
@@ -1110,7 +1114,11 @@ void test_parser_errors(void) {
     } tests[] = {
         {"let x = =;", "unexpected token '='"},
         {"let = = 1;", "expected next token to be 'Identifier', got '=' instead"},
-        {"return let;", "expected next token to be 'Identifier', got ';' instead"},
+        {
+            "return let;", // empty return statement followed by invalid let
+                           // statement
+            "expected next token to be 'Identifier', got ';' instead"
+        },
 
         {"1..5", "could not parse '1..5' as float"},
         {
@@ -1132,10 +1140,12 @@ void test_parser_errors(void) {
 
         {"fn (1)", "expected token to be 'Identifier', got 'Integer' instead"},
         {"add(4 5);", "expected next token to be ')', got 'Integer' instead"},
+        {"add(return)", "unexpected token 'return'"},
 
         {"\"hello world\"\";", "missing closing '\"' for string"},
         {"[1 2]", "expected next token to be ']', got 'Integer' instead"},
         {"[1, 1 2]", "expected next token to be ']', got 'Integer' instead"},
+        {"[ return; ]", "unexpected token 'return'"},
 
         {"array[1 2]", "expected next token to be ']', got 'Integer' instead"},
 

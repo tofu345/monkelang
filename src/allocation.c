@@ -219,9 +219,8 @@ void mark_objs(Object *objs, int len) {
         if (objs[i].type >= o_String) {
             trace_mark_object(objs[i]);
         }
-
 #ifdef DEBUG
-        if (objs[i].type < o_String) {
+        else {
             printf("skip: ");
             object_fprint(objs[i], stdout);
             putc('\n', stdout);
