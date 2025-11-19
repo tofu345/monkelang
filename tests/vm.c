@@ -79,6 +79,26 @@ test_conditionals(void) {
     vm_test("if ((if (false) { 10 })) { 10 } else { 20 }", TEST(int, 20));
 }
 
+// Truthy:
+// - boolean true
+// - numbers not 0 (C-like)
+// - arrays and tables with more than one element
+// - everything else except null.
+static void
+test_truthy(void) {
+    vm_test("if (true) {1}", TEST(int, 1));
+    vm_test("if (1) {1}", TEST(int, 1));
+    vm_test("if (1.5) {1}", TEST(int, 1));
+    vm_test("if (-1) {1}", TEST(int, 1));
+    vm_test("if (-1.5) {1}", TEST(int, 1));
+    vm_test("if ([1]) {1}", TEST(int, 1));
+    vm_test("if ({1: 2}) {1}", TEST(int, 1));
+
+    vm_test("if ([]) {1}", TEST_NULL);
+    vm_test("if ({}) {1}", TEST_NULL);
+    vm_test("if (null) {1}", TEST_NULL);
+}
+
 static void
 test_global_let_statements(void) {
     vm_test("let one = 1; one", TEST(int, 1));
@@ -187,6 +207,11 @@ test_functions_without_return_value(void) {
             noReturnTwo();\
         ",
         TEST_NULL
+    );
+
+    vm_test_error(
+        "let infRec = fn() { infRec(); }; infRec()",
+        "exceeded maximum function call stack"
     );
 }
 
@@ -357,12 +382,25 @@ test_builtin_functions(void) {
     vm_test("rest([1, 2, 3])", TEST_ARR(2, 3));
     vm_test("rest([])", TEST_ARR(0));
     vm_test("push([], 1)", TEST_ARR(1));
+    vm_test(
+        "\
+        let arr = [1, 2];\
+        let arr2 = copy(arr);\
+        push(arr2, 3);\
+        arr\
+        ",
+        TEST_ARR(1, 2)
+    );
+    vm_test("type([])", TEST(str, "array"));
+    vm_test("type({})", TEST(str, "table"));
+    vm_test("type(1) != type(1.0)", TEST(bool, true));
 
     vm_test_error("len(1)", "builtin len(): argument of integer not supported");
     vm_test_error("len(\"one\", \"two\")", "builtin len() takes 1 argument got 2");
     vm_test_error("first(1)", "builtin first(): argument of integer not supported");
     vm_test_error("last(1)", "builtin last(): argument of integer not supported");
     vm_test_error("push(1, 1)", "builtin push() expects first argument to be array got integer");
+    vm_test_error("type(1, 1)", "builtin type() takes 1 argument got 2");
 }
 
 static void
@@ -914,6 +952,7 @@ int main(void) {
     RUN_TEST(test_integer_arithmetic);
     RUN_TEST(test_boolean_expressions);
     RUN_TEST(test_conditionals);
+    RUN_TEST(test_truthy);
     RUN_TEST(test_global_let_statements);
     RUN_TEST(test_string_expressions);
     RUN_TEST(test_array_literals);

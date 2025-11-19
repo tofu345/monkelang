@@ -61,16 +61,15 @@ typedef union {
     long integer;
     double floating;
     bool boolean;
+    const Builtin *builtin;
+    error err;
 
     CharBuffer* string;
     ObjectBuffer* array;
     Table* table;
     Closure *closure;
-    const Builtin *builtin;
 
-    error err;
-
-    void *ptr;
+    void *ptr; // generic pointer
 } ObjectData;
 
 struct Object {
@@ -85,11 +84,6 @@ struct Closure {
     Object free[];
 };
 
-// Truthy:
-// - boolean true
-// - numbers not 0 (C-like)
-// - arrays and tables with any number of elements
-// - everything else except null.
 bool is_truthy(Object obj);
 
 // compare [left] and [right]. returns [Null Object] otherwise

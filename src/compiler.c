@@ -31,9 +31,10 @@ void compiler_init(Compiler *c) {
     c->current_symbol_table = symbol_table_new();
 
     // define builtin function [Symbols]
-    Builtins builtins = get_builtins();
-    for (int i = 0; i < builtins.length; i++) {
-        sym_builtin(c->current_symbol_table, i, builtins.data[i].name);
+    int len;
+    const Builtin *builtins = get_builtins(&len);
+    for (int i = 0; i < len; i++) {
+        sym_builtin(c->current_symbol_table, i, builtins[i].name);
     }
 
     CompiledFunction *main_fn = new_function();

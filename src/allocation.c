@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 
 // [vm_allocate()], memset 0 and create [Allocation] with [type].
 static void *new_allocation(VM *vm, ObjectType type, size_t size);
@@ -13,8 +14,7 @@ static void *new_allocation(VM *vm, ObjectType type, size_t size);
 CharBuffer *create_string(VM *vm, const char *text, int length) {
     char *data = vm_allocate(vm, length + 1);
     if (text) {
-        memcpy(data, text, length);
-        data[length] = '\0';
+        strncpy(data, text, length);
     }
 
     CharBuffer *buf = new_allocation(vm, o_String, sizeof(CharBuffer));
@@ -284,8 +284,8 @@ void *vm_allocate(VM *vm, size_t size) {
         vm->bytesTillGC = NextGC;
     }
 
-    void *ptr = malloc(size);
-    if (ptr == NULL) { die("malloc"); }
+    void *ptr = calloc(1, size);
+    if (ptr == NULL) { die("calloc"); }
     return ptr;
 }
 

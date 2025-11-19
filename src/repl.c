@@ -216,8 +216,8 @@ multigetline(char **input, size_t *input_cap,
     }
 
     // last character before '\n'
-    char last_th = (*input)[len - 2];
-    if (last_th != '{' && last_th != '(') { return len; }
+    char last_ch = (*input)[len - 2];
+    if (last_ch != '{' && last_ch != '(') { return len; }
 
     char *line = NULL;
     size_t line_cap = 0,

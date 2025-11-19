@@ -90,7 +90,7 @@ fprint_closure(Closure *cl, FILE *fp) {
 }
 
 static int
-fprint_builtin_function(Builtin *builtin, FILE *fp) {
+fprint_builtin_function(const Builtin *builtin, FILE *fp) {
     FPRINTF(fp, "<builtin: %s>", builtin->name);
     return 0;
 }
@@ -123,7 +123,7 @@ int object_fprint(Object o, FILE* fp) {
             return fprint_table(o.data.table, fp);
 
         case o_BuiltinFunction:
-            return fprint_builtin_function(o.data.ptr, fp);
+            return fprint_builtin_function(o.data.builtin, fp);
 
         case o_Closure:
             return fprint_closure(o.data.closure, fp);

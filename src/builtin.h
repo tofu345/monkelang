@@ -12,9 +12,5 @@ struct Builtin {
     BuiltinFn *fn;
 };
 
-typedef struct {
-    const Builtin *data;
-    int length;
-} Builtins;
-
-Builtins get_builtins();
+// set len if not NULL, return pointer to array of Builtins.
+const Builtin *get_builtins(int *len);

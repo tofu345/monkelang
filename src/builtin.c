@@ -175,6 +175,17 @@ builtin_puts(__attribute__ ((unused)) VM *vm, Object *args, int num_args) {
     return NULL_OBJ;
 }
 
+Object
+builtin_type(VM *vm, Object *args, int num_args) {
+    if (num_args != 1) {
+        return ERR_NUM_ARGS("builtin type()", 1, num_args);
+    }
+
+    const char *type = show_object_type(args[0].type);
+    CharBuffer *string = create_string(vm, type, strlen(type));
+    return OBJ(o_String, .string = string);
+}
+
 #define BUILTIN(fn) {#fn, builtin_##fn}
 
 const Builtin builtins[] = {
@@ -186,9 +197,12 @@ const Builtin builtins[] = {
     BUILTIN(push),
     BUILTIN(exit),
     BUILTIN(copy),
+    BUILTIN(type),
 };
 
-Builtins get_builtins() {
-    static int len = sizeof(builtins) / sizeof(builtins[0]);
-    return (Builtins){ .data = builtins, .length = len };
+const Builtin *get_builtins(int *len) {
+    if (len) {
+        *len = sizeof(builtins) / sizeof(builtins[0]);
+    }
+    return builtins;
 }

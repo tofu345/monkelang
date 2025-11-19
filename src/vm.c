@@ -549,7 +549,7 @@ call_closure(VM *vm, Closure *cl, int num_args) {
 }
 
 static error
-call_builtin(VM *vm, Builtin *builtin, int num_args) {
+call_builtin(VM *vm, const Builtin *builtin, int num_args) {
     Object *args = vm->stack + vm->sp - num_args;
     Object result = builtin->fn(vm, args, num_args);
 
@@ -598,7 +598,7 @@ execute_call(VM *vm, int num_args) {
         case o_Closure:
             return call_closure(vm, callee.data.closure, num_args);
         case o_BuiltinFunction:
-            return call_builtin(vm, callee.data.ptr, num_args);
+            return call_builtin(vm, callee.data.builtin, num_args);
         default:
             return new_error("calling non-function and non-builtin");
     }
@@ -630,21 +630,19 @@ vm_push_closure(VM *vm, int const_index, int num_free) {
 }
 
 error vm_run(VM *vm, Bytecode bytecode) {
-    *vm->main_cl = (Closure) {
-        .func = bytecode.main_function,
-        .num_free = 0,
-    };
-    frame_init(vm, vm->main_cl, 0);
-
     vm->num_globals = bytecode.num_globals;
     vm->constants = *bytecode.constants;
 
+    vm->main_cl->func = bytecode.main_function;
+    vm->frames_index = 0;
+    frame_init(vm, vm->main_cl, 0);
+
     Frame *current_frame = vm->frames;
     Instructions ins = instructions(current_frame);
+    const Builtin *builtins = get_builtins(NULL);
 
-    Builtins builtins = get_builtins();
-    Opcode op;
     int ip, pos, num;
+    Opcode op;
     Object obj;
     error err;
     while (current_frame->ip < ins.length - 1) {
@@ -852,7 +850,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 current_frame->ip += 1;
 
                 err = vm_push(vm,
-                        OBJ(o_BuiltinFunction, .builtin = builtins.data + pos));
+                        OBJ(o_BuiltinFunction, .builtin = builtins + pos));
                 if (err) { return err; };
                 break;
 
