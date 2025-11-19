@@ -586,7 +586,7 @@ test_assign_expressions(void) {
 
 static void
 test_free_variable_list(void) {
-    // has effect
+    // should have an effect
     vm_test(
         "\
         fn() {\
@@ -618,7 +618,7 @@ test_free_variable_list(void) {
         TEST(bool, true)
     );
 
-    // no effect
+    // should have no effect
     vm_test(
         "\
         fn() {\

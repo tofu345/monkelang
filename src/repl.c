@@ -11,21 +11,15 @@
 #include <string.h>
 #include <sys/poll.h>
 
-// A successfully compiled and run evaluation.
+// Successfully compiled and run input.
 typedef struct {
-    char *source;
-    int len;
-
+    char *input;
     Program program;
-
-    // main function
-    CompiledFunction *function;
 } Eval;
 
-BUFFER(Eval, Eval)
-DEFINE_BUFFER(Eval, Eval)
+BUFFER(Done, Eval)
+DEFINE_BUFFER(Done, Eval)
 
-static void free_eval(Eval *current);
 static void print_parser_errors(FILE* out, Parser *p);
 
 // getline() but if first line ends with '{' or '(', read and append multiple
@@ -44,37 +38,34 @@ void repl(FILE* in_stream, FILE* out_stream) {
     VM vm;
     vm_init(&vm, NULL, NULL, NULL);
 
-    EvalBuffer done = {0};
-    Eval eval = {0};
-    bool success = false;
+    DoneBuffer done = {0};
 
+    char *input = NULL;
+    int len;
     size_t cap = 0;
+    Program prog;
     while (1) {
-        eval.len = multigetline(&eval.source, &cap, in_stream, out_stream);
-        if (eval.len == -1) {
-            free(eval.source);
+        len = multigetline(&input, &cap, in_stream, out_stream);
+        if (len == -1) {
+            free(input);
             break;
 
         // only '\n' was entered.
-        } else if (eval.len == 1) {
-            free(eval.source);
-            eval.source = NULL;
+        } else if (len == 1) {
+            free(input);
+            input = NULL;
             continue;
         }
 
-        eval.program = parse_(&p, eval.source, eval.len);
+        prog = parse_(&p, input, len);
         if (p.errors.length > 0) {
             print_parser_errors(out_stream, &p);
             goto cleanup;
-
-        } else if (eval.program.stmts.length == 0) {
-            free(eval.source);
-            eval.source = NULL;
-            continue;
+        } else if (prog.stmts.length == 0) {
+            goto cleanup;
         }
 
-        eval.function = c.cur_scope->function;
-        Error *e = compile(&c, &eval.program);
+        Error *e = compile(&c, &prog);
         if (e) {
             fprintf(out_stream, "Woops! Compilation failed!\n");
             print_error(e);
@@ -97,28 +88,25 @@ void repl(FILE* in_stream, FILE* out_stream) {
             fputc('\n', out_stream);
         }
 
-        EvalBufferPush(&done, eval);
-        success = true;
+        DoneBufferPush(&done, (Eval){
+            .input = input,
+            .program = prog,
+        });
+        goto cleanup_;
 
 cleanup:
-        if (!success) {
-            free_eval(&eval);
-        }
-        eval = (Eval){0};
-        success = false;
+        free(input);
+        program_free(&prog);
+
+cleanup_:
+        input = NULL;
+        prog = (Program){0};
 
         // free unsuccessfully [CompiledFunctions]
         for (; c.cur_scope_index > 0; --c.cur_scope_index) {
             free_function(c.scopes.data[c.cur_scope_index].function);
         }
         c.scopes.length = 1;
-
-        // new main function
-        CompiledFunction *main_fn = new_function();
-        c.scopes.data[0] = (CompilationScope){ .function = main_fn };
-        c.cur_scope = c.scopes.data;
-        c.current_instructions = &main_fn->instructions;
-        c.cur_mapping = &main_fn->mappings;
 
         // reset VM
         vm.sp = 0;
@@ -130,7 +118,8 @@ cleanup:
     compiler_free(&c);
     parser_free(&p);
     for (int i = 0; i < done.length; i++) {
-        free_eval(done.data + i);
+        free(done.data[i].input);
+        program_free(&done.data[i].program);
     }
     free(done.data);
 }
@@ -175,17 +164,6 @@ cleanup:
     compiler_free(&c);
     program_free(&prog);
     parser_free(&p);
-}
-
-static void
-free_eval(Eval *eval) {
-    free(eval->source);
-
-    program_free(&eval->program);
-
-    if (eval->function) {
-        free_function(eval->function);
-    }
 }
 
 static void

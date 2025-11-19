@@ -1,6 +1,6 @@
 # [Writing an Compiler ~~in Go~~](https://compilerbook.com/) in C.
 
-A port of the book in C.  Takes a lot of inspiration from
+A port of the book in C. Takes a lot of inspiration from
 [wren](https://github.com/wren-lang/wren).
 
 ## Syntax
@@ -120,13 +120,14 @@ fn() {
   let array = [];
   fn() {
     // A free variable is a non-global variable not defined in the current
-    // function.  All functions create shallow copies of their free variables.
+    // function.  All functions create shallow copies of their free variables
+    // in a free list.
 
     // no effect outside this function, only changes the value in the free
-    // variable list.
+    // list.
     num = 2;
 
-    // has an effect, because the free variable list contains a shallow copy.
+    // has an effect, because the free list contains a shallow copy.
     push(array, 1);
 
     array = {}; // no effect
@@ -134,8 +135,21 @@ fn() {
   puts("num is", num); // num is 1
   puts("array is", array); // array is [1]
 }()
+
+// Say [message] 5 times
+let say5times = fn(message) {
+  let num = 0;
+  let aux = fn() {
+    if (num == 5) { return; } // Empty return statement
+    puts(message);
+    num = num + 1;
+    aux();
+  }
+  aux();
+}
+say5times("hi!"); // => "hi" "hi" "hi" "hi" "hi"
 ```
 
 ## Tree Walking Interpreter
 
-Available on a [separate branch](https://github.com/tofu345/monkelang/tree/evaluator).
+Available on a [separate branch].

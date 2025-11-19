@@ -3,17 +3,16 @@
 // This module defines types for Object.  A C variable of that type contains an
 // ObjectType and ObjectData of the following categories:
 //
-// Primitive data types: null, numbers and booleans are stored entirely
-// in ObjectData, copying them copies their value.
+// Primitive data types: null, integers and floats and booleans are stored
+// entirely in ObjectData, so copies are deep copies.
 //
 // Compound data types: strings, arrays, tables (hashmaps) and closures contain
-// pointers.  Copying them only copies their pointer.
+// pointers.  All copies are shallow, unless with the copy() builtin function
+// (which wraps around object_copy).
 //
-// All functions are Closures and all Closures contain a list of Objects
-// representing its free variables, variables defined outside the
-// current function that are not global variables.  Because of this,
-// assignments to free variables of primitive types only change the
-// value in the free variable list.
+// All functions (except builtins) are Closures and all Closures contain a free
+// list, which contains shallow copies of variables defined outside the current
+// function that are not global.
 
 #include "ast.h"
 #include "code.h"
