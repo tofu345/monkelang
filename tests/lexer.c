@@ -40,7 +40,11 @@ if (5 < 10) {\
 \"foo\nbar\"\
 [1, 2];\
 {\"foo\": \"bar\"};\
-// this should be ignored";
+// this should be ignored\n\
+\
+for (let i = 0; i < 10; i = i + 1) {\
+    puts(\"i:\", i);\
+}";
 
     struct Test {
         TokenType type;
@@ -150,6 +154,32 @@ if (5 < 10) {\
 	{t_String, "bar", 3},
 	{t_Rbrace, "}", 1},
 	{t_Semicolon, ";", 1},
+        {t_For, "for", 3},
+        {t_Lparen, "(", 1},
+        {t_Let, "let", 3},
+        {t_Ident, "i", 1},
+        {t_Assign, "=", 1},
+        {t_Integer, "0", 1},
+        {t_Semicolon, ";", 1},
+        {t_Ident, "i", 1},
+        {t_Lt, "<", 1},
+        {t_Integer, "10", 2},
+        {t_Semicolon, ";", 1},
+        {t_Ident, "i", 1},
+        {t_Assign, "=", 1},
+        {t_Ident, "i", 1},
+        {t_Plus, "+", 1},
+        {t_Integer, "1", 1},
+        {t_Rparen, ")", 1},
+        {t_Lbrace, "{", 1},
+        {t_Ident, "puts", 4},
+        {t_Lparen, "(", 1},
+        {t_String, "i:", 2},
+        {t_Comma, ",", 1},
+        {t_Ident, "i", 1},
+        {t_Rparen, ")", 1},
+        {t_Semicolon, ";", 1},
+        {t_Rbrace, "}", 1},
 	{t_Eof, "", 1},
     };
     size_t len_tests = sizeof(tests) / sizeof(tests[0]);

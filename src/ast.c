@@ -151,6 +151,18 @@ fprint_expression_statement(ExpressionStatement* es, FILE* fp) {
 }
 
 static int
+fprint_for_statement(ForStatement* fs, FILE* fp) {
+    FPRINTF(fp, "for (");
+    NODE_FPRINT(fp, fs->init_statement);
+    NODE_FPRINT(fp, fs->condition);
+    FPRINTF(fp, ";");
+    NODE_FPRINT(fp, fs->update_statement);
+    FPRINTF(fp, ")");
+    node_fprint(NODE(n_BlockStatement, fs->body), fp);
+    return 0;
+}
+
+static int
 fprint_array_literal(ArrayLiteral* al, FILE* fp) {
     FPRINTF(fp, "[");
     for (int i = 0; i < al->elements.length - 1; i++) {
@@ -256,6 +268,9 @@ int node_fprint(const Node n, __attribute__ ((unused)) FILE* fp) {
         case n_BlockStatement:
             return fprint_block_statement(n.obj, fp);
 
+        case n_ForStatement:
+            return fprint_for_statement(n.obj, fp);
+
         case n_ArrayLiteral:
             return fprint_array_literal(n.obj, fp);
 
@@ -355,6 +370,16 @@ free_expression_statement(ExpressionStatement* es) {
     free(es);
 }
 
+void free_for_statement(ForStatement *fs) {
+    node_free(fs->init_statement);
+    node_free(fs->condition);
+    node_free(fs->update_statement);
+    if (fs->body) {
+        free_block_statement(fs->body);
+    }
+    free(fs);
+}
+
 static void
 free_array_literal(ArrayLiteral* al) {
     if (al->elements.data != NULL) {
@@ -423,6 +448,10 @@ void node_free(Node n) {
 
         case n_ExpressionStatement:
             free_expression_statement(n.obj);
+            return;
+
+        case n_ForStatement:
+            free_for_statement(n.obj);
             return;
 
         case n_BlockStatement:

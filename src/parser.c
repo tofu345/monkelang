@@ -658,6 +658,64 @@ parse_expression_or_assign_statement(Parser* p) {
     return stmt;
 }
 
+static Node
+parse_for_statement(Parser *p) {
+    ForStatement *fs = allocate(sizeof(ForStatement));
+    fs->tok = p->cur_token;
+
+    if (!expect_peek(p, t_Lparen)) {
+        free(fs);
+        return INVALID;
+    }
+
+    next_token(p);
+
+    // => '(... ; ... ; ... )' or '(;;)'
+    if (!cur_token_is(p, t_Semicolon)) {
+        fs->init_statement = parse_statement(p);
+        if (IS_INVALID(fs->init_statement)) {
+            free_for_statement(fs);
+            return INVALID;
+        }
+    }
+
+    next_token(p);
+
+    // => '; ... )' or ';)'
+    if (cur_token_is(p, t_Semicolon) && peek_token_is(p, t_Rparen)) {
+    } else {
+        fs->condition = parse_expression(p, p_Lowest);
+        if (IS_INVALID(fs->condition) || !expect_peek(p, t_Semicolon)) {
+            free_for_statement(fs);
+            return INVALID;
+        }
+    }
+
+    // => '... )' or ')'
+    if (!peek_token_is(p, t_Rparen)) {
+        next_token(p);
+        fs->update_statement = parse_statement(p);
+        if (IS_INVALID(fs->update_statement)) {
+            free_for_statement(fs);
+            return INVALID;
+        }
+    }
+    if (!expect_peek(p, t_Rparen)) {
+        free_for_statement(fs);
+        return INVALID;
+    }
+
+    // => ') {'
+    next_token(p);
+    fs->body = parse_block_statement(p);
+    if (fs->body == NULL) {
+        free_for_statement(fs);
+        return INVALID;
+    }
+
+    return NODE(n_ForStatement, fs);
+}
+
 // on failure, return Node with `n.obj` == NULL
 static Node
 parse_statement(Parser* p) {
@@ -666,6 +724,8 @@ parse_statement(Parser* p) {
         return parse_let_statement(p);
     case t_Return:
         return parse_return_statement(p);
+    case t_For:
+        return parse_for_statement(p);
     case t_Illegal:
         parser_error(p,
                 "illegal character '%.*s'",

@@ -31,6 +31,7 @@ enum NodeType {
     n_LetStatement,
     n_AssignStatement,
     n_ReturnStatement,
+    n_ForStatement,
     n_ExpressionStatement,
     n_BlockStatement,
 };
@@ -118,6 +119,16 @@ typedef struct {
 
 void free_block_statement(BlockStatement* bs);
 int fprint_block_statement(BlockStatement* bs, FILE* fp);
+
+typedef struct {
+    Token tok; // the 'for' token
+    Node init_statement;
+    Node condition; // expression
+    Node update_statement;
+    BlockStatement* body;
+} ForStatement;
+
+void free_for_statement(ForStatement *fs);
 
 typedef struct {
     Token tok; // the 'if' token

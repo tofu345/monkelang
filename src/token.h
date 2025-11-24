@@ -42,6 +42,7 @@ typedef enum __attribute__ ((__packed__)) {
     t_Rbracket,
 
     // Keywords
+    t_For,
     t_Function,
     t_Let,
     t_If,

@@ -18,6 +18,9 @@ void setUp(void) {}
 void tearDown(void) {
     program_free(&prog);
     parser_free(&p);
+
+    prog = (Program){0};
+    p.errors = (ErrorBuffer){0};
 }
 
 // free and reset [prog]
@@ -1107,6 +1110,74 @@ void test_parsing_null_literals(void) {
     }
 }
 
+void test_for_statement(void) {
+    char* input = "for (let i = 0; i < 5; i = i + 1) { i == 10; }";
+
+    parser_init(&p);
+    prog = parse(&p, input);
+
+    check_parser_errors(&p);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.length,
+            "wrong prog.statements length");
+
+    Node n = prog.stmts.data[0];
+
+    TEST_ASSERT_MESSAGE(n_ForStatement == n.typ, "type not ForStatement");
+
+    ForStatement* fs = n.obj;
+
+    test_let_statement(fs->init_statement, "i");
+    LetStatement* ls = fs->init_statement.obj;
+    test_literal_expression(ls->value, TEST(int, 0));
+
+    test_infix_expression(fs->condition, TEST(str, "i"), "<", TEST(int, 5));
+
+    TEST_ASSERT_MESSAGE(
+            n_AssignStatement == fs->update_statement.typ,
+            "type not AssignStatement");
+
+    AssignStatement* as = fs->update_statement.obj;
+    test_identifier(as->left, "i");
+    test_infix_expression(as->right, TEST(str, "i"), "+", TEST(int, 1));
+
+    BlockStatement *bs = fs->body;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, bs->stmts.length, "wrong BlockStatement length");
+    Node stmt = bs->stmts.data[0];
+    TEST_ASSERT_MESSAGE(n_ExpressionStatement == stmt.typ,
+            "BlockStatement type not ExpressionStatement");
+    ExpressionStatement* es = stmt.obj;
+    test_infix_expression(es->expression, TEST(str, "i"), "==", TEST(int, 10));
+}
+
+void test_empty_for_statement(void) {
+    char* input = "for (;;) { i == 10; }";
+
+    parser_init(&p);
+    prog = parse(&p, input);
+
+    check_parser_errors(&p);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, prog.stmts.length,
+            "wrong prog.statements length");
+
+    Node n = prog.stmts.data[0];
+
+    TEST_ASSERT_MESSAGE(n_ForStatement == n.typ, "type not ForStatement");
+
+    ForStatement* fs = n.obj;
+
+    test_literal_expression(fs->init_statement, TEST_NULL);
+    test_literal_expression(fs->condition, TEST_NULL);
+    test_literal_expression(fs->update_statement, TEST_NULL);
+
+    BlockStatement *bs = fs->body;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, bs->stmts.length, "wrong BlockStatement length");
+    Node stmt = bs->stmts.data[0];
+    TEST_ASSERT_MESSAGE(n_ExpressionStatement == stmt.typ,
+            "BlockStatement type not ExpressionStatement");
+    ExpressionStatement* es = stmt.obj;
+    test_infix_expression(es->expression, TEST(str, "i"), "==", TEST(int, 10));
+}
+
 void test_parser_errors(void) {
     struct Test {
         const char* input;
@@ -1208,6 +1279,8 @@ int main(void) {
     RUN_TEST(test_parsing_assign_expressions);
     RUN_TEST(test_parsing_index_assign_expressions);
     RUN_TEST(test_parsing_null_literals);
+    RUN_TEST(test_for_statement);
+    RUN_TEST(test_empty_for_statement);
     RUN_TEST(test_parser_errors);
     return UNITY_END();
 }
