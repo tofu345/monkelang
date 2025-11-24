@@ -1,4 +1,5 @@
 #include "compiler.h"
+#include "ast.h"
 #include "builtin.h"
 #include "code.h"
 #include "constants.h"
@@ -224,6 +225,55 @@ _compile(Compiler *c, Node n) {
 
                     emit(c, OpReturnValue);
                 }
+                return 0;
+            }
+
+        case n_ForStatement:
+            {
+                // 00 initilization statement
+                // 01 Jump 03
+                // 02 update statement
+                // 03 condition
+                // 04 JumpNotTruthy 07
+                // 05 body
+                // 06 Jump 02
+                // 07 ...
+
+                source_map_statement(c, n);
+
+                ForStatement *fs = n.obj;
+
+                err = _compile(c, fs->init_statement);
+                if (err) { return err; }
+
+                // Emit an `OpJump` with a bogus value
+                int jump_pos = emit(c, OpJump, 9999);
+
+                int before_update_pos = c->current_instructions->length;
+                err = _compile(c, fs->update_statement);
+                if (err) { return err; }
+
+                int before_condition_pos = c->current_instructions->length;
+                change_operand(c, jump_pos, before_condition_pos);
+
+                if (fs->condition.obj != NULL) {
+                    err = _compile(c, fs->condition);
+                    if (err) { return err; }
+                } else {
+                    emit(c, OpNull);
+                }
+
+                // Emit an `OpJumpNotTruthy` with a bogus value
+                int jump_not_truthy_pos = emit(c, OpJumpNotTruthy, 9999);
+
+                err = _compile(c, NODE(n_BlockStatement, fs->body));
+                if (err) { return err; }
+
+                emit(c, OpJump, before_update_pos);
+
+                int after_body_pos = c->current_instructions->length;
+                change_operand(c, jump_not_truthy_pos, after_body_pos);
+
                 return 0;
             }
 

@@ -136,18 +136,23 @@ fn() {
   puts("array is", array); // array is [1]
 }()
 
-// Say [message] 5 times
-let say5times = fn(message) {
-  let num = 0;
-  let aux = fn() {
-    if (num == 5) { return; } // Empty return statement
-    puts(message);
-    num = num + 1;
-    aux();
-  }
-  aux();
+// Empty return statements
+let sayIf = fn(message, condition) {
+  if (!condition) { return; }
+  puts(message);
 }
-say5times("hi!"); // => "hi" "hi" "hi" "hi" "hi"
+sayIf("hi!", true); // => "hi"
+sayIf("hi!", null); // =>
+
+// Double `a`
+let a = [1, 2, 3, 4];
+let double = fn(x) { x * 2 };
+let doubled = [];
+// For loops!
+for (let i = 0; i < len(a); i = i + 1) {
+  push(doubled, double(a[i]));
+}
+puts("a:", a, "doubled:", doubled);
 ```
 
 ## Tree Walking Interpreter

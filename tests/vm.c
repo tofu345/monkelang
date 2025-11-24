@@ -641,6 +641,38 @@ test_free_variable_list(void) {
     );
 }
 
+static void
+test_for_statement(void) {
+    vm_test(
+        "\
+        let a = 5;\
+        for (let b = 1; b < 5; b = b + 1) {\
+            a = a + b;\
+        }\
+        a\
+        ",
+        TEST(int, 15)
+    );
+    vm_test(
+        "\
+        let a = 0;\
+        for (; a < 5; a = a + 1) {}\
+        a\
+        ",
+        TEST(int, 5)
+    );
+    vm_test(
+        "\
+        let a = 0;\
+        for (; a < 5; ) {\
+            a = a + 1;\
+        }\
+        a\
+        ",
+        TEST(int, 5)
+    );
+}
+
 static IntArray
 make_int_array(int n, ...) {
     IntArray arr = {0};
@@ -970,5 +1002,6 @@ int main(void) {
     RUN_TEST(test_recursive_fibonacci);
     RUN_TEST(test_assign_expressions);
     RUN_TEST(test_free_variable_list);
+    RUN_TEST(test_for_statement);
     return UNITY_END();
 }

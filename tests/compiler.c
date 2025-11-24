@@ -991,6 +991,71 @@ void test_return_statements(void) {
     );
 }
 
+void test_for_statements(void) {
+    c_test(
+        "\
+        for (let i = 0; i < 5; i = i + 1) {\
+            puts(\"i:\", i);\
+        }\
+        ",
+        _C( INT(0), INT(1), INT(5), STR("i:") ),
+        _I(
+            // initialization
+            make(OpConstant, 0),    // let i = 0;
+            make(OpSetGlobal, 0),
+
+            make(OpJump, 19),
+
+            // update
+            make(OpGetGlobal, 0),   // i = i + 1;
+            make(OpConstant, 1),
+            make(OpAdd),
+            make(OpSetGlobal, 0),
+
+            // condition
+            make(OpConstant, 2),    // i < 5;
+            make(OpGetGlobal, 0),
+            make(OpGreaterThan),
+
+            make(OpJumpNotTruthy, 43),
+
+            // body
+            make(OpGetBuiltin, 1),  // puts(...)
+            make(OpConstant, 3),
+            make(OpGetGlobal, 0),
+            make(OpCall, 2),
+            make(OpPop),
+            make(OpJump, 9)
+        )
+    );
+    c_test(
+        "\
+        for (;;) {\
+            puts(\"i\");\
+        }\
+        ",
+        _C( STR("i") ),
+        _I(
+            // initialization
+
+            make(OpJump, 3),
+
+            // update
+            // condition
+
+            make(OpNull),
+            make(OpJumpNotTruthy, 18),
+
+            // body
+            make(OpGetBuiltin, 1),
+            make(OpConstant, 0),
+            make(OpCall, 1),
+            make(OpPop),
+            make(OpJump, 3)
+        )
+    );
+}
+
 void test_compiler_errors(void) {
     c_test_error("b", "undefined variable 'b'");
     c_test_error("b = 1", "undefined variable 'b' is not assignable");
@@ -1232,6 +1297,7 @@ int main(void) {
     RUN_TEST(test_recursive_functions);
     RUN_TEST(test_assign_expressions);
     RUN_TEST(test_return_statements);
+    RUN_TEST(test_for_statements);
     RUN_TEST(test_compiler_errors);
     return UNITY_END();
 }

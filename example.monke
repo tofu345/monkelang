@@ -51,5 +51,11 @@ let double = fn(x) { x * 2 };
 let res = map(double, a);
 puts("a:", a, "map(double, a):", res);
 
+let doubled = [];
+for (let i = 0; i < len(a); i = i + 1) {
+    push(doubled, double(a[i]));
+}
+puts("a:", a, "doubled:", doubled);
+
 let arr = [1, 2, 3, 4, 5];
 puts("arr:", arr, "sum(arr)", sum(arr));

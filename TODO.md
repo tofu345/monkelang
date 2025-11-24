@@ -11,6 +11,8 @@
 
 # Object
 
+- Classes
+
 - char datatype
 - print more than four decimal places in floats
 - table_expand() move all elements in previous buckets gradually.
@@ -19,6 +21,8 @@
 
 - remove duplicate constants
 - store more information in symbol table
+- while loops
+- break, continue in loops
 
 # VM
 
@@ -28,5 +32,6 @@
 
 - highlight `[...]` in index expressions and `(...)` in call expressions
 - repl tests
+- repl: don't display result of for loop condition
 - append all inputs into one string and parse incrementally
 - ErrorType
