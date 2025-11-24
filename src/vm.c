@@ -184,7 +184,15 @@ execute_binary_string_operation(VM *vm, Opcode op, Object left, Object right) {
             r->length * sizeof(char));
     new_str->data[length] = '\0';
 
-    return OBJ(o_String, .string = new_str);
+    Object obj = OBJ(o_String, .string = new_str);
+
+#ifdef DEBUG
+    printf("create: ");
+    object_fprint(obj, stdout);
+    putc('\n', stdout);
+#endif
+
+    return obj;
 }
 
 static error

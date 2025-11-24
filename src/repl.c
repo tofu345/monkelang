@@ -22,9 +22,9 @@ DEFINE_BUFFER(Done, Eval)
 
 static void print_parser_errors(FILE* out, Parser *p);
 
-// getline() but if first line ends with '{' or '(', read and append multiple
-// lines to [input] until a blank line is encountered and there is no more data
-// to read in [in_stream].
+// getline() but if there is no more data to read or the first line ends with
+// '{' or '('.  Then read and append multiple lines to [input] until a blank
+// line is encountered and there is no data left in [in_stream].
 static int multigetline(char **input, size_t *input_cap,
                         FILE *in_stream, FILE *out_stream);
 
@@ -102,11 +102,14 @@ cleanup_:
         input = NULL;
         prog = (Program){0};
 
-        // free unsuccessfully [CompiledFunctions]
+        // reset compiler
         for (; c.cur_scope_index > 0; --c.cur_scope_index) {
+            // free unsuccessfully [CompiledFunctions]
             free_function(c.scopes.data[c.cur_scope_index].function);
         }
         c.scopes.length = 1;
+        c.current_instructions->length = 0;
+        c.cur_mapping->length = 0;
 
         // reset VM
         vm.sp = 0;
@@ -170,9 +173,9 @@ static void
 print_parser_errors(FILE* out_stream, Parser *p) {
     fprintf(out_stream, "Woops! We ran into some monkey business here!\n");
     for (int i = 0; i < p->errors.length; i++) {
-        Error err = p->errors.data[i];
-        print_error(&err);
-        free(err.message);
+        Error *err = &p->errors.data[i];
+        print_error(err);
+        free(err->message);
     }
     p->errors.length = 0;
 }
@@ -193,24 +196,26 @@ multigetline(char **input, size_t *input_cap,
         return len;
     }
 
+    struct pollfd fds;
+    fds.fd = fileno(in_stream);
+    fds.events = POLLIN;
+    int ret = poll(&fds, 1, 0);
+
     // last character before '\n'
     char last_ch = (*input)[len - 2];
-    if (last_ch != '{' && last_ch != '(') { return len; }
+    // ret is 0 if there is no data to read.
+    if (ret == 0 && last_ch != '{' && last_ch != '(') {
+        return len;
+    }
 
     char *line = NULL;
     size_t line_cap = 0,
            capacity = *input_cap;
 
-    int ret;
-    struct pollfd fds;
-    fds.fd = fileno(in_stream);
-    fds.events = POLLIN; // check if there is data to read.
-
     while (1) {
         // Skip printing '.. ' when a multiline string is pasted.
         ret = poll(&fds, 1, 0);
-        // ret is 1 if there is data to read.
-        if (ret != 1) {
+        if (ret == 0) {
             fprintf(out_stream, ".. ");
         }
 
