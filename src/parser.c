@@ -670,7 +670,7 @@ parse_for_statement(Parser *p) {
 
     next_token(p);
 
-    // => '(... ; ... ; ... )' or '(;;)'
+    // => '... ; ... ; ... )' or ';;)'
     if (!cur_token_is(p, t_Semicolon)) {
         fs->init_statement = parse_statement(p);
         if (IS_INVALID(fs->init_statement)) {
@@ -681,7 +681,7 @@ parse_for_statement(Parser *p) {
 
     next_token(p);
 
-    // => '; ... )' or ';)'
+    // => '... ; ... )' or ';)'
     if (cur_token_is(p, t_Semicolon) && peek_token_is(p, t_Rparen)) {
     } else {
         fs->condition = parse_expression(p, p_Lowest);
