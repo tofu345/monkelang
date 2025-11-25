@@ -12,6 +12,8 @@
 DEFINE_BUFFER(Object, Object)
 DEFINE_BUFFER(Char, char)
 
+static int _object_fprint(Object o, VoidPtrBuffer *print_stack, FILE* fp);
+
 static int
 fprintf_integer(long i, FILE* fp) {
     FPRINTF(fp, "%ld", i);
@@ -46,34 +48,61 @@ fprintf_string(CharBuffer *str, FILE* fp) {
     return 0;
 }
 
-static int
-fprint_array(ObjectBuffer *array, FILE* fp) {
-    FPRINTF(fp, "[");
-    for (int i = 0; i < array->length - 1; i++) {
-        object_fprint(array->data[i], fp);
-        FPRINTF(fp, ", ");
+inline static int
+in_seen(void *cur, VoidPtrBuffer *seen) {
+    for (int i = seen->length - 1; i >= 0; --i) {
+        if (cur == seen->data[i]) {
+            return 1;
+        }
     }
-    if (array->length >= 1)
-        object_fprint(array->data[array->length - 1], fp);
-    FPRINTF(fp, "]");
     return 0;
 }
 
 static int
-fprint_table(Table *tbl, FILE* fp) {
+fprint_array(ObjectBuffer *array, VoidPtrBuffer *seen, FILE* fp) {
+    if (in_seen(array, seen)) {
+        FPRINTF(fp, "[...]");
+        return 0;
+    }
+    VoidPtrBufferPush(seen, array);
+
+    FPRINTF(fp, "[");
+    for (int i = 0; i < array->length - 1; i++) {
+        _object_fprint(array->data[i], seen, fp);
+        FPRINTF(fp, ", ");
+    }
+    if (array->length >= 1) {
+        _object_fprint(array->data[array->length - 1], seen, fp);
+    }
+    FPRINTF(fp, "]");
+
+    --seen->length;
+    return 0;
+}
+
+static int
+fprint_table(Table *tbl, VoidPtrBuffer *seen, FILE* fp) {
+    if (in_seen(tbl, seen)) {
+        FPRINTF(fp, "{...}");
+        return 0;
+    }
+    VoidPtrBufferPush(seen, tbl);
+
     FPRINTF(fp, "{");
     tbl_it it;
     tbl_iterator(&it, tbl);
     size_t last = tbl->length - 1;
     for (size_t i = 0; tbl_next(&it); i++) {
-        object_fprint(it.cur_key, fp);
+        _object_fprint(it.cur_key, seen, fp);
         FPRINTF(fp, ": ");
-        object_fprint(it.cur_val, fp);
+        _object_fprint(it.cur_val, seen, fp);
         if (i != last) {
             FPRINTF(fp, ", ");
         }
     }
     FPRINTF(fp, "}");
+
+    --seen->length;
     return 0;
 }
 
@@ -95,7 +124,8 @@ fprint_builtin_function(const Builtin *builtin, FILE *fp) {
     return 0;
 }
 
-int object_fprint(Object o, FILE* fp) {
+static int
+_object_fprint(Object o, VoidPtrBuffer *seen, FILE* fp) {
     switch (o.type) {
         case o_Integer:
             return fprintf_integer(o.data.integer, fp);
@@ -117,10 +147,10 @@ int object_fprint(Object o, FILE* fp) {
             return 0;
 
         case o_Array:
-            return fprint_array(o.data.array, fp);
+            return fprint_array(o.data.array, seen, fp);
 
         case o_Table:
-            return fprint_table(o.data.table, fp);
+            return fprint_table(o.data.table, seen, fp);
 
         case o_BuiltinFunction:
             return fprint_builtin_function(o.data.builtin, fp);
@@ -133,6 +163,13 @@ int object_fprint(Object o, FILE* fp) {
                     o.type);
             exit(1);
     }
+}
+
+int object_fprint(Object o, FILE* fp) {
+    VoidPtrBuffer seen = {0};
+    int res = _object_fprint(o, &seen, fp);
+    free(seen.data);
+    return res;
 }
 
 bool is_truthy(Object obj) {

@@ -50,6 +50,8 @@
         name##BufferFill(buf, val, 1);                                        \
     }                                                                         \
 
+BUFFER(VoidPtr, void *)
+
 // from dwm :p
 void die(const char *fmt, ...);
 
