@@ -242,6 +242,9 @@ execute_integer_comparison(VM *vm, Opcode op, Object left, Object right) {
         case OpNotEqual:
             result = BOOL(left.data.integer != right.data.integer);
             break;
+        case OpLessThan:
+            result = BOOL(left.data.integer < right.data.integer);
+            break;
         case OpGreaterThan:
             result = BOOL(left.data.integer > right.data.integer);
             break;
@@ -262,6 +265,9 @@ execute_float_comparison(VM *vm, Opcode op, Object left, Object right) {
             break;
         case OpNotEqual:
             result = BOOL(left.data.floating != right.data.floating);
+            break;
+        case OpLessThan:
+            result = BOOL(left.data.floating < right.data.floating);
             break;
         case OpGreaterThan:
             result = BOOL(left.data.floating > right.data.floating);
@@ -692,6 +698,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
 
             case OpEqual:
             case OpNotEqual:
+            case OpLessThan:
             case OpGreaterThan:
                 err = execute_comparison(vm, op);
                 if (err) { return err; };

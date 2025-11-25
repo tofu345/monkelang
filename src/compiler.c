@@ -360,16 +360,6 @@ _compile(Compiler *c, Node n) {
         case n_InfixExpression:
             {
                 InfixExpression *ie = n.obj;
-                if ('<' == ie->tok.start[0]) {
-                    err = _compile(c, ie->right);
-                    if (err) { return err; }
-
-                    err = _compile(c, ie->left);
-                    if (err) { return err; }
-
-                    emit(c, OpGreaterThan);
-                    return 0;
-                }
 
                 err = _compile(c, ie->left);
                 if (err) { return err; }
@@ -390,6 +380,9 @@ _compile(Compiler *c, Node n) {
 
                 } else if ('/' == ie->tok.start[0]) {
                     emit(c, OpDiv);
+
+                } else if ('<' == ie->tok.start[0]) {
+                    emit(c, OpLessThan);
 
                 } else if ('>' == ie->tok.start[0]) {
                     emit(c, OpGreaterThan);

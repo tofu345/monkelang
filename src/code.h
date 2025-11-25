@@ -25,6 +25,7 @@ typedef enum {
     OpDiv,
     OpEqual,
     OpNotEqual,
+    OpLessThan,
     OpGreaterThan,
 
     // Pop an Object off the stack, perform an operation and push the result

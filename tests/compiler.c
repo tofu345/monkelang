@@ -104,11 +104,11 @@ void test_boolean_expressions(void) {
     );
     c_test(
         "1 < 2",
-        _C( INT(2), INT(1) ),
+        _C( INT(1), INT(2) ),
         _I(
             make(OpConstant, 0),
             make(OpConstant, 1),
-            make(OpGreaterThan),
+            make(OpLessThan),
             make(OpPop)
         )
     );
@@ -1014,9 +1014,9 @@ void test_for_statements(void) {
             make(OpSetGlobal, 0),
 
             // condition
-            make(OpConstant, 2),    // i < 5;
-            make(OpGetGlobal, 0),
-            make(OpGreaterThan),
+            make(OpGetGlobal, 0),   // i < 5;
+            make(OpConstant, 2),
+            make(OpLessThan),
 
             make(OpJumpNotTruthy, 43), // to after body
 

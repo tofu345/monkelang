@@ -32,6 +32,7 @@ const Definition definitions[] = {
     DEF_EMPTY(OpDiv),
     DEF_EMPTY(OpEqual),
     DEF_EMPTY(OpNotEqual),
+    DEF_EMPTY(OpLessThan),
     DEF_EMPTY(OpGreaterThan),
 
     DEF_EMPTY(OpMinus),
