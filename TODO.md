@@ -35,3 +35,4 @@
 - repl: don't display result of for loop condition
 - append all inputs into one string and parse incrementally
 - ErrorType
+- with DEBUG check if OpPop overwrites the current frames local variables

@@ -90,11 +90,21 @@ append_return_if_not_present(Compiler *c) {
     emit(c, OpReturn);
 }
 
+// if the last statement in `bs` is an Expression Statement, remove its OpPop.
+//
+// Otherwise emit an OpNull, because no other Statement should produce a value.
 static void
-remove_last_pop(Compiler *c) {
-    c->current_instructions->length =
-        c->cur_scope->last_instruction.position;
-    c->cur_scope->last_instruction = c->cur_scope->previous_instruction;
+remove_last_expression_stmt_pop(Compiler *c, BlockStatement *bs) {
+    int len = bs->stmts.length;
+    if (last_instruction_is(c, OpPop) && len > 0
+            && bs->stmts.data[len - 1].typ == n_ExpressionStatement) {
+        // remove last pop
+        c->current_instructions->length = c->cur_scope->last_instruction.position;
+        c->cur_scope->last_instruction = c->cur_scope->previous_instruction;
+
+    } else {
+        emit(c, OpNull);
+    }
 }
 
 static void
@@ -260,7 +270,7 @@ _compile(Compiler *c, Node n) {
                     err = _compile(c, fs->condition);
                     if (err) { return err; }
                 } else {
-                    emit(c, OpNull);
+                    emit(c, OpTrue);
                 }
 
                 // Emit an `OpJumpNotTruthy` with a bogus value
@@ -431,12 +441,7 @@ _compile(Compiler *c, Node n) {
                 err = _compile(c, NODE(n_BlockStatement, ie->consequence));
                 if (err) { return err; }
 
-                if (last_instruction_is(c, OpPop)) {
-                    remove_last_pop(c);
-                }
-
-                // TODO: when if branch ends in ReturnStatement, do not
-                // emit OpJump
+                remove_last_expression_stmt_pop(c, ie->consequence);
 
                 // Emit an `OpJump` with a bogus value
                 int jump_pos = emit(c, OpJump, 9999);
@@ -450,9 +455,7 @@ _compile(Compiler *c, Node n) {
                     err = _compile(c, NODE(n_BlockStatement, ie->alternative));
                     if (err) { return err; }
 
-                    if (last_instruction_is(c, OpPop)) {
-                        remove_last_pop(c);
-                    }
+                    remove_last_expression_stmt_pop(c, ie->alternative);
                 }
 
                 int after_alternative_pos = c->current_instructions->length;

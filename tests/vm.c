@@ -671,6 +671,21 @@ test_for_statement(void) {
         ",
         TEST(int, 5)
     );
+    vm_test(
+        "\
+        fn() {\
+            let a = 0;\
+            for (;;) {\
+                if (a < 5) {\
+                    a = a + 1;\
+                } else {\
+                    return a;\
+                }\
+            }\
+        }()\
+        ",
+        TEST(int, 5)
+    );
 }
 
 static IntArray

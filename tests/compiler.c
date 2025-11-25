@@ -975,9 +975,10 @@ void test_return_statements(void) {
             INT(3333),
             INS(
                 make(OpTrue),
-                make(OpJumpNotTruthy, 8),
+                make(OpJumpNotTruthy, 9),
                 make(OpReturn),
-                make(OpJump, 11),
+                make(OpNull),
+                make(OpJump, 12),
                 make(OpConstant, 0),
                 make(OpPop),
                 make(OpConstant, 1),
@@ -1004,7 +1005,7 @@ void test_for_statements(void) {
             make(OpConstant, 0),    // let i = 0;
             make(OpSetGlobal, 0),
 
-            make(OpJump, 19),
+            make(OpJump, 19), // to condition
 
             // update
             make(OpGetGlobal, 0),   // i = i + 1;
@@ -1017,7 +1018,7 @@ void test_for_statements(void) {
             make(OpGetGlobal, 0),
             make(OpGreaterThan),
 
-            make(OpJumpNotTruthy, 43),
+            make(OpJumpNotTruthy, 43), // to after body
 
             // body
             make(OpGetBuiltin, 1),  // puts(...)
@@ -1025,7 +1026,8 @@ void test_for_statements(void) {
             make(OpGetGlobal, 0),
             make(OpCall, 2),
             make(OpPop),
-            make(OpJump, 9)
+
+            make(OpJump, 9) // to update
         )
     );
     c_test(
@@ -1038,20 +1040,22 @@ void test_for_statements(void) {
         _I(
             // initialization
 
-            make(OpJump, 3),
+            make(OpJump, 3), // to condition
 
             // update
-            // condition
 
-            make(OpNull),
-            make(OpJumpNotTruthy, 18),
+            // condition
+            make(OpTrue),
+
+            make(OpJumpNotTruthy, 18), // to after body
 
             // body
             make(OpGetBuiltin, 1),
             make(OpConstant, 0),
             make(OpCall, 1),
             make(OpPop),
-            make(OpJump, 3)
+
+            make(OpJump, 3) // to update
         )
     );
 }
