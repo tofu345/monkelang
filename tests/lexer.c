@@ -42,6 +42,11 @@ if (5 < 10) {\
 {\"foo\": \"bar\"};\
 // this should be ignored\n\
 \
+a += 1;\
+a -= 1;\
+a /= 1;\
+a *= 1;\
+\
 for (let i = 0; i < 10; i = i + 1) {\
     puts(\"i:\", i);\
 }";
@@ -154,6 +159,24 @@ for (let i = 0; i < 10; i = i + 1) {\
 	{t_String, "bar", 3},
 	{t_Rbrace, "}", 1},
 	{t_Semicolon, ";", 1},
+
+        {t_Ident, "a", 1},
+        {t_Add_Assign, "+=", 2},
+        {t_Integer, "1", 1},
+        {t_Semicolon, ";", 1},
+        {t_Ident, "a", 1},
+        {t_Sub_Assign, "-=", 2},
+        {t_Integer, "1", 1},
+        {t_Semicolon, ";", 1},
+        {t_Ident, "a", 1},
+        {t_Div_Assign, "/=", 2},
+        {t_Integer, "1", 1},
+        {t_Semicolon, ";", 1},
+        {t_Ident, "a", 1},
+        {t_Mul_Assign, "*=", 2},
+        {t_Integer, "1", 1},
+        {t_Semicolon, ";", 1},
+
         {t_For, "for", 3},
         {t_Lparen, "(", 1},
         {t_Let, "let", 3},

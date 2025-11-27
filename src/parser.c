@@ -111,6 +111,13 @@ expect_peek(Parser* p, TokenType t) {
 }
 
 static void
+skip_semicolon(Parser *p) {
+    if (peek_token_is(p, t_Semicolon)) {
+        next_token(p);
+    }
+}
+
+static void
 no_prefix_parse_error(Parser* p, TokenType t) {
     parser_error(p, "unexpected token '%s'", show_token_type(t));
 }
@@ -128,9 +135,7 @@ parse_expression(Parser* p, enum Precedence precedence) {
         return INVALID;
     }
 
-    while (!peek_token_is(p, t_Semicolon)
-            && precedence < peek_precedence(p)) {
-
+    while (!peek_token_is(p, t_Semicolon) && precedence < peek_precedence(p)) {
         InfixParseFn *infix = p->infix_parse_fns[p->peek_token.type];
         if (infix == NULL) {
             return left_exp;
@@ -589,9 +594,7 @@ parse_let_statement(Parser* p) {
         fl->name = stmt->name;
     }
 
-    if (peek_token_is(p, t_Semicolon)) {
-        next_token(p);
-    }
+    skip_semicolon(p);
     return NODE(n_LetStatement, stmt);
 }
 
@@ -612,15 +615,13 @@ parse_return_statement(Parser* p) {
         }
     }
 
-    if (peek_token_is(p, t_Semicolon)) {
-        next_token(p);
-    }
+    skip_semicolon(p);
     return NODE(n_ReturnStatement, stmt);
 }
 
 static Node
-parse_assign_statement(Parser *p, Node left) {
-    // (x2) next_token()
+parse_assignment(Parser *p, Node left) {
+    // (x2) next_token() to skip t_Assign
     p->cur_token = lexer_next_token(&p->l);
     p->peek_token = lexer_next_token(&p->l);
 
@@ -635,26 +636,42 @@ parse_assign_statement(Parser *p, Node left) {
         fl->name = left.obj;
     }
 
-    AssignStatement *as = allocate(sizeof(AssignStatement));
+    Assignment *as = allocate(sizeof(Assignment));
     as->left = left;
     as->tok = *node_token(right);
     as->right = right;
-
-    if (peek_token_is(p, t_Semicolon)) {
-        next_token(p);
-    }
-    return NODE(n_AssignStatement, as);
+    skip_semicolon(p);
+    return NODE(n_Assignment, as);
 }
 
 static Node
-parse_expression_statement(Parser* p, Node left) {
+parse_operator_assignment(Parser *p, Node left) {
+    Token tok = p->peek_token;
+
+    // (x2) next_token() to skip t_(operator)_Assign
+    p->cur_token = lexer_next_token(&p->l);
+    p->peek_token = lexer_next_token(&p->l);
+
+    Node right = parse_expression(p, p_Lowest);
+    if (IS_INVALID(right)) {
+        node_free(left);
+        return INVALID;
+    }
+
+    OperatorAssignment *stmt = allocate(sizeof(OperatorAssignment));
+    stmt->tok = tok;
+    stmt->left = left;
+    stmt->right = right;
+    skip_semicolon(p);
+    return NODE(n_OperatorAssignment, stmt);
+}
+
+static Node
+parse_expression_statement(__attribute__ ((unused)) Parser* p, Node left) {
     ExpressionStatement *es = allocate(sizeof(ExpressionStatement));
     es->tok = *node_token(left);
     es->expression = left;
-
-    if (peek_token_is(p, t_Semicolon)) {
-        next_token(p);
-    }
+    skip_semicolon(p);
     return NODE(n_ExpressionStatement, es);
 }
 
@@ -738,14 +755,19 @@ parse_statement(Parser* p) {
                 return INVALID;
             }
 
-            if (peek_token_is(p, t_Assign)) {
-                return parse_assign_statement(p, left);
+            TokenType peek = p->peek_token.type;
+
+            if (peek == t_Assign) {
+                return parse_assignment(p, left);
+
+            } else if (peek >= t_Add_Assign && peek <= t_Div_Assign) {
+                return parse_operator_assignment(p, left);
+
             } else {
                 return parse_expression_statement(p, left);
             }
         }
     }
-    return INVALID;
 }
 
 void parser_init(Parser* p) {

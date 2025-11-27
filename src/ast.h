@@ -29,7 +29,8 @@ enum NodeType {
 
     // Statements
     n_LetStatement,
-    n_AssignStatement,
+    n_Assignment,
+    n_OperatorAssignment,
     n_ReturnStatement,
     n_ForStatement,
     n_ExpressionStatement,
@@ -70,11 +71,19 @@ typedef struct {
     Node value; // Expression
 } LetStatement;
 
+// e.g. a = 1
 typedef struct {
     Token tok; // the token of [right]
-    Node left; // [Identifier] or [IndexExpression]
+    Node left; // Identifier or IndexExpression
     Node right;
-} AssignStatement;
+} Assignment;
+
+// e.g. a += 1
+typedef struct {
+    Token tok; // the operator
+    Node left;
+    Node right;
+} OperatorAssignment;
 
 typedef struct {
     Token tok; // the 't_Return' token
@@ -96,11 +105,13 @@ typedef struct {
     double value;
 } FloatLiteral;
 
+// e.g. !true
 typedef struct {
     Token tok; // the prefix token, e.g '!'
     Node right;
 } PrefixExpression;
 
+// e.g. 1 * 3
 typedef struct {
     Token tok; // the infix token, e.g. '+'
     Node left;
@@ -120,6 +131,7 @@ typedef struct {
 void free_block_statement(BlockStatement* bs);
 int fprint_block_statement(BlockStatement* bs, FILE* fp);
 
+// for (loop) statement
 typedef struct {
     Token tok; // the 'for' token
     Node init_statement;

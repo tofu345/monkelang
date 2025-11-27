@@ -19,16 +19,24 @@ typedef enum __attribute__ ((__packed__)) {
     t_Float,
 
     // Operators
-    t_Assign,
     t_Plus,
     t_Minus,
-    t_Bang,
     t_Asterisk,
     t_Slash,
-    t_Lt,
-    t_Gt,
+    t_Bang,
+
+    // Assignment Operators
+    t_Assign,
+    t_Add_Assign,
+    t_Sub_Assign,
+    t_Mul_Assign,
+    t_Div_Assign,
+
+    // Comparison Operators
     t_Eq,
     t_Not_eq,
+    t_Lt,
+    t_Gt,
 
     // Delimeters
     t_Colon,

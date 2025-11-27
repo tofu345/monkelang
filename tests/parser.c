@@ -997,7 +997,7 @@ void test_parsing_table_literals_with_expressions(void) {
     }
 }
 
-void test_parsing_assign_expressions(void) {
+void test_parsing_assignment(void) {
     char* input = "foobar = 0;";
 
     parser_init(&p);
@@ -1010,9 +1010,9 @@ void test_parsing_assign_expressions(void) {
     Node n = prog.stmts.data[0];
 
     TEST_ASSERT_MESSAGE(
-            n_AssignStatement == n.typ, "type not AssignStatement");
+            n_Assignment == n.typ, "type not AssignStatement");
 
-    AssignStatement* as = n.obj;
+    Assignment* as = n.obj;
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             n_Identifier, as->left.typ,
@@ -1034,7 +1034,7 @@ void test_parsing_assign_expressions(void) {
             0, int_lit->value, "wrong IntegerLiteral.value");
 }
 
-void test_parsing_index_assign_expressions(void) {
+void test_parsing_index_assignment(void) {
     char* input = "foobar[12] = 69;";
 
     parser_init(&p);
@@ -1047,9 +1047,9 @@ void test_parsing_index_assign_expressions(void) {
     Node n = prog.stmts.data[0];
 
     TEST_ASSERT_MESSAGE(
-            n_AssignStatement == n.typ, "type not AssignStatement");
+            n_Assignment == n.typ, "type not AssignStatement");
 
-    AssignStatement* as = n.obj;
+    Assignment* as = n.obj;
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             n_IndexExpression, as->left.typ,
@@ -1079,6 +1079,49 @@ void test_parsing_index_assign_expressions(void) {
     IntegerLiteral* int_lit = as->right.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             69, int_lit->value, "wrong AssignStatement.Right.value");
+}
+
+void test_parsing_operator_assignment(void) {
+    struct Test {
+        const char *input;
+        const char *ident;
+        const char *operator;
+        Test *value;
+    } tests[] = {
+        {"a += 1", "a", "+", TEST(int, 1)},
+        {"a -= 1", "a", "-", TEST(int, 1)},
+        {"a *= 1", "a", "*", TEST(int, 1)},
+        {"a /= 1", "a", "/", TEST(int, 1)},
+    };
+    int tests_len = sizeof(tests) / sizeof(tests[0]);
+
+    parser_init(&p);
+
+    for (int i = 0; i < tests_len; i++) {
+        struct Test test = tests[i];
+
+        prog = parse(&p, test.input);
+
+        check_parser_errors(&p);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(
+                1, prog.stmts.length, "wrong prog.statements length");
+
+        Node n = prog.stmts.data[0];
+
+        TEST_ASSERT_EQUAL_INT_MESSAGE(
+                n_OperatorAssignment, n.typ, "type not OperatorAssignment");
+
+        OperatorAssignment *stmt = n.obj;
+
+        test_identifier(stmt->left, test.ident);
+
+        TEST_ASSERT_EQUAL_STRING_LEN(
+                test.operator, stmt->tok.start, strlen(test.operator));
+
+        test_literal_expression(stmt->right, test.value);
+
+        _program_free();
+    }
 }
 
 void test_parsing_null_literals(void) {
@@ -1133,10 +1176,10 @@ void test_for_statement(void) {
     test_infix_expression(fs->condition, TEST(str, "i"), "<", TEST(int, 5));
 
     TEST_ASSERT_MESSAGE(
-            n_AssignStatement == fs->update_statement.typ,
+            n_Assignment == fs->update_statement.typ,
             "type not AssignStatement");
 
-    AssignStatement* as = fs->update_statement.obj;
+    Assignment* as = fs->update_statement.obj;
     test_identifier(as->left, "i");
     test_infix_expression(as->right, TEST(str, "i"), "+", TEST(int, 1));
 
@@ -1276,8 +1319,9 @@ int main(void) {
     RUN_TEST(test_parsing_table_literals_string_keys);
     RUN_TEST(test_parsing_empty_table_literal);
     RUN_TEST(test_parsing_table_literals_with_expressions);
-    RUN_TEST(test_parsing_assign_expressions);
-    RUN_TEST(test_parsing_index_assign_expressions);
+    RUN_TEST(test_parsing_assignment);
+    RUN_TEST(test_parsing_index_assignment);
+    RUN_TEST(test_parsing_operator_assignment);
     RUN_TEST(test_parsing_null_literals);
     RUN_TEST(test_for_statement);
     RUN_TEST(test_empty_for_statement);

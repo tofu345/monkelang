@@ -149,7 +149,7 @@ let a = [1, 2, 3, 4];
 let double = fn(x) { x * 2 };
 let doubled = [];
 // For loops!
-for (let i = 0; i < len(a); i = i + 1) {
+for (let i = 0; i < len(a); i += 1) {
   push(doubled, double(a[i]));
 }
 puts("a:", a, "doubled:", doubled);

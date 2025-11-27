@@ -22,6 +22,9 @@ static void source_map_statement(Compiler *c, Node node);
 // create [Error] with [n.token]
 static Error *compiler_error(Node n, char* format, ...);
 
+// emit opcodes to assign to `node`.
+static Error *perform_assignment(Compiler *c, Node node);
+
 DEFINE_BUFFER(Scope, CompilationScope)
 DEFINE_BUFFER(Function, CompiledFunction *)
 
@@ -122,7 +125,7 @@ replace_last_opcode_with(Compiler *c, Opcode old, Opcode new) {
 
     assert(c->current_instructions->data[last_pos] == old);
 
-    replace_instruction(c, last_pos, make(new));
+    c->current_instructions->data[last_pos] = new;
     c->cur_scope->last_instruction.opcode = new;
 }
 
@@ -159,6 +162,37 @@ load_symbol(Compiler *c, Symbol *s) {
         case FreeScope:
             emit(c, OpGetFree, s->index);
             break;
+    }
+}
+
+static void
+compile_operator(Compiler *c, Token op) {
+    if ('+' == op.start[0]) {
+        emit(c, OpAdd);
+
+    } else if ('-' == op.start[0]) {
+        emit(c, OpSub);
+
+    } else if ('*' == op.start[0]) {
+        emit(c, OpMul);
+
+    } else if ('/' == op.start[0]) {
+        emit(c, OpDiv);
+
+    } else if ('<' == op.start[0]) {
+        emit(c, OpLessThan);
+
+    } else if ('>' == op.start[0]) {
+        emit(c, OpGreaterThan);
+
+    } else if (!strncmp("==", op.start, 2)) {
+        emit(c, OpEqual);
+
+    } else if (!strncmp("!=", op.start, 2)) {
+        emit(c, OpNotEqual);
+
+    } else {
+        die("compiler: unknown infix operator %.*s", LITERAL(op));
     }
 }
 
@@ -300,61 +334,38 @@ _compile(Compiler *c, Node n) {
                 return 0;
             }
 
-        case n_AssignStatement:
+        case n_Assignment:
             {
-                source_map_statement(c, n);
-
-                AssignStatement *stmt = n.obj;
+                Assignment *stmt = n.obj;
 
                 err = _compile(c, stmt->right);
                 if (err) { return err; }
 
-                if (stmt->left.typ == n_Identifier) {
-                    Identifier *id = stmt->left.obj;
-                    Node id_node = { .obj = id };
+                source_map_statement(c, n);
+                err = perform_assignment(c, stmt->left);
+                if (err) { return err; }
 
-                    Symbol *symbol = sym_resolve(c->current_symbol_table, id->hash);
-                    if (symbol == NULL) {
-                        return compiler_error(id_node,
-                                "undefined variable '%.*s' is not assignable",
-                                LITERAL(id->tok));
-                    }
+                return 0;
+            }
 
-                    char *format;
-                    switch (symbol->scope) {
-                        case GlobalScope:
-                            emit(c, OpSetGlobal, symbol->index);
-                            return 0;
+        case n_OperatorAssignment:
+            {
+                OperatorAssignment *stmt = n.obj;
 
-                        case LocalScope:
-                            emit(c, OpSetLocal, symbol->index);
-                            return 0;
+                err = _compile(c, stmt->left);
+                if (err) { return err; }
 
-                        case FreeScope:
-                            emit(c, OpSetFree, symbol->index);
-                            return 0;
+                err = _compile(c, stmt->right);
+                if (err) { return err; }
 
-                        case FunctionScope:
-                            format = "function '%.*s' is not assignable";
-                            break;
+                source_map_statement(c, n);
+                compile_operator(c, stmt->tok);
 
-                        case BuiltinScope:
-                            format = "builtin %.*s() is not assignable";
-                            break;
-                    }
+                source_map_statement(c, n);
+                err = perform_assignment(c, stmt->left);
+                if (err) { return err; }
 
-                    return compiler_error(id_node, format, LITERAL(id->tok));
-
-                } else if (stmt->left.typ == n_IndexExpression) {
-                    err = _compile(c, stmt->left);
-                    if (err) { return err; }
-
-                    replace_last_opcode_with(c, OpIndex, OpSetIndex);
-                    return 0;
-                }
-
-                return compiler_error(stmt->left,
-                        "cannot assign non-variable");
+                return 0;
             }
 
         case n_InfixExpression:
@@ -369,34 +380,8 @@ _compile(Compiler *c, Node n) {
 
                 source_map_statement(c, n);
 
-                if ('+' == ie->tok.start[0]) {
-                    emit(c, OpAdd);
+                compile_operator(c, ie->tok);
 
-                } else if ('-' == ie->tok.start[0]) {
-                    emit(c, OpSub);
-
-                } else if ('*' == ie->tok.start[0]) {
-                    emit(c, OpMul);
-
-                } else if ('/' == ie->tok.start[0]) {
-                    emit(c, OpDiv);
-
-                } else if ('<' == ie->tok.start[0]) {
-                    emit(c, OpLessThan);
-
-                } else if ('>' == ie->tok.start[0]) {
-                    emit(c, OpGreaterThan);
-
-                } else if (!strncmp("==", ie->tok.start, 2)) {
-                    emit(c, OpEqual);
-
-                } else if (!strncmp("!=", ie->tok.start, 2)) {
-                    emit(c, OpNotEqual);
-
-                } else {
-                    die("compiler: unknown infix operator %.*s",
-                            LITERAL(ie->tok));
-                }
                 return 0;
             }
 
@@ -621,6 +606,55 @@ _compile(Compiler *c, Node n) {
         default:
             return 0;
     }
+}
+
+static Error *
+perform_assignment(Compiler *c, Node node) {
+    if (node.typ == n_Identifier) {
+        Identifier *id = node.obj;
+        Node id_node = { .obj = id };
+
+        Symbol *symbol = sym_resolve(c->current_symbol_table, id->hash);
+        if (symbol == NULL) {
+            return compiler_error(id_node,
+                    "undefined variable '%.*s' is not assignable",
+                    LITERAL(id->tok));
+        }
+
+        char *format;
+        switch (symbol->scope) {
+            case GlobalScope:
+                emit(c, OpSetGlobal, symbol->index);
+                return 0;
+
+            case LocalScope:
+                emit(c, OpSetLocal, symbol->index);
+                return 0;
+
+            case FreeScope:
+                emit(c, OpSetFree, symbol->index);
+                return 0;
+
+            case FunctionScope:
+                format = "function '%.*s' is not assignable";
+                break;
+
+            case BuiltinScope:
+                format = "builtin %.*s() is not assignable";
+                break;
+        }
+
+        return compiler_error(id_node, format, LITERAL(id->tok));
+
+    } else if (node.typ == n_IndexExpression) {
+        Error *err = _compile(c, node);
+        if (err) { return err; }
+
+        replace_last_opcode_with(c, OpIndex, OpSetIndex);
+        return 0;
+    }
+
+    return compiler_error(node, "cannot assign non-variable");
 }
 
 static int

@@ -903,7 +903,7 @@ void test_recursive_functions(void) {
     );
 }
 
-void test_assign_expressions(void) {
+void test_assignments(void) {
     c_test(
         "let foobar = 1; foobar = 0;",
         _C( INT(1), INT(0) ),
@@ -923,9 +923,25 @@ void test_assign_expressions(void) {
             make(OpConstant, 2),
             make(OpArray, 3),
             make(OpSetGlobal, 0),
+
             make(OpConstant, 3),
             make(OpGetGlobal, 0),
             make(OpConstant, 4),
+            make(OpSetIndex)
+        )
+    );
+    c_test(
+        "let foobar = {0: 1}; foobar[0] = 5;",
+        _C( INT(0), INT(1), INT(5), INT(0) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 1),
+            make(OpTable, 2),
+            make(OpSetGlobal, 0),
+
+            make(OpConstant, 2),
+            make(OpGetGlobal, 0),
+            make(OpConstant, 3),
             make(OpSetIndex)
         )
     );
@@ -963,6 +979,73 @@ void test_assign_expressions(void) {
         _I(
             make(OpClosure, 2, 0),
             make(OpSetGlobal, 0)
+        )
+    );
+}
+
+void test_operator_assignments(void) {
+    c_test(
+        "\
+        let var = 1;\
+        var += 3;\
+        ",
+        _C( INT(1), INT(3) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpSetGlobal, 0),
+
+            make(OpGetGlobal, 0),
+            make(OpConstant, 1),
+            make(OpAdd),
+            make(OpSetGlobal, 0)
+        )
+    );
+    c_test(
+        "\
+        let var = [1];\
+        var[0] += 2;\
+        ",
+        _C(
+            // really need to remove duplicate constants
+            INT(1), INT(0), INT(2), INT(0)
+        ),
+        _I(
+            make(OpConstant, 0),
+            make(OpArray, 1),
+            make(OpSetGlobal, 0),
+
+            make(OpGetGlobal, 0),
+            make(OpConstant, 1),
+            make(OpIndex),
+            make(OpConstant, 2),
+            make(OpAdd),
+
+            make(OpGetGlobal, 0),
+            make(OpConstant, 3),
+            make(OpSetIndex)
+        )
+    );
+    c_test(
+        "\
+        let var = {1: 2};\
+        var[1] += 2;\
+        ",
+        _C( INT(1), INT(2), INT(1), INT(2), INT(1) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 1),
+            make(OpTable, 2),
+            make(OpSetGlobal, 0),
+
+            make(OpGetGlobal, 0),
+            make(OpConstant, 2),
+            make(OpIndex),
+            make(OpConstant, 3),
+            make(OpAdd),
+
+            make(OpGetGlobal, 0),
+            make(OpConstant, 4),
+            make(OpSetIndex)
         )
     );
 }
@@ -1299,7 +1382,8 @@ int main(void) {
     RUN_TEST(test_builtins);
     RUN_TEST(test_closures);
     RUN_TEST(test_recursive_functions);
-    RUN_TEST(test_assign_expressions);
+    RUN_TEST(test_assignments);
+    RUN_TEST(test_operator_assignments);
     RUN_TEST(test_return_statements);
     RUN_TEST(test_for_statements);
     RUN_TEST(test_compiler_errors);

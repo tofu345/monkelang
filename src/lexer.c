@@ -111,7 +111,6 @@ Token lexer_next_token(Lexer *l) {
             read_char(l);
             tok.type = t_Eq;
             tok.length = 2;
-
         } else {
             tok.type = t_Assign;
         }
@@ -122,18 +121,29 @@ Token lexer_next_token(Lexer *l) {
             read_char(l);
             tok.type = t_Not_eq;
             tok.length = 2;
-
         } else {
             tok.type = t_Bang;
         }
         break;
 
     case '+':
-        tok.type = t_Plus;
+        if (peek_char(l) == '=') {
+            read_char(l);
+            tok.type = t_Add_Assign;
+            tok.length = 2;
+        } else {
+            tok.type = t_Plus;
+        }
         break;
 
     case '-':
-        tok.type = t_Minus;
+        if (peek_char(l) == '=') {
+            read_char(l);
+            tok.type = t_Sub_Assign;
+            tok.length = 2;
+        } else {
+            tok.type = t_Minus;
+        }
         break;
 
     case '/':
@@ -147,13 +157,24 @@ Token lexer_next_token(Lexer *l) {
             read_char(l);
             return lexer_next_token(l);
 
+        } else if (peek_char(l) == '=') {
+            read_char(l);
+            tok.type = t_Div_Assign;
+            tok.length = 2;
+
         } else {
             tok.type = t_Slash;
         }
         break;
 
     case '*':
-        tok.type = t_Asterisk;
+        if (peek_char(l) == '=') {
+            read_char(l);
+            tok.type = t_Mul_Assign;
+            tok.length = 2;
+        } else {
+            tok.type = t_Asterisk;
+        }
         break;
 
     case '<':

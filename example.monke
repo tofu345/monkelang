@@ -27,7 +27,7 @@ let map = fn(f, arr) {
 
 let map2 = fn(f, arr) {
     let result = [null] * len(arr);
-    for (let i = 0; i < len(arr); i = i + 1) {
+    for (let i = 0; i < len(arr); i += 1) {
         result[i] = f(arr[i]);
     }
     return result
@@ -56,14 +56,8 @@ puts("fibonacci of 50:", fibonacci(50));
 
 let a = [1, 2, 3, 4];
 let double = fn(x) { x * 2 };
-let res = map(double, a);
-puts("a:", a, "map(double, a):", res);
-
-let doubled = [];
-for (let i = 0; i < len(a); i = i + 1) {
-    push(doubled, double(a[i]));
-}
-puts("a:", a, "doubled:", doubled);
+let triple = fn(x) { x * 3 };
+puts("a:", a, "double:", map(double, a), "triple:", map2(triple, a));
 
 let arr = [1, 2, 3, 4, 5];
 puts("arr:", arr, "sum(arr)", sum(arr));

@@ -550,7 +550,7 @@ test_recursive_fibonacci(void) {
 }
 
 static void
-test_assign_expressions(void) {
+test_assignments(void) {
     vm_test("let a = 15; a = 5; a", TEST(int, 5));
     vm_test("let a = null; a = 5;", TEST(int, 5));
 
@@ -581,6 +581,33 @@ test_assign_expressions(void) {
         }()\
         ",
         TEST(int, 330)
+    );
+
+    vm_test("let var = 1; var += 3;", TEST(int, 4));
+    vm_test(
+        "\
+        let var = [1];\
+        var[0] += 2;\
+        var[0];\
+        ",
+        TEST(int, 3)
+    );
+    vm_test(
+        "\
+        let var = {1: 2};\
+        var[1] += 2;\
+        var;\
+        ",
+        TEST_TABLE(1, 4)
+    );
+
+    vm_test_error(
+        "let var = []; var[0] += 2;",
+        "unkown operation: null + integer"
+    );
+    vm_test_error(
+        "let var = {1: 2}; var[2] += 2;",
+        "unkown operation: null + integer"
     );
 }
 
@@ -853,13 +880,14 @@ test_expected_object(Test expected, Object actual) {
                         table_get(tbl, OBJ(o_Integer, exp_pairs.data[i]));
 
                     if (value.type == o_Null) {
-                        printf("no pair for key %d", i);
+                        printf("no pair for key %d (%d)\n", i, exp_pairs.data[i]);
                         return -1;
                     }
 
                     err = test_integer_object(exp_pairs.data[i + 1], value);
                     if (err != 0) {
-                        printf("test table element %d failed", i);
+                        printf("test table element %d (%d) failed\n",
+                                i, exp_pairs.data[i + 1]);
                         return -1;
                     }
                 }
@@ -1015,7 +1043,7 @@ int main(void) {
     RUN_TEST(test_closures);
     RUN_TEST(test_recursive_functions);
     RUN_TEST(test_recursive_fibonacci);
-    RUN_TEST(test_assign_expressions);
+    RUN_TEST(test_assignments);
     RUN_TEST(test_free_variable_list);
     RUN_TEST(test_for_statement);
     return UNITY_END();

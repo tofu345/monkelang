@@ -217,10 +217,19 @@ fprint_string_literal(StringLiteral* sl, FILE* fp) {
 }
 
 static int
-fprint_assign_statement(AssignStatement *ae, FILE *fp) {
-    node_fprint(ae->left, fp);
+fprint_assignment(Assignment *as, FILE *fp) {
+    node_fprint(as->left, fp);
     FPRINTF(fp, " = ");
-    node_fprint(ae->right, fp);
+    node_fprint(as->right, fp);
+    FPRINTF(fp, ";");
+    return 0;
+}
+
+static int
+fprint_operator_assignment(OperatorAssignment *stmt, FILE *fp) {
+    node_fprint(stmt->left, fp);
+    FPRINTF(fp, " %.*s= ", LITERAL(stmt->tok));
+    node_fprint(stmt->right, fp);
     FPRINTF(fp, ";");
     return 0;
 }
@@ -283,8 +292,11 @@ int node_fprint(const Node n, __attribute__ ((unused)) FILE* fp) {
         case n_StringLiteral:
             return fprint_string_literal(n.obj, fp);
 
-        case n_AssignStatement:
-            return fprint_assign_statement(n.obj, fp);
+        case n_Assignment:
+            return fprint_assignment(n.obj, fp);
+
+        case n_OperatorAssignment:
+            return fprint_operator_assignment(n.obj, fp);
 
         case n_NullLiteral:
             FPRINTF(fp, "null");
@@ -408,10 +420,17 @@ void free_table_literal(TableLiteral* hl) {
 }
 
 static void
-free_assign_statement(AssignStatement *ae) {
-    node_free(ae->left);
-    node_free(ae->right);
-    free(ae);
+free_assignment(Assignment *as) {
+    node_free(as->left);
+    node_free(as->right);
+    free(as);
+}
+
+static void
+free_operator_assignment(OperatorAssignment *as) {
+    node_free(as->left);
+    node_free(as->right);
+    free(as);
 }
 
 void node_free(Node n) {
@@ -466,8 +485,12 @@ void node_free(Node n) {
             free_index_expression(n.obj);
             return;
 
-        case n_AssignStatement:
-            free_assign_statement(n.obj);
+        case n_Assignment:
+            free_assignment(n.obj);
+            return;
+
+        case n_OperatorAssignment:
+            free_operator_assignment(n.obj);
             return;
 
         case n_TableLiteral:
