@@ -205,6 +205,7 @@ multigetline(char **input, size_t *input_cap,
     char last_ch = (*input)[len - 2];
     // ret is 0 if there is no data to read.
     if (ret == 0 && last_ch != '{' && last_ch != '(') {
+        (*input)[len - 1] = '\0';
         return len;
     }
 

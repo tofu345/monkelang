@@ -1256,7 +1256,7 @@ void test_parser_errors(void) {
         {"add(4 5);", "expected next token to be ')', got 'Integer' instead"},
         {"add(return)", "unexpected token 'return'"},
 
-        {"\"hello world\"\";", "missing closing '\"' for string"},
+        {"\"hello world\"\";", "missing closing '\"'"},
         {"[1 2]", "expected next token to be ']', got 'Integer' instead"},
         {"[1, 1 2]", "expected next token to be ']', got 'Integer' instead"},
         {"[ return; ]", "unexpected token 'return'"},

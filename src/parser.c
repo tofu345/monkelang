@@ -350,7 +350,12 @@ parse_function_literal(Parser* p) {
 static Node
 parse_string_literal(Parser* p) {
     if (p->cur_token.start[p->cur_token.length] != '\"') {
-        parser_error(p, "missing closing '\"' for string");
+        // make token point to opening quote
+        --p->cur_token.start;
+        --p->cur_token.position;
+        p->cur_token.length = 1;
+
+        parser_error(p, "missing closing '\"'");
         return INVALID;
     }
 
