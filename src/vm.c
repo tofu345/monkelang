@@ -115,6 +115,30 @@ vm_pop(VM *vm) {
     return vm->stack[--vm->sp];
 }
 
+#ifdef DEBUG
+static void
+debug_print_args(Object function, Object *args, int num_args) {
+    object_fprint(function, stdout);
+    printf(" (");
+    int last = num_args - 1;
+    for (int i = 0; i < last; i++) {
+        object_fprint(args[i], stdout);
+        printf(", ");
+    }
+    if (num_args >= 1) {
+        object_fprint(args[last], stdout);
+    }
+    printf(")");
+}
+
+static void
+debug_print_create(Object new_obj) {
+    printf("create: ");
+    object_fprint(new_obj, stdout);
+    putc('\n', stdout);
+}
+#endif
+
 static Object
 execute_binary_float_operation(Opcode op, Object left, Object right) {
     double result;
@@ -187,9 +211,30 @@ execute_binary_string_operation(VM *vm, Opcode op, Object left, Object right) {
     Object obj = OBJ(o_String, .string = new_str);
 
 #ifdef DEBUG
-    printf("create: ");
-    object_fprint(obj, stdout);
-    putc('\n', stdout);
+    debug_print_create(obj);
+#endif
+
+    return obj;
+}
+
+static Object
+execute_binary_array_operation(VM *vm, Opcode op, Object left, Object right) {
+    if (op != OpMul) {
+        return ERR("unkown binary array operator: %s", lookup(op)->name);
+    }
+
+    int l_length = left.data.array->length,
+        new_length = l_length * right.data.integer;
+
+    ObjectBuffer *new_arr = create_array(vm, NULL, new_length);
+    for (int i = 0; i < new_length; i += l_length) {
+        memcpy(new_arr->data + i, left.data.array->data, l_length * sizeof(Object));
+    }
+
+    Object obj = OBJ(o_Array, .array = new_arr);
+
+#ifdef DEBUG
+    debug_print_create(obj);
 #endif
 
     return obj;
@@ -202,6 +247,8 @@ execute_binary_operation(VM *vm, Opcode op) {
     Object left = vm->stack[vm->sp - 2];
     Object result;
 
+    // TODO replace with switch case
+
     if (left.type == o_Integer && right.type == o_Integer) {
         result = execute_binary_integer_operation(op, left, right);
 
@@ -210,6 +257,9 @@ execute_binary_operation(VM *vm, Opcode op) {
 
     } else if (left.type == o_String && right.type == o_String) {
         result = execute_binary_string_operation(vm, op, left, right);
+
+    } else if (left.type == o_Array && right.type == o_Integer) {
+        result = execute_binary_array_operation(vm, op, left, right);
 
     } else {
         static const char binary_ops[] = {'+', '-', '*', '/'};
@@ -456,9 +506,7 @@ vm_push_constant(VM *vm, Constant c) {
                 Object obj = OBJ(o_String, .string = new_str);
 
 #ifdef DEBUG
-                printf("create: ");
-                object_fprint(obj, stdout);
-                putc('\n', stdout);
+    debug_print_create(obj);
 #endif
 
                 return vm_push(vm, obj);
@@ -482,9 +530,7 @@ build_array(VM *vm, int start_index, int end_index) {
     Object array = OBJ(o_Array, .array = create_array(vm, data, length));
 
 #ifdef DEBUG
-    printf("create: ");
-    object_fprint(array, stdout);
-    putc('\n', stdout);
+    debug_print_create(array);
 #endif
 
     return array;
@@ -520,11 +566,8 @@ build_table(VM *vm, int start_index, int end_index) {
     Object obj = OBJ(o_Table, .table = tbl);
 
 #ifdef DEBUG
-    printf("create: ");
-    object_fprint(obj, stdout);
-    putc('\n', stdout);
+    debug_print_create(obj);
 #endif
-
     return obj;
 }
 
@@ -580,23 +623,6 @@ call_builtin(VM *vm, const Builtin *builtin, int num_args) {
     }
 }
 
-#ifdef DEBUG
-static void
-debug_print_args(Object function, Object *args, int num_args) {
-    object_fprint(function, stdout);
-    printf(" (");
-    int last = num_args - 1;
-    for (int i = 0; i < last; i++) {
-        object_fprint(args[i], stdout);
-        printf(", ");
-    }
-    if (num_args >= 1) {
-        object_fprint(args[last], stdout);
-    }
-    printf(")");
-}
-#endif
-
 static error
 execute_call(VM *vm, int num_args) {
     Object callee = vm->stack[vm->sp - 1 - num_args];
@@ -632,9 +658,7 @@ vm_push_closure(VM *vm, int const_index, int num_free) {
     Object obj = OBJ(o_Closure, .closure = closure);
 
 #ifdef DEBUG
-    printf("create: ");
-    object_fprint(obj, stdout);
-    putc('\n', stdout);
+    debug_print_create(obj);
 #endif
 
     // remove free variables from stack

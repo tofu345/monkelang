@@ -1018,7 +1018,7 @@ void test_for_statements(void) {
             make(OpConstant, 2),
             make(OpLessThan),
 
-            make(OpJumpNotTruthy, 43), // to after body
+            make(OpJumpNotTruthy, 43), // to after last jump
 
             // body
             make(OpGetBuiltin, 1),  // puts(...)
@@ -1047,7 +1047,7 @@ void test_for_statements(void) {
             // condition
             make(OpTrue),
 
-            make(OpJumpNotTruthy, 18), // to after body
+            make(OpJumpNotTruthy, 18), // to after last jump
 
             // body
             make(OpGetBuiltin, 1),

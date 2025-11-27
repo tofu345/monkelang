@@ -24,6 +24,9 @@
 - while loops
 - break, continue in loops
 
+- default, optional, variable function arguments
+- Python-like generators with closures and for-loop support
+
 # VM
 
 - check for integer overflow, underflow.

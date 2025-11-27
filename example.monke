@@ -25,6 +25,14 @@ let map = fn(f, arr) {
     iter(arr, []);
 };
 
+let map2 = fn(f, arr) {
+    let result = [null] * len(arr);
+    for (let i = 0; i < len(arr); i = i + 1) {
+        result[i] = f(arr[i]);
+    }
+    return result
+};
+
 let reduce = fn(arr, initial, f) {
     let iter = fn(arr, result) {
         if (len(arr) == 0) {
