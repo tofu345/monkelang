@@ -267,9 +267,12 @@ parse_block_statement(Parser* p) {
 
     while (!cur_token_is(p, t_Rbrace) && !cur_token_is(p, t_Eof)) {
         Node stmt = parse_statement(p);
-        if (!IS_INVALID(stmt)) {
-            NodeBufferPush(&bs->stmts, stmt);
+        if (IS_INVALID(stmt)) {
+            free_block_statement(bs);
+            return NULL;
         }
+
+        NodeBufferPush(&bs->stmts, stmt);
         next_token(p);
     }
 
