@@ -17,7 +17,7 @@ static int add_constant(Compiler *c, Constant obj_const);
 
 // new [SourceMapping] with [c.current_instructions.length] (will point to next
 // emitted instruction) and [node.token].
-static void source_map_statement(Compiler *c, Node node);
+static void source_map(Compiler *c, Node node);
 
 // create [Error] with [n.token]
 static Error *compiler_error(Node n, char* format, ...);
@@ -212,7 +212,7 @@ _compile(Compiler *c, Node n) {
 
         case n_ExpressionStatement:
             {
-                source_map_statement(c, n);
+                source_map(c, n);
 
                 ExpressionStatement *es = n.obj;
                 err = _compile(c, es->expression);
@@ -224,7 +224,7 @@ _compile(Compiler *c, Node n) {
 
         case n_LetStatement:
             {
-                source_map_statement(c, n);
+                source_map(c, n);
 
                 LetStatement *ls = n.obj;
 
@@ -251,7 +251,7 @@ _compile(Compiler *c, Node n) {
 
         case n_ReturnStatement:
             {
-                source_map_statement(c, n);
+                source_map(c, n);
 
                 if (c->cur_scope_index == 0) {
                     return compiler_error(n,
@@ -283,7 +283,7 @@ _compile(Compiler *c, Node n) {
                 // 06 Jump 02
                 // 07 ...
 
-                source_map_statement(c, n);
+                source_map(c, n);
 
                 ForStatement *fs = n.obj;
 
@@ -341,7 +341,7 @@ _compile(Compiler *c, Node n) {
                 err = _compile(c, stmt->right);
                 if (err) { return err; }
 
-                source_map_statement(c, n);
+                source_map(c, n);
                 err = perform_assignment(c, stmt->left);
                 if (err) { return err; }
 
@@ -358,10 +358,10 @@ _compile(Compiler *c, Node n) {
                 err = _compile(c, stmt->right);
                 if (err) { return err; }
 
-                source_map_statement(c, n);
+                source_map(c, n);
                 compile_operator(c, stmt->tok);
 
-                source_map_statement(c, n);
+                source_map(c, n);
                 err = perform_assignment(c, stmt->left);
                 if (err) { return err; }
 
@@ -378,7 +378,7 @@ _compile(Compiler *c, Node n) {
                 err = _compile(c, ie->right);
                 if (err) { return err; }
 
-                source_map_statement(c, n);
+                source_map(c, n);
 
                 compile_operator(c, ie->tok);
 
@@ -391,7 +391,7 @@ _compile(Compiler *c, Node n) {
                 err = _compile(c, pe->right);
                 if (err) { return err; }
 
-                source_map_statement(c, n);
+                source_map(c, n);
 
                 if ('!' == pe->tok.start[0]) {
                     emit(c, OpBang);
@@ -450,7 +450,7 @@ _compile(Compiler *c, Node n) {
                 err = _compile(c, ie->index);
                 if (err) { return err; }
 
-                source_map_statement(c, n);
+                source_map(c, n);
 
                 emit(c, OpIndex);
                 return 0;
@@ -468,7 +468,7 @@ _compile(Compiler *c, Node n) {
                     if (err) { return err; }
                 }
 
-                source_map_statement(c, n);
+                source_map(c, n);
 
                 emit(c, OpCall, args.length);
                 return 0;
@@ -736,7 +736,7 @@ Bytecode bytecode(Compiler *c) {
 }
 
 static void
-source_map_statement(Compiler *c, Node node) {
+source_map(Compiler *c, Node node) {
     SourceMapping mapping = {
         .position = c->current_instructions->length,
         .node = node
