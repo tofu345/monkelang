@@ -97,8 +97,8 @@ peek_token_is(const Parser* p, TokenType t) {
     return p->peek_token.type == t;
 }
 
-// if peek_token.typ is not [t] return false, else return true and call
-// [next_token].
+// if peek_token.typ is [t] call [next_token] and return true,
+// otherwise return false.
 static bool
 expect_peek(Parser* p, TokenType t) {
     if (peek_token_is(p, t)) {
@@ -616,46 +616,43 @@ parse_return_statement(Parser* p) {
 }
 
 static Node
-parse_expression_or_assign_statement(Parser* p) {
-    Node left = parse_expression(p, p_Lowest);
-    if (IS_INVALID(left)) {
+parse_assign_statement(Parser *p, Node left) {
+    // (x2) next_token()
+    p->cur_token = lexer_next_token(&p->l);
+    p->peek_token = lexer_next_token(&p->l);
+
+    Node right = parse_expression(p, p_Lowest);
+    if (IS_INVALID(right)) {
+        node_free(left);
         return INVALID;
     }
 
-    Node stmt;
-    if (peek_token_is(p, t_Assign)) {
-        // (x2) next_token()
-        p->cur_token = lexer_next_token(&p->l);
-        p->peek_token = lexer_next_token(&p->l);
-
-        Node right = parse_expression(p, p_Lowest);
-        if (IS_INVALID(right)) {
-            node_free(left);
-            return INVALID;
-        }
-
-        if (left.typ == n_Identifier && right.typ == n_FunctionLiteral) {
-            FunctionLiteral *fl = right.obj;
-            fl->name = left.obj;
-        }
-
-        AssignStatement *as = allocate(sizeof(AssignStatement));
-        as->left = left;
-        as->tok = *node_token(right);
-        as->right = right;
-        stmt = NODE(n_AssignStatement, as);
-
-    } else {
-        ExpressionStatement *es = allocate(sizeof(ExpressionStatement));
-        es->tok = *node_token(left);
-        es->expression = left;
-        stmt = NODE(n_ExpressionStatement, es);
+    if (left.typ == n_Identifier && right.typ == n_FunctionLiteral) {
+        FunctionLiteral *fl = right.obj;
+        fl->name = left.obj;
     }
+
+    AssignStatement *as = allocate(sizeof(AssignStatement));
+    as->left = left;
+    as->tok = *node_token(right);
+    as->right = right;
 
     if (peek_token_is(p, t_Semicolon)) {
         next_token(p);
     }
-    return stmt;
+    return NODE(n_AssignStatement, as);
+}
+
+static Node
+parse_expression_statement(Parser* p, Node left) {
+    ExpressionStatement *es = allocate(sizeof(ExpressionStatement));
+    es->tok = *node_token(left);
+    es->expression = left;
+
+    if (peek_token_is(p, t_Semicolon)) {
+        next_token(p);
+    }
+    return NODE(n_ExpressionStatement, es);
 }
 
 static Node
@@ -732,7 +729,18 @@ parse_statement(Parser* p) {
                 p->cur_token.length, p->cur_token.start);
         return INVALID;
     default:
-        return parse_expression_or_assign_statement(p);
+        {
+            Node left = parse_expression(p, p_Lowest);
+            if (IS_INVALID(left)) {
+                return INVALID;
+            }
+
+            if (peek_token_is(p, t_Assign)) {
+                return parse_assign_statement(p, left);
+            } else {
+                return parse_expression_statement(p, left);
+            }
+        }
     }
     return INVALID;
 }
