@@ -156,9 +156,6 @@ static Node
 parse_identifier(Parser* p) {
     Identifier* id = allocate(sizeof(Identifier));
     id->tok = p->cur_token;
-
-    // avoid recomputing hash, does not gain much.
-    id->hash = hash_string_fnv1a(p->cur_token.start, p->cur_token.length);
     return NODE(n_Identifier, id);
 }
 
@@ -354,6 +351,7 @@ static Node
 parse_string_literal(Parser* p) {
     if (p->cur_token.start[p->cur_token.length] != '\"') {
         parser_error(p, "missing closing '\"' for string");
+        return INVALID;
     }
 
     StringLiteral* sl = allocate(sizeof(StringLiteral));

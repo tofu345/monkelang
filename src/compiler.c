@@ -75,6 +75,11 @@ void compiler_free(Compiler *c) {
     free(c->functions.data);
 }
 
+static uint64_t
+hash(Identifier *id) {
+    return hash_string_fnv1a(id->tok.start, id->tok.length);
+}
+
 static bool
 last_instruction_is(Compiler *c, Opcode op) {
     if (c->current_instructions->length == 0) {
@@ -228,14 +233,13 @@ _compile(Compiler *c, Node n) {
 
                 LetStatement *ls = n.obj;
 
-                Identifier *ident = ls->name;
-                char *name = (char *)ident->tok.start;
+                Identifier *id = ls->name;
                 Symbol *symbol =
-                    sym_define(c->current_symbol_table, name, ident->hash);
+                    sym_define(c->current_symbol_table, id->tok.start, hash(id));
 
                 if (symbol->index >= GlobalsSize) {
                     return compiler_error(
-                            (Node){.obj = ident}, "too many global variables");
+                            (Node){.obj = id}, "too many global variables");
                 }
 
                 err = _compile(c, ls->value);
@@ -324,7 +328,7 @@ _compile(Compiler *c, Node n) {
         case n_Identifier:
             {
                 Identifier *id = n.obj;
-                Symbol *symbol = sym_resolve(c->current_symbol_table, id->hash);
+                Symbol *symbol = sym_resolve(c->current_symbol_table, hash(id));
                 if (symbol == NULL) {
                     return compiler_error(n,
                             "undefined variable '%.*s'", LITERAL(id->tok));
@@ -556,7 +560,7 @@ _compile(Compiler *c, Node n) {
 
                 if (fl->name) {
                     sym_function_name(c->current_symbol_table,
-                            fl->name->tok.start, fl->name->hash);
+                            fl->name->tok.start, hash(fl->name));
                 }
 
                 ParamBuffer params = fl->params;
@@ -564,7 +568,7 @@ _compile(Compiler *c, Node n) {
                 for (int i = 0; i < params.length; i++) {
                     cur = params.data[i];
                     sym_define(c->current_symbol_table, cur->tok.start,
-                            cur->hash);
+                            hash(cur));
                 }
 
                 err = _compile(c, NODE(n_BlockStatement, fl->body));
@@ -614,7 +618,7 @@ perform_assignment(Compiler *c, Node node) {
         Identifier *id = node.obj;
         Node id_node = { .obj = id };
 
-        Symbol *symbol = sym_resolve(c->current_symbol_table, id->hash);
+        Symbol *symbol = sym_resolve(c->current_symbol_table, hash(id));
         if (symbol == NULL) {
             return compiler_error(id_node,
                     "undefined variable '%.*s' is not assignable",

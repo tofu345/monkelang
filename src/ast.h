@@ -62,7 +62,6 @@ int program_fprint(Program* p, FILE* fp);
 
 typedef struct {
     Token tok; // the 't_Ident' token
-    uint64_t hash;
 } Identifier;
 
 typedef struct {
