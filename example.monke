@@ -1,14 +1,11 @@
 let fibonacci = fn(num) {
-    // memoization is nice
     let seen = {0: 0, 1: 1};
     let fib = fn(num) {
         let res = seen[num];
-        if (res != null) {
-            return res;
+        if (!res) {
+            res = fib(num - 1) + fib(num - 2);
+            seen[num] = res;
         }
-
-        res = fib(num - 1) + fib(num - 2);
-        seen[num] = res;
         return res;
     };
     fib(num);

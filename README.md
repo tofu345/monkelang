@@ -84,21 +84,17 @@ hello("dear, future Reader!"); // => Hello dear, future Reader!
 
 ```javascript
 let fibonacci = fn(num) {
-  let seen = {0: 0, 1: 1};
-  let fib = fn(num) {
-    let res = seen[num];
-
-    // null literals
-    if (res != null) {
-      return res;
-    }
-    res = fib(num - 1) + fib(num - 2);
-
-    // Assignment to Table Keys.
-    seen[num] = res;
-    return res;
-  };
-  fib(num);
+    let seen = {0: 0, 1: 1};
+    let fib = fn(num) {
+        let res = seen[num];
+        if (!res) {
+            res = fib(num - 1) + fib(num - 2);
+            // Assignment to Table Keys.
+            seen[num] = res;
+        }
+        return res;
+    };
+    fib(num);
 };
 puts("fibonacci(50):", fibonacci(50)); // => fibonacci(50): 12586269025
 
@@ -147,12 +143,15 @@ sayIf("hi!", null); // =>
 // Double `a`
 let a = [1, 2, 3, 4];
 let double = fn(x) { x * 2 };
-let doubled = [];
-// For loops!
-for (let i = 0; i < len(a); i += 1) {   // operator assignment
-  push(doubled, double(a[i]));
-}
-puts("a:", a, "doubled:", doubled);
+let map = fn(f, arr) {
+    let length = len(arr);
+    let result = [null] * length;           // initialize array of given length
+    for (let i = 0; i < length; i += 1) { // operator assignment
+        result[i] = f(arr[i]);
+    }
+    return result
+};
+puts("a:", a, "doubled:", map(double, a));
 ```
 
 ## Tree Walking Interpreter

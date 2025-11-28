@@ -658,7 +658,7 @@ perform_assignment(Compiler *c, Node node) {
         return 0;
     }
 
-    return compiler_error(node, "cannot assign non-variable");
+    return compiler_error(node, "cannot assign to non-variable");
 }
 
 static int

@@ -58,5 +58,6 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "error: expect only optional path to program\n");
         return EXIT_FAILURE;
     }
+
     return run_program(argv[1]);
 }

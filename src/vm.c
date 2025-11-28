@@ -31,8 +31,15 @@ instructions(Frame *f) {
 
 static error
 error_unknown_operation(Opcode op, Object left, Object right) {
+    static const char *op_strs[] = {"+", "-", "*", "/", "==", "!=", "<", ">"};
+    if (op < OpAdd || op > OpGreaterThan) {
+        return new_error("unkown operation: %s %s %s",
+                lookup(op)->name, show_object_type(left.type),
+                show_object_type(right.type));
+    }
+
     return new_error("unkown operation: %s %s %s",
-            lookup(op)->name, show_object_type(left.type),
+            show_object_type(left.type), op_strs[op - OpAdd],
             show_object_type(right.type));
 }
 
@@ -206,7 +213,7 @@ execute_binary_integer_operation(Opcode op, Object left, Object right) {
 static Object
 execute_binary_string_operation(VM *vm, Opcode op, Object left, Object right) {
     if (op != OpAdd) {
-        return ERR("unkown binary string operator: %s", lookup(op)->name);
+        return OBJ(o_Error, .err = error_unknown_operation(op, left, right));
     }
 
     // copy [left] and [right] into new string
@@ -234,7 +241,7 @@ execute_binary_string_operation(VM *vm, Opcode op, Object left, Object right) {
 static Object
 execute_binary_array_operation(VM *vm, Opcode op, Object left, Object right) {
     if (op != OpMul) {
-        return ERR("unkown binary array operator: %s", lookup(op)->name);
+        return OBJ(o_Error, .err = error_unknown_operation(op, left, right));
     }
 
     int l_length = left.data.array->length,
@@ -276,15 +283,7 @@ execute_binary_operation(VM *vm, Opcode op) {
         result = execute_binary_array_operation(vm, op, left, right);
 
     } else {
-        static const char binary_ops[] = {'+', '-', '*', '/'};
-        if (op > OpDiv) {
-            return error_unknown_operation(op, left, right);
-        }
-
-        int idx = op - OpAdd;
-        return new_error("unkown operation: %s %c %s",
-                show_object_type(left.type), binary_ops[idx],
-                show_object_type(right.type));
+        return error_unknown_operation(op, left, right);
     }
 
     vm->sp -= 2;

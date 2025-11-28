@@ -52,8 +52,6 @@ void repl(FILE* in_stream, FILE* out_stream) {
 
         // only '\n' was entered.
         } else if (len == 1) {
-            free(input);
-            input = NULL;
             continue;
         }
 
@@ -186,27 +184,25 @@ multigetline(char **input, size_t *input_cap,
 
     fprintf(out_stream, ">> ");
 
-    // [len] is number of chars read.
     int len = getline(input, input_cap, in_stream);
-    if (len == -1) { return -1; }
-
-    if (len == 1) {
-        // remove ending '\n'
-        (*input)[0] = '\0';
-        return len;
-    }
+    if (len == -1) { return len; }
 
     struct pollfd fds;
     fds.fd = fileno(in_stream);
     fds.events = POLLIN;
     int ret = poll(&fds, 1, 0);
 
-    // last character before '\n'
-    char last_ch = (*input)[len - 2];
     // ret is 0 if there is no data to read.
-    if (ret == 0 && last_ch != '{' && last_ch != '(') {
-        (*input)[len - 1] = '\0';
-        return len;
+    if (ret == 0) {
+        if (len == 1) {
+            return len;
+        }
+
+        // last character before '\n'
+        char last_ch = (*input)[len - 2];
+        if (last_ch != '{' && last_ch != '(') {
+            return len;
+        }
     }
 
     char *line = NULL;
@@ -217,6 +213,10 @@ multigetline(char **input, size_t *input_cap,
         // Skip printing '.. ' when a multiline string is pasted.
         ret = poll(&fds, 1, 0);
         if (ret == 0) {
+            // print '.. ' on a newline
+            if ((*input)[len - 1] != '\n') {
+                putc('\n', out_stream);
+            }
             fprintf(out_stream, ".. ");
         }
 

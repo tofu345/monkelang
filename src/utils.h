@@ -53,7 +53,7 @@
 BUFFER(VoidPtr, void *)
 
 // from dwm :p
-void die(const char *fmt, ...);
+_Noreturn void die(const char *fmt, ...);
 
 // return fnv1a hash of `string[0:length)` exclusive.
 uint64_t hash_string_fnv1a(const char *string, int length);
