@@ -37,8 +37,6 @@
 
 - ErrorType
 
-- create array of arbitrary length
-
 - highlight `[...]` in index expressions and `(...)` in call expressions in
   stack trace
 
