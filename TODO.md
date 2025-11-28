@@ -39,7 +39,6 @@
 
 - create array of arbitrary length
 
-- with DEBUG check if OpPop overwrites the current frames local variables
 - highlight `[...]` in index expressions and `(...)` in call expressions in
   stack trace
 

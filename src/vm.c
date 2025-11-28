@@ -112,7 +112,21 @@ vm_push(VM *vm, Object obj) {
 
 static Object
 vm_pop(VM *vm) {
+#ifdef DEBUG
+    --vm->sp;
+
+    // check for possible local variables overwrite
+    Frame *cur = &vm->frames[vm->frames_index];
+    if (vm->sp >= cur->base_pointer + cur->cl->func->num_parameters) {
+        return vm->stack[vm->sp];
+    }
+
+    print_vm_stack_trace(vm);
+    die("stack pointer below limit for current frame");
+
+#else
     return vm->stack[--vm->sp];
+#endif
 }
 
 #ifdef DEBUG

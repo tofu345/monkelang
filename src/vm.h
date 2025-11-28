@@ -8,8 +8,9 @@
 
 #include <stdint.h>
 
-// When defined VM prints allocations, function calls, returns and garbage
-// collection.
+// When defined:
+// - print allocations, function calls, returns and garbage collection.
+// - perform checks on stack pointer in vm_pop()
 // #define DEBUG
 
 static const int StackSize = 2048;
@@ -71,6 +72,6 @@ void vm_free(VM *vm);
 // Last object popped of the stack.
 Object vm_last_popped(VM *vm);
 
-// Print where an error occured when [vm_run] exited, using instruction
-// pointers and SourceMapping of Frames in the Function call stack.
+// Print the state function call stack where [vm_run] exited, using instruction
+// pointers and SourceMapping of Frames.
 void print_vm_stack_trace(VM *vm);
