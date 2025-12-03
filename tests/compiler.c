@@ -253,6 +253,8 @@ void test_global_let_statements(void) {
             make(OpPop)
         )
     );
+
+    c_test_error("b", "undefined variable 'b'");
 }
 
 void test_string_expressions(void) {
@@ -981,6 +983,16 @@ void test_assignments(void) {
             make(OpSetGlobal, 0)
         )
     );
+
+    c_test_error("b = 1", "undefined variable 'b' is not assignable");
+    c_test_error(
+        "let a = fn() { a = 1; }",
+        "function 'a' is not assignable"
+    );
+    c_test_error(
+        "len = 1;",
+        "builtin len() is not assignable"
+    );
 }
 
 void test_operator_assignments(void) {
@@ -1073,12 +1085,14 @@ void test_return_statements(void) {
             make(OpPop)
         )
     );
+
+    c_test_error("return", "return statement outside function");
 }
 
 void test_for_statements(void) {
     c_test(
         "\
-        for (let i = 0; i < 5; i = i + 1) {\
+        for (let i = 0; i < 5; i += 1) {\
             puts(\"i:\", i);\
         }\
         ",
@@ -1091,7 +1105,7 @@ void test_for_statements(void) {
             make(OpJump, 19), // to condition
 
             // update
-            make(OpGetGlobal, 0),   // i = i + 1;
+            make(OpGetGlobal, 0),   // i += 1;
             make(OpConstant, 1),
             make(OpAdd),
             make(OpSetGlobal, 0),
@@ -1140,20 +1154,6 @@ void test_for_statements(void) {
 
             make(OpJump, 3) // to update
         )
-    );
-}
-
-void test_compiler_errors(void) {
-    c_test_error("b", "undefined variable 'b'");
-    c_test_error("b = 1", "undefined variable 'b' is not assignable");
-    c_test_error("return", "return statement outside function");
-    c_test_error(
-        "let a = fn() { a = 1; }",
-        "function 'a' is not assignable"
-    );
-    c_test_error(
-        "len = 1;",
-        "builtin len() is not assignable"
     );
 }
 
@@ -1386,6 +1386,5 @@ int main(void) {
     RUN_TEST(test_operator_assignments);
     RUN_TEST(test_return_statements);
     RUN_TEST(test_for_statements);
-    RUN_TEST(test_compiler_errors);
     return UNITY_END();
 }

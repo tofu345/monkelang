@@ -60,13 +60,13 @@ void test_instructions_string(void) {
     char *buf = NULL;
     size_t len;
     FILE *fp = open_memstream(&buf, &len);
+    TEST_ASSERT_NOT_NULL_MESSAGE(fp, "open_memstream fail");
 
     int err = fprint_instructions(fp, test);
     TEST_ASSERT_MESSAGE(err == 0, "fprint_instructions failed");
-
     free(test.data);
-    fflush(fp);
 
+    fflush(fp);
     if (strcmp(expected_body, buf) != 0) {
         printf("instructions wrongly formatted\n");
         printf("want=\n%s\n", expected_body);
@@ -83,7 +83,7 @@ void test_instructions_string(void) {
 
 void test_read_operands(void) {
     struct Test {
-        int bytesRead;
+        int n_bytes;
         int bytecode[5]; // NULL-terminated
         Instructions actual;
     } tests[] = {
@@ -92,30 +92,32 @@ void test_read_operands(void) {
     };
     int length = sizeof(tests) / sizeof(tests[0]);
 
+    bool fail = false;
     int n;
     for (int i = 0; i < length; i++) {
         struct Test tt = tests[i];
         const Definition *def = lookup(tt.bytecode[0]);
         Operands operands = read_operands(&n, def, tt.actual.data);
-        if (n != tt.bytesRead) {
-            printf("n wrong. want=%d, got=%d\n",
-                    tt.bytesRead, operands.length);
-            TEST_FAIL();
+        if (n != tt.n_bytes) {
+            printf("n_bytes wrong. want=%d, got=%d\n",
+                    tt.n_bytes, operands.length);
+            fail = true;
         }
 
-        bool fail = false;
         for (int i = 0; i < operands.length; i++) {
-            //                       skip opcode -vvv
+            //                       skip opcode -vvvvv
             if (operands.widths[i] != tt.bytecode[i + 1]) {
                 printf("operand %d wrong. want=%d, got=%d\n",
                         i, tt.bytecode[i + 1], operands.widths[i]);
                 fail = true;
+                break;
             }
         }
+
         free(operands.widths);
         free(tt.actual.data);
-        if (fail) TEST_FAIL();
     }
+    if (fail) { TEST_FAIL(); }
 }
 
 int main(void) {

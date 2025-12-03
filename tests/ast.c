@@ -21,58 +21,46 @@ void test_print(void) {
                     .start = "let",
                     .length = 3
                 },
-                .name =
+                .name = &(Identifier){
+                    .tok = {
+                        .type = t_Ident,
+                        .start = "myVar",
+                        .length = 5
+                    },
+                },
+                .value = {
+                    n_Identifier,
                     &(Identifier){
                         .tok = {
                             .type = t_Ident,
-                            .start = "myVar",
-                            .length = 5
+                            .start = "anotherVar",
+                            .length = 10
                         },
                     },
-                .value =
-                    {
-                        n_Identifier,
-                        &(Identifier){
-                            .tok = {
-                                .type = t_Ident,
-                                .start = "anotherVar",
-                                .length = 10
-                            },
-                        },
-                    }
+                }
             }
         }
     };
-    Program prog = {{ stmts, 1, 0 }};
-
     char* expected = "let myVar = anotherVar;";
-    size_t len = strlen(expected) + 2; // in case of stupidity
-    char* buf = calloc(len, sizeof(char));
 
-    // `open_memstream` would be better
-    FILE* fp = fmemopen(buf, len, "w");
-    if (fp == NULL) {
-        fprintf(stderr, "no memory");
-        exit(1);
-    }
+    Program prog = { .stmts = { .data = stmts, .length = 1 } };
+
+    char *buf = NULL;
+    size_t len;
+    FILE *fp = open_memstream(&buf, &len);
+    TEST_ASSERT_NOT_NULL_MESSAGE(fp, "open_memstream fail");
 
     int err = program_fprint(&prog, fp);
-    if (err == -1) {
-        printf("program_fprint fail");
-        goto cleanup;
-    }
+    TEST_ASSERT_EQUAL_MESSAGE(0, err, "program_fprint fail");
 
     fflush(fp);
     if (strcmp(expected, buf) != 0) {
         printf("program wrong.\nwant=%s\n got =%s", expected, buf);
-        err = -1;
+        TEST_FAIL();
     }
 
-cleanup:
     fclose(fp);
     free(buf);
-
-    TEST_ASSERT(err != -1);
 }
 
 int main(void) {

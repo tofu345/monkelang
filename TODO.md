@@ -19,6 +19,8 @@
 
 # Compiler
 
+- define variables with no value, define multiple variables in one statement.
+
 - remove duplicate constants
 - store more information in symbol table
 - while loops

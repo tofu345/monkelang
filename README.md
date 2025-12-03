@@ -134,6 +134,7 @@ fn() {
 
 // Empty return statements
 let sayIf = fn(message, condition) {
+  // !object is true only if object is null or false
   if (!condition) { return; }
   puts(message);
 }

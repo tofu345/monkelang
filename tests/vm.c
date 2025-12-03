@@ -62,6 +62,8 @@ test_boolean_expressions(void) {
     vm_test("!!true", TEST(bool, true));
     vm_test("!!false", TEST(bool, false));
     vm_test("!!5", TEST(bool, true));
+
+    vm_test_error("1 < 1.", "unkown operation: integer < float");
 }
 
 static void
@@ -93,9 +95,11 @@ test_truthy(void) {
     vm_test("if (-1.5) {1}", TEST(int, 1));
     vm_test("if ([1]) {1}", TEST(int, 1));
     vm_test("if ({1: 2}) {1}", TEST(int, 1));
+    vm_test("if (fn(){}) {1}", TEST(int, 1));
 
     vm_test("if ([]) {1}", TEST_NULL);
     vm_test("if ({}) {1}", TEST_NULL);
+    vm_test("if (false) {1}", TEST_NULL);
     vm_test("if (null) {1}", TEST_NULL);
 }
 
@@ -122,6 +126,10 @@ test_array_literals(void) {
     vm_test("[]", TEST_ARR(0));
     vm_test("[1, 2, 3]", TEST_ARR(1, 2, 3));
     vm_test("[1 + 2, 3 * 4, 5 + 6]", TEST_ARR(3, 12, 11));
+
+    vm_test("[] * 3", TEST_ARR(0));
+    vm_test("[2] * 1", TEST_ARR(2));
+    vm_test("[1, 2] * 3", TEST_ARR(1, 2, 1, 2, 1, 2));
 }
 
 #define TEST_TABLE(...) \
