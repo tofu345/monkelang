@@ -66,7 +66,7 @@ void test_instructions_string(void) {
     TEST_ASSERT_MESSAGE(err == 0, "fprint_instructions failed");
     free(test.data);
 
-    fflush(fp);
+    fclose(fp);
     if (strcmp(expected_body, buf) != 0) {
         printf("instructions wrongly formatted\n");
         printf("want=\n%s\n", expected_body);
@@ -74,7 +74,6 @@ void test_instructions_string(void) {
         TEST_FAIL();
     }
 
-    fclose(fp);
     free(buf);
 }
 
