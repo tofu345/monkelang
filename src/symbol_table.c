@@ -2,6 +2,7 @@
 #include "hash-table/ht.h"
 #include "utils.h"
 
+#include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -42,8 +43,8 @@ new_symbol(SymbolTable *st, const char *name, uint64_t hash, int index,
     Symbol *symbol = malloc(sizeof(Symbol));
     if (symbol == NULL) { die("new_symbol: malloc"); }
 
-    Symbol *ptr = ht_set_hash(st->store, name, symbol, hash);
-    if (ptr == NULL) {
+    Symbol *ptr = ht_set_hash(st->store, (void *) name, symbol, hash);
+    if (errno == ENOMEM) {
         die("new_symbol: ht_set");
 
     // previous symbol with same [name]
