@@ -1169,17 +1169,17 @@ void test_for_statement(void) {
 
     ForStatement* fs = n.obj;
 
-    test_let_statement(fs->init_statement, "i");
-    LetStatement* ls = fs->init_statement.obj;
+    test_let_statement(fs->init, "i");
+    LetStatement* ls = fs->init.obj;
     test_literal_expression(ls->value, TEST(int, 0));
 
     test_infix_expression(fs->condition, TEST(str, "i"), "<", TEST(int, 5));
 
     TEST_ASSERT_MESSAGE(
-            n_Assignment == fs->update_statement.typ,
+            n_Assignment == fs->update.typ,
             "type not AssignStatement");
 
-    Assignment* as = fs->update_statement.obj;
+    Assignment* as = fs->update.obj;
     test_identifier(as->left, "i");
     test_infix_expression(as->right, TEST(str, "i"), "+", TEST(int, 1));
 
@@ -1208,9 +1208,9 @@ void test_empty_for_statement(void) {
 
     ForStatement* fs = n.obj;
 
-    test_literal_expression(fs->init_statement, TEST_NULL);
+    test_literal_expression(fs->init, TEST_NULL);
     test_literal_expression(fs->condition, TEST_NULL);
-    test_literal_expression(fs->update_statement, TEST_NULL);
+    test_literal_expression(fs->update, TEST_NULL);
 
     BlockStatement *bs = fs->body;
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, bs->stmts.length, "wrong BlockStatement length");

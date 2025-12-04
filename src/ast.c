@@ -153,10 +153,10 @@ fprint_expression_statement(ExpressionStatement* es, FILE* fp) {
 static int
 fprint_for_statement(ForStatement* fs, FILE* fp) {
     FPRINTF(fp, "for (");
-    NODE_FPRINT(fp, fs->init_statement);
+    NODE_FPRINT(fp, fs->init);
     NODE_FPRINT(fp, fs->condition);
     FPRINTF(fp, ";");
-    NODE_FPRINT(fp, fs->update_statement);
+    NODE_FPRINT(fp, fs->update);
     FPRINTF(fp, ")");
     node_fprint(NODE(n_BlockStatement, fs->body), fp);
     return 0;
@@ -383,9 +383,9 @@ free_expression_statement(ExpressionStatement* es) {
 }
 
 void free_for_statement(ForStatement *fs) {
-    node_free(fs->init_statement);
+    node_free(fs->init);
     node_free(fs->condition);
-    node_free(fs->update_statement);
+    node_free(fs->update);
     if (fs->body) {
         free_block_statement(fs->body);
     }

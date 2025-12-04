@@ -1096,35 +1096,33 @@ void test_for_statements(void) {
             puts(\"i:\", i);\
         }\
         ",
-        _C( INT(0), INT(1), INT(5), STR("i:") ),
+        _C( INT(0), INT(5), STR("i:"), INT(1) ),
         _I(
             // initialization
             make(OpConstant, 0),    // let i = 0;
             make(OpSetGlobal, 0),
 
-            make(OpJump, 19), // to condition
-
-            // update
-            make(OpGetGlobal, 0),   // i += 1;
-            make(OpConstant, 1),
-            make(OpAdd),
-            make(OpSetGlobal, 0),
-
             // condition
             make(OpGetGlobal, 0),   // i < 5;
-            make(OpConstant, 2),
+            make(OpConstant, 1),
             make(OpLessThan),
 
-            make(OpJumpNotTruthy, 43), // to after last jump
+            make(OpJumpNotTruthy, 40), // to after loop
 
             // body
             make(OpGetBuiltin, 1),  // puts(...)
-            make(OpConstant, 3),
+            make(OpConstant, 2),
             make(OpGetGlobal, 0),
             make(OpCall, 2),
             make(OpPop),
 
-            make(OpJump, 9) // to update
+            // update
+            make(OpGetGlobal, 0),   // i += 1;
+            make(OpConstant, 3),
+            make(OpAdd),
+            make(OpSetGlobal, 0),
+
+            make(OpJump, 6) // to condition
         )
     );
     c_test(
@@ -1137,14 +1135,10 @@ void test_for_statements(void) {
         _I(
             // initialization
 
-            make(OpJump, 3), // to condition
-
-            // update
-
             // condition
             make(OpTrue),
 
-            make(OpJumpNotTruthy, 18), // to after last jump
+            make(OpJumpNotTruthy, 15), // to after loop
 
             // body
             make(OpGetBuiltin, 1),
@@ -1152,7 +1146,9 @@ void test_for_statements(void) {
             make(OpCall, 1),
             make(OpPop),
 
-            make(OpJump, 3) // to update
+            // update
+
+            make(OpJump, 0) // to condition
         )
     );
 }

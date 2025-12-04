@@ -681,7 +681,7 @@ test_for_statement(void) {
     vm_test(
         "\
         let a = 5;\
-        for (let b = 1; b < 5; b = b + 1) {\
+        for (let b = 1; b < 5; b += 1) {\
             a = a + b;\
         }\
         a\
@@ -691,7 +691,7 @@ test_for_statement(void) {
     vm_test(
         "\
         let a = 0;\
-        for (; a < 5; a = a + 1) {}\
+        for (; a < 5; a += 1) {}\
         a\
         ",
         TEST(int, 5)
@@ -700,7 +700,7 @@ test_for_statement(void) {
         "\
         let a = 0;\
         for (; a < 5; ) {\
-            a = a + 1;\
+            a += 1;\
         }\
         a\
         ",
@@ -712,7 +712,7 @@ test_for_statement(void) {
             let a = 0;\
             for (;;) {\
                 if (a < 5) {\
-                    a = a + 1;\
+                    a += 1;\
                 } else {\
                     return a;\
                 }\

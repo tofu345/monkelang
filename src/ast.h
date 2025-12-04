@@ -133,9 +133,9 @@ int fprint_block_statement(BlockStatement* bs, FILE* fp);
 // for (loop) statement
 typedef struct {
     Token tok; // the 'for' token
-    Node init_statement;
+    Node init; // statement
     Node condition; // expression
-    Node update_statement;
+    Node update; // statement
     BlockStatement* body;
 } ForStatement;
 

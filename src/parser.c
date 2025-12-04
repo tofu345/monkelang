@@ -87,7 +87,7 @@ peek_error(Parser* p, TokenType t) {
             show_token_type(t), show_token_type(p->peek_token.type));
 }
 
-static bool
+inline static bool
 cur_token_is(const Parser* p, TokenType t) {
     return p->cur_token.type == t;
 }
@@ -111,7 +111,7 @@ expect_peek(Parser* p, TokenType t) {
 }
 
 static void
-skip_semicolon(Parser *p) {
+peek_semicolon(Parser *p) {
     if (peek_token_is(p, t_Semicolon)) {
         next_token(p);
     }
@@ -597,7 +597,7 @@ parse_let_statement(Parser* p) {
         fl->name = stmt->name;
     }
 
-    skip_semicolon(p);
+    peek_semicolon(p);
     return NODE(n_LetStatement, stmt);
 }
 
@@ -618,7 +618,7 @@ parse_return_statement(Parser* p) {
         }
     }
 
-    skip_semicolon(p);
+    peek_semicolon(p);
     return NODE(n_ReturnStatement, stmt);
 }
 
@@ -643,7 +643,7 @@ parse_assignment(Parser *p, Node left) {
     as->left = left;
     as->tok = *node_token(right);
     as->right = right;
-    skip_semicolon(p);
+    peek_semicolon(p);
     return NODE(n_Assignment, as);
 }
 
@@ -665,7 +665,7 @@ parse_operator_assignment(Parser *p, Node left) {
     stmt->tok = tok;
     stmt->left = left;
     stmt->right = right;
-    skip_semicolon(p);
+    peek_semicolon(p);
     return NODE(n_OperatorAssignment, stmt);
 }
 
@@ -674,7 +674,7 @@ parse_expression_statement(__attribute__ ((unused)) Parser* p, Node left) {
     ExpressionStatement *es = allocate(sizeof(ExpressionStatement));
     es->tok = *node_token(left);
     es->expression = left;
-    skip_semicolon(p);
+    peek_semicolon(p);
     return NODE(n_ExpressionStatement, es);
 }
 
@@ -683,57 +683,41 @@ parse_for_statement(Parser *p) {
     ForStatement *fs = allocate(sizeof(ForStatement));
     fs->tok = p->cur_token;
 
-    if (!expect_peek(p, t_Lparen)) {
-        free(fs);
-        return INVALID;
-    }
-
+    // for ( ...
+    if (!expect_peek(p, t_Lparen)) { goto fail; }
     next_token(p);
 
-    // => '... ; ... ; ... )' or ';;)'
+    // for ( [optional init] ; ...
     if (!cur_token_is(p, t_Semicolon)) {
-        fs->init_statement = parse_statement(p);
-        if (IS_INVALID(fs->init_statement)) {
-            free_for_statement(fs);
-            return INVALID;
-        }
+        fs->init = parse_statement(p);
+        if (IS_INVALID(fs->init)) { goto fail; }
     }
-
     next_token(p);
 
-    // => '... ; ... )' or ';)'
-    if (cur_token_is(p, t_Semicolon) && peek_token_is(p, t_Rparen)) {
-    } else {
+    // ...; [optional condition] ; ...
+    if (!cur_token_is(p, t_Semicolon)) {
         fs->condition = parse_expression(p, p_Lowest);
-        if (IS_INVALID(fs->condition) || !expect_peek(p, t_Semicolon)) {
-            free_for_statement(fs);
-            return INVALID;
-        }
+        if (IS_INVALID(fs->condition)
+                || !expect_peek(p, t_Semicolon)) { goto fail; }
     }
 
-    // => '... )' or ')'
+    // ...; [optional update] ) {
     if (!peek_token_is(p, t_Rparen)) {
         next_token(p);
-        fs->update_statement = parse_statement(p);
-        if (IS_INVALID(fs->update_statement)) {
-            free_for_statement(fs);
-            return INVALID;
-        }
+        fs->update = parse_statement(p);
+        if (IS_INVALID(fs->update)) { goto fail; }
     }
-    if (!expect_peek(p, t_Rparen)) {
-        free_for_statement(fs);
-        return INVALID;
-    }
-
-    // => ') {'
+    if (!expect_peek(p, t_Rparen)) { goto fail; }
     next_token(p);
+
     fs->body = parse_block_statement(p);
-    if (fs->body == NULL) {
-        free_for_statement(fs);
-        return INVALID;
-    }
+    if (fs->body == NULL) { goto fail; }
 
     return NODE(n_ForStatement, fs);
+
+fail:
+    free_for_statement(fs);
+    return INVALID;
 }
 
 // on failure, return Node with `n.obj` == NULL
