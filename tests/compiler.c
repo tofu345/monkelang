@@ -7,6 +7,8 @@
 #include <stdio.h>
 
 Compiler c;
+Program prog;
+Error *err;
 
 // initialize Program and Compiler.
 static void init(void);
@@ -1153,15 +1155,104 @@ void test_for_statements(void) {
     );
 }
 
+void test_source_mapping(void) {
+    char *input = "\
+    let a = 0;\n\
+    a += 2;\n\
+    1 + 2 * a;\n\
+    let func = fn(a) { a + 24 };\n\
+    puts(type(func), \"func(10):\", func(10));\n\
+    a = !true == !(false == true);\n\
+    for (let i = 0; i < 5; i += 1) {}\n\
+    ";
+
+    SourceMapping exp_mappings[] = {
+        { 0, NODE(n_LetStatement, NULL) },          // let a = 0;
+        { 12, NODE(n_OperatorAssignment, NULL) },   // a += 2;
+        { 13, NODE(n_OperatorAssignment, NULL) },
+
+        { 16, NODE(n_ExpressionStatement, NULL) },  // 1 + 2 * a;
+        { 25, NODE(n_InfixExpression, NULL) },      // 1 + 2 * a;
+        //                                                   ^
+        { 26, NODE(n_InfixExpression, NULL) },      // 1 + 2 * a;
+        //                                               ^
+
+        { 28, NODE(n_LetStatement, NULL) },         // let func = fn(a) { a + 24 };
+        { 35, NODE(n_ExpressionStatement, NULL) },  // puts(type(func), "func(10):", func(10));
+        { 42, NODE(n_CallExpression, NULL) },       // puts(type(func), "func(10):", func(10));
+        //                                                  ^^^^
+        { 53, NODE(n_CallExpression, NULL) },       // puts(type(func), "func(10):", func(10));
+        //                                                                           ^^^^
+        { 55, NODE(n_CallExpression, NULL) },       // puts(type(func), "func(10):", func(10));
+        //                                             ^^^^
+
+        { 59, NODE(n_PrefixExpression, NULL) },     // a = !true == !(false == true);
+        //                                                 ^
+        { 62, NODE(n_InfixExpression, NULL) },      // a = !true == !(false == true);
+        //                                                                  ^^
+        { 63, NODE(n_PrefixExpression, NULL) },     // a = !true == !(false == true);
+        //                                                          ^
+        { 64, NODE(n_InfixExpression, NULL) },      // a = !true == !(false == true);
+        //                                                       ^^
+        { 65, NODE(n_Assignment, NULL) },           // a = !true == !(false == true);
+        //                                               ^
+
+        { 68, NODE(n_ForStatement, NULL) },         // for (let i = 0; i < 5; i += 1) {}
+        { 68, NODE(n_LetStatement, NULL) },         // for (let i = 0; i < 5; i += 1) {}
+        //                                                  ^^^
+        { 80, NODE(n_InfixExpression, NULL) },      // for (let i = 0; i < 5; i += 1) {}
+        //                                                               ^
+        { 90, NODE(n_OperatorAssignment, NULL) },   // for (let i = 0; i < 5; i += 1) {}
+        //                                                                      ^^
+        { 91, NODE(n_OperatorAssignment, NULL) },
+    };
+    int len = sizeof(exp_mappings) / sizeof(exp_mappings[0]);
+
+    init();
+
+    prog = test_parse(input);
+
+    err = compile(&c, &prog);
+    if (err != 0) {
+        print_error(err);
+        TEST_FAIL();
+    };
+
+    Bytecode code = bytecode(&c);
+    CompiledFunction *main_fn = code.main_function;
+
+    // fprint_instructions_mappings(
+    //         stdout, main_fn->mappings, main_fn->instructions);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            len, main_fn->mappings.length, "wrong mappings length");
+
+    SourceMapping *mappings = main_fn->mappings.data;
+    for (int i = 0; i < len; ++i) {
+        if (exp_mappings[i].position != mappings[i].position) {
+            printf("SourceMapping at:\n");
+            highlight_token(node_token(mappings[i].node), 0);
+            printf("has wrong position, want %d, got %d\n",
+                    exp_mappings[i].position, mappings[i].position);
+            TEST_FAIL();
+        }
+
+        if (exp_mappings[i].node.typ != mappings[i].node.typ) {
+            printf("SourceMapping at:\n");
+            highlight_token(node_token(mappings[i].node), 0);
+            printf("has wrong node type, want %d, got %d\n",
+                    exp_mappings[i].node.typ, mappings[i].node.typ);
+            TEST_FAIL();
+        }
+    }
+}
+
 static int test_instructions(Instructions expected, Instructions actual);
 static int test_constants(Constants expected, ConstantBuffer *actual);
 
 // Because each test contains multiple c_test() and c_test_error() which must
 // reinitialize before running.
 bool initialized = false;
-
-Program prog;
-Error *err;
 
 static void
 init(void) {
@@ -1382,5 +1473,6 @@ int main(void) {
     RUN_TEST(test_operator_assignments);
     RUN_TEST(test_return_statements);
     RUN_TEST(test_for_statements);
+    RUN_TEST(test_source_mapping);
     return UNITY_END();
 }

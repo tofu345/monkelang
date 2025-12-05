@@ -266,19 +266,15 @@ SourceMapping *find_mapping(SourceMappingBuffer maps, int ip) {
 int
 fprint_instructions_mappings(FILE *out, SourceMappingBuffer mappings,
                              Instructions ins) {
-    int err, read, i = 0;
+    int err, read, i = 0, current = 0;
     const Definition *def;
     Operands operands;
 
-    int next_mapping = 0;
-
     while (i < ins.length) {
-        if (next_mapping < mappings.length) {
-            if (mappings.data[next_mapping].position <= i) {
-                putc('\n', out);
-                highlight_token(node_token(mappings.data[next_mapping].node), 0);
-                next_mapping++;
-            }
+        for (; current < mappings.length
+                && mappings.data[current].position <= i; ++current) {
+            putc('\n', out);
+            highlight_token(node_token(mappings.data[current].node), 0);
         }
 
         def = lookup(ins.data[i]);

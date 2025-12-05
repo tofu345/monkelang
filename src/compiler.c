@@ -376,7 +376,6 @@ _compile(Compiler *c, Node n) {
                 if (err) { return err; }
 
                 source_map(c, n);
-
                 compile_operator(c, ie->tok);
 
                 return 0;

@@ -16,7 +16,7 @@
 
 static bool
 test_token_literal(Token *tok, const char *expected) {
-    // FIX? use strlen(expected)
+    // not using strlen(expected) because of Floats
     return strncmp(expected, tok->start, tok->length) == 0;
 }
 

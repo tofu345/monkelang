@@ -624,6 +624,8 @@ parse_return_statement(Parser* p) {
 
 static Node
 parse_assignment(Parser *p, Node left) {
+    Token tok = p->peek_token;
+
     // (x2) next_token() to skip t_Assign
     p->cur_token = lexer_next_token(&p->l);
     p->peek_token = lexer_next_token(&p->l);
@@ -641,7 +643,7 @@ parse_assignment(Parser *p, Node left) {
 
     Assignment *as = allocate(sizeof(Assignment));
     as->left = left;
-    as->tok = *node_token(right);
+    as->tok = tok;
     as->right = right;
     peek_semicolon(p);
     return NODE(n_Assignment, as);
