@@ -38,7 +38,7 @@ void compiler_init(Compiler *c) {
     int len;
     const Builtin *builtins = get_builtins(&len);
     for (int i = 0; i < len; i++) {
-        sym_builtin(c->current_symbol_table, i, builtins[i].name);
+        sym_builtin(c->current_symbol_table, builtins[i].name, i);
     }
 
     CompiledFunction *main_fn = new_function();
@@ -234,8 +234,8 @@ _compile(Compiler *c, Node n) {
                 LetStatement *ls = n.obj;
 
                 Identifier *id = ls->name;
-                Symbol *symbol =
-                    sym_define(c->current_symbol_table, id->tok.start, hash(id));
+                Symbol *symbol = sym_define(c->current_symbol_table, &id->tok,
+                                            hash(id));
 
                 if (symbol->index >= GlobalsSize) {
                     return compiler_error(
@@ -551,16 +551,15 @@ _compile(Compiler *c, Node n) {
                 enter_scope(c);
 
                 if (fl->name) {
-                    sym_function_name(c->current_symbol_table,
-                            fl->name->tok.start, hash(fl->name));
+                    sym_function_name(c->current_symbol_table, &fl->name->tok,
+                                      hash(fl->name));
                 }
 
                 ParamBuffer params = fl->params;
                 Identifier *cur;
                 for (int i = 0; i < params.length; i++) {
                     cur = params.data[i];
-                    sym_define(c->current_symbol_table, cur->tok.start,
-                            hash(cur));
+                    sym_define(c->current_symbol_table, &cur->tok, hash(cur));
                 }
 
                 err = _compile(c, NODE(n_BlockStatement, fl->body));

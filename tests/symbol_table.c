@@ -24,6 +24,14 @@ void tearDown(void) {
     free_sym_tbl(&second_local);
 }
 
+static inline Symbol *
+define(SymbolTable *st, const char *name) {
+    return sym_define(st, (void *) name, hash_fnv1a(name));
+}
+static inline Symbol *
+define_function_name(SymbolTable *st, const char *name) {
+    return sym_function_name(st, (void *) name, hash_fnv1a(name));
+}
 static bool symbol_eq(Symbol *a, Symbol *b);
 static bool test_sym_define(SymbolTable *table, Symbol *expected, char *name);
 static bool test_sym_resolve(SymbolTable *table, Symbol expected[], int len);
@@ -55,8 +63,8 @@ void test_define(void) {
 
 void test_resolve_global(void) {
     global = symbol_table_new();
-    sym_define(global, "a", hash_fnv1a("a"));
-    sym_define(global, "b", hash_fnv1a("b"));
+    define(global, "a");
+    define(global, "b");
 
     Symbol expected[] = {
         {.name = "a", .scope = GlobalScope, .index = 0},
@@ -69,12 +77,12 @@ void test_resolve_global(void) {
 
 void test_resolve_local(void) {
     global = symbol_table_new();
-    sym_define(global, "a", hash_fnv1a("a"));
-    sym_define(global, "b", hash_fnv1a("b"));
+    define(global, "a");
+    define(global, "b");
 
     first_local = enclosed_symbol_table(global);
-    sym_define(first_local, "c", hash_fnv1a("c"));
-    sym_define(first_local, "d", hash_fnv1a("d"));
+    define(first_local, "c");
+    define(first_local, "d");
 
     Symbol expected[] = {
         {.name = "a", .scope = GlobalScope, .index = 0},
@@ -89,16 +97,16 @@ void test_resolve_local(void) {
 
 void test_resolve_nested_local(void) {
     global = symbol_table_new();
-    sym_define(global, "a", hash_fnv1a("a"));
-    sym_define(global, "b", hash_fnv1a("b"));
+    define(global, "a");
+    define(global, "b");
 
     first_local = enclosed_symbol_table(global);
-    sym_define(first_local, "c", hash_fnv1a("c"));
-    sym_define(first_local, "d", hash_fnv1a("d"));
+    define(first_local, "c");
+    define(first_local, "d");
 
     second_local = enclosed_symbol_table(global);
-    sym_define(second_local, "e", hash_fnv1a("e"));
-    sym_define(second_local, "f", hash_fnv1a("f"));
+    define(second_local, "e");
+    define(second_local, "f");
 
     Symbol first_expected[] = {
         {.name = "a", .scope = GlobalScope, .index = 0},
@@ -135,7 +143,7 @@ void test_define_resolve_builtins(void) {
     int len = sizeof(expected) / sizeof(expected[0]);
 
     for (int i = 0; i < len; i++) {
-        sym_builtin(global, i, expected[i].name);
+        sym_builtin(global, expected[i].name, i);
     }
 
     TEST_ASSERT(test_sym_resolve(global, expected, len));
@@ -145,16 +153,16 @@ void test_define_resolve_builtins(void) {
 
 void test_resolve_free(void) {
     global = symbol_table_new();
-    sym_define(global, "a", hash_fnv1a("a"));
-    sym_define(global, "b", hash_fnv1a("b"));
+    define(global, "a");
+    define(global, "b");
 
     first_local = enclosed_symbol_table(global);
-    sym_define(first_local, "c", hash_fnv1a("c"));
-    sym_define(first_local, "d", hash_fnv1a("d"));
+    define(first_local, "c");
+    define(first_local, "d");
 
     second_local = enclosed_symbol_table(first_local);
-    sym_define(second_local, "e", hash_fnv1a("e"));
-    sym_define(second_local, "f", hash_fnv1a("f"));
+    define(second_local, "e");
+    define(second_local, "f");
 
     Symbol expected_symbols[] = {
         {.name = "a", .scope = GlobalScope, .index = 0},
@@ -191,14 +199,14 @@ void test_resolve_free(void) {
 
 void test_resolve_unresolvable_free(void) {
     global = symbol_table_new();
-    sym_define(global, "a", hash_fnv1a("a"));
+    define(global, "a");
 
     first_local = enclosed_symbol_table(global);
-    sym_define(first_local, "c", hash_fnv1a("c"));
+    define(first_local, "c");
 
     second_local = enclosed_symbol_table(first_local);
-    sym_define(second_local, "e", hash_fnv1a("e"));
-    sym_define(second_local, "f", hash_fnv1a("f"));
+    define(second_local, "e");
+    define(second_local, "f");
 
     Symbol expected[] = {
         {.name = "a", .scope = GlobalScope, .index = 0},
@@ -233,7 +241,8 @@ void test_resolve_unresolvable_free(void) {
 
 void test_define_and_resolve_function_name(void) {
     global = symbol_table_new();
-    sym_function_name(global, "a", hash_fnv1a("a"));
+
+    define_function_name(global, "a");
 
     Symbol expected = {.name = "a", .scope = FunctionScope, .index = 0};
 
@@ -242,12 +251,32 @@ void test_define_and_resolve_function_name(void) {
 
 void test_shadowing_function_name(void) {
     global = symbol_table_new();
-    sym_function_name(global, "a", hash_fnv1a("a"));
-    sym_define(global, "a", hash_fnv1a("a"));
+
+    define_function_name(global, "a");
+    define(global, "a");
 
     Symbol expected = {.name = "a", .scope = GlobalScope, .index = 0};
 
     TEST_ASSERT(test_sym_resolve(global, &expected, 1));
+}
+
+void test_shadowing_free_variable(void) {
+    global = symbol_table_new();
+    first_local = enclosed_symbol_table(global);
+    second_local = enclosed_symbol_table(first_local);
+
+    define(first_local, "a");
+
+    Symbol expected1 = {.name = "a", .scope = FreeScope, .index = 0};
+    TEST_ASSERT(test_sym_resolve(second_local, &expected1, 1));
+
+    define(second_local, "a");
+
+    Symbol expected2 = {.name = "a", .scope = LocalScope, .index = 0};
+    TEST_ASSERT(test_sym_resolve(second_local, &expected2, 1));
+
+    Symbol expected3 = {.name = "a", .scope = LocalScope, .index = 0};
+    TEST_ASSERT(test_sym_resolve(first_local, &expected3, 1));
 }
 
 int main(void) {
@@ -260,6 +289,7 @@ int main(void) {
     RUN_TEST(test_resolve_unresolvable_free);
     RUN_TEST(test_define_and_resolve_function_name);
     RUN_TEST(test_shadowing_function_name);
+    RUN_TEST(test_shadowing_free_variable);
     return UNITY_END();
 }
 
@@ -290,15 +320,15 @@ test_sym_resolve(SymbolTable *table, Symbol expected[], int len) {
     for (int i = 0; i < len; i++) {
         result = sym_resolve(table, hash_fnv1a(expected[i].name));
         if (result == NULL) {
-            printf("name '%s' not resolvable\n", expected[i].name);
+            printf("name '%s' not resolvable\n", (char *) expected[i].name);
             return false;
         }
 
         if (!symbol_eq(result, &expected[i])) {
             printf("expected '%s' to sym_resolve to Symbol(%s, %s, %d) got Symbol(%s, %s, %d)\n",
-                    expected[i].name,
-                    expected[i].name, show_scope(expected[i].scope), expected[i].index,
-                    result->name, show_scope(result->scope), result->index);
+                    (char *) expected[i].name,
+                    (char *) expected[i].name, show_scope(expected[i].scope), expected[i].index,
+                    (char *) result->name, show_scope(result->scope), result->index);
             return false;
         }
     }
@@ -323,8 +353,8 @@ test_sym_resolve_free(SymbolTable *table, Symbol expected[], int len,
         result = table->free_symbols.data[i];
         if (!symbol_eq(result, free_symbols + i)) {
             printf("wrong free symbol: Symbol(%s, %s, %d) want Symbol(%s, %s, %d)\n",
-                    result->name, show_scope(result->scope), result->index,
-                    expected[i].name, show_scope(expected[i].scope), expected[i].index);
+                    (char *) result->name, show_scope(result->scope), result->index,
+                    (char *) expected[i].name, show_scope(expected[i].scope), expected[i].index);
             return false;
         }
     }
@@ -333,11 +363,11 @@ test_sym_resolve_free(SymbolTable *table, Symbol expected[], int len,
 
 static bool
 test_sym_define(SymbolTable *table, Symbol *expected, char *name) {
-    Symbol *a = sym_define(table, name, hash_fnv1a(name));
+    Symbol *a = define(table, name);
     if (!symbol_eq(a, expected)) {
         printf("expected Symbol(%s, %s, %d) got Symbol(%s, %s, %d)\n",
-                expected->name, show_scope(expected->scope), expected->index,
-                a->name, show_scope(a->scope), a->index);
+                (char *) expected->name, show_scope(expected->scope), expected->index,
+                (char *) a->name, show_scope(a->scope), a->index);
         return false;
     }
     return true;

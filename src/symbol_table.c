@@ -12,10 +12,11 @@ DEFINE_BUFFER(Symbol, Symbol *)
 SymbolTable *
 symbol_table_new() {
     SymbolTable *st = calloc(1, sizeof(SymbolTable));
-    if (st == NULL) { die("malloc"); }
+    if (st == NULL) { die("malloc:"); }
 
     st->store = ht_create();
-    if (st->store == NULL) { die("symbol_table_init"); }
+    if (st->store == NULL) { die("symbol_table_init:"); }
+
     return st;
 }
 
@@ -37,28 +38,31 @@ void symbol_table_free(SymbolTable *st) {
 }
 
 static Symbol *
-new_symbol(SymbolTable *st, const char *name, uint64_t hash, int index,
-        SymbolScope scope) {
+new_symbol(SymbolTable *st, void *name, uint64_t hash, int index,
+           SymbolScope scope) {
 
     Symbol *symbol = malloc(sizeof(Symbol));
     if (symbol == NULL) { die("new_symbol: malloc"); }
 
     Symbol *ptr = ht_set_hash(st->store, (void *) name, symbol, hash);
     if (errno == ENOMEM) {
-        die("new_symbol: ht_set");
+        die("new_symbol ht_set:");
 
-    // previous symbol with same [name]
+    // Previous symbol with same [name]
     } else if (ptr != symbol) {
-        // if in [LocalScope] or [GlobalScope]
+        // If the previous variable is in the `LocalScope` or `GlobalScope`
+        // then a new variable was not created, but the previous variable was
+        // shadowed.
         if (ptr->scope <= LocalScope) {
-            // a new variable was not created.
-            st->num_definitions--;
-            // [symbol] replaced [ptr] in hash-table,
-            // copy [ptr] to use previous index.
+            --st->num_definitions; // see new_symbol() call in sym_define()
+
+            // use previous variables index.
             memcpy(symbol, ptr, sizeof(Symbol));
             free(ptr);
             return symbol;
 
+        // Previous variable is assumed to be in the `FreeScope`,
+        // a new variable is created to replace it.
         } else {
             free(ptr);
         }
@@ -69,7 +73,6 @@ new_symbol(SymbolTable *st, const char *name, uint64_t hash, int index,
         .index = index,
         .scope = scope,
     };
-
     return symbol;
 }
 
@@ -80,7 +83,7 @@ define_free(SymbolTable *st, Symbol *original, uint64_t hash) {
     return new_symbol(st, original->name, hash, index, FreeScope);
 }
 
-Symbol *sym_define(SymbolTable *st, const char *name, uint64_t hash) {
+Symbol *sym_define(SymbolTable *st, Token *name, uint64_t hash) {
     SymbolScope scope;
     if (st->outer == NULL) {
         scope = GlobalScope;
@@ -106,6 +109,7 @@ resolve(SymbolTable *st, uint64_t hash) {
                 return define_free(st, sym, hash);
         }
     }
+
     return sym;
 }
 
@@ -113,11 +117,11 @@ Symbol *sym_resolve(SymbolTable *st, uint64_t hash) {
     return resolve(st, hash);
 }
 
-Symbol *sym_function_name(SymbolTable *st, const char *name, uint64_t hash) {
+Symbol *sym_function_name(SymbolTable *st, Token *name, uint64_t hash) {
     return new_symbol(st, name, hash, 0, FunctionScope);
 }
 
-Symbol *sym_builtin(SymbolTable *st, int index, const char *name) {
+Symbol *sym_builtin(SymbolTable *st, const char *name, int index) {
     uint64_t hash = hash_fnv1a(name);
-    return new_symbol(st, name, hash, index, BuiltinScope);
+    return new_symbol(st, (void *) name, hash, index, BuiltinScope);
 }
