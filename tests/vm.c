@@ -97,9 +97,10 @@ test_truthy(void) {
     vm_test("if ({1: 2}) {1}", TEST(int, 1));
     vm_test("if (fn(){}) {1}", TEST(int, 1));
 
+    vm_test("if (false) {1}", TEST_NULL);
+    vm_test("if (0) {1}", TEST_NULL);
     vm_test("if ([]) {1}", TEST_NULL);
     vm_test("if ({}) {1}", TEST_NULL);
-    vm_test("if (false) {1}", TEST_NULL);
     vm_test("if (null) {1}", TEST_NULL);
 }
 
@@ -968,6 +969,12 @@ vm_test(char *input, Test *expected) {
     if (e) {
         printf("vm error: %s\n", e);
         free(err);
+        fail = true;
+        goto cleanup;
+    }
+
+    if (vm.sp != 0) {
+        printf("stack pointer not zero got %d", vm.sp);
         fail = true;
         goto cleanup;
     }
