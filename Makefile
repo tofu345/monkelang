@@ -4,7 +4,7 @@ CFLAGS = -g -Wall -Werror -Wextra -pedantic-errors
 OBJS := $(patsubst src/%.c, build/%.o, $(wildcard src/*.c))
 
 main: $(OBJS)
-	@ $(CC) $(CFLAGS) -o build/$@ $^ main.c src/hash-table/ht.c -lm
+	@ $(CC) $(CFLAGS) -o build/$@ $^ main.c src/hash-table/ht.c
 
 # recompile when changing DEBUG
 build/allocation.o: src/vm.h
@@ -14,7 +14,6 @@ build/%.o: src/%.c src/%.h
 
 $(wildcard tests/*.c): $(OBJS) tests/*.h .FORCE
 	@ $(CC) $(CFLAGS) -o $(patsubst tests/%.c, build/test_%, $@) \
-		$@ $(OBJS) tests/helpers.c tests/unity/unity.c src/hash-table/ht.c \
-		-lm
+		$@ $(OBJS) tests/helpers.c tests/unity/unity.c src/hash-table/ht.c
 
 .FORCE:
