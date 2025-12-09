@@ -63,11 +63,19 @@ end_of_line(Token *tok, int *distance) {
         cur++;
         dist++;
     }
+
     *distance = dist + tok->length;
     return cur;
 }
 
-static void left_padding(int length) {
+#define get_data(tok) \
+    int left, right, len; \
+    const char *start = start_of_line(tok, &left); \
+    end_of_line(tok, &right); \
+    len = left + right; \
+    if (len > MAX_PRINT_LENGTH) { return; } \
+
+static void left_pad(int length) {
     for (; length > 0; --length) { putc(' ', stdout); }
 }
 
@@ -75,58 +83,37 @@ static void highlight(int length) {
     for (; length > 0; --length) { putc('^', stdout); }
 }
 
-static const char *
-_get_start_length(Token *tok, int *length) {
-    int left_dist, right_dist;
-    const char *start = start_of_line(tok, &left_dist);
-    end_of_line(tok, &right_dist);
-    *length = left_dist + right_dist;
-    return start;
-}
-
 void print_token(Token *tok, int leftpad) {
-    int length;
-    const char *start = _get_start_length(tok, &length);
-    left_padding(leftpad);
-    printf("%.*s\n", length, start);
+    get_data(tok);
+
+    left_pad(leftpad);
+    printf("%.*s\n", len, start);
 }
 
 void print_token_line_number(Token *tok) {
-    int length;
-    const char *start = _get_start_length(tok, &length);
-    printf("%4d | %.*s\n", tok->line, length, start);
+    get_data(tok);
+
+    printf("%4d | %.*s\n", tok->line, len, start);
 }
 
 void highlight_token(Token *tok, int leftpad) {
-    int left_dist, right_dist;
-    const char *start = start_of_line(tok, &left_dist);
-    end_of_line(tok, &right_dist);
+    get_data(tok);
 
-    left_padding(leftpad);
-    printf("%.*s\n", left_dist + right_dist, start);
+    left_pad(leftpad);
+    printf("%.*s\n", len, start);
 
-    left_padding(leftpad + left_dist);
+    left_pad(leftpad + left);
     highlight(tok->length);
     putc('\n', stdout);
 }
 
 void highlight_token_with_line_number(Token *tok) {
-    int left_dist, right_dist;
-    const char *start = start_of_line(tok, &left_dist);
-    end_of_line(tok, &right_dist);
+    get_data(tok);
 
-    printf("%4d | %.*s\n", tok->line, left_dist + right_dist, start);
-    left_padding(left_dist + 7); // + 'line | '
+    printf("%4d | %.*s\n", tok->line, len, start);
+
+    left_pad(left + 7); // + 'line | '
     highlight(tok->length);
-    putc('\n', stdout);
-}
-
-void highlight_line_with_line_number(Token *tok) {
-    int length;
-    const char *start = _get_start_length(tok, &length);
-    printf("%4d | %.*s\n", tok->line, length, start);
-    left_padding(7); // 'line | '
-    highlight(length);
     putc('\n', stdout);
 }
 

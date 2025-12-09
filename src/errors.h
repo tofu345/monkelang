@@ -26,6 +26,9 @@ void free_error(Error *err);
 
 // Utilities for displaying Errors.
 
+// Max length of a line an error is displayed on
+#define MAX_PRINT_LENGTH 80
+
 const char *start_of_line(Token *tok, int *distance);
 const char *end_of_line(Token *tok, int *distance);
 
@@ -38,5 +41,3 @@ void print_token_line_number(Token *tok);
 
 void highlight_token(Token *tok, int leftpad);
 void highlight_token_with_line_number(Token *tok);
-
-void highlight_line_with_line_number(Token *tok);
