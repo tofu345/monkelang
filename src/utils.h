@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #define FPRINTF(fp, ...) \
     if (fprintf(fp, __VA_ARGS__) <= 0) return -1;
@@ -60,3 +61,10 @@ uint64_t hash_string_fnv1a(const char *string, int length);
 
 // From: wrenPowerOf2Ceil: http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2Float
 int power_of_2_ceil(int n);
+
+static inline int fprintf_float(double f, FILE* fp) {
+    FPRINTF(fp, "%.16g", f);
+    // %g specifier removes trailing '.' if it is followed by only zeros
+    if (trunc(f) == f) { FPRINTF(fp, ".") }
+    return 0;
+}

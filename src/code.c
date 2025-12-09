@@ -257,8 +257,10 @@ SourceMapping *find_mapping(SourceMappingBuffer maps, int ip) {
     }
 
     if (maps.data[low].position > ip) {
-        assert(low > 0);
-        return &maps.data[low - 1];
+        if (low == 0) {
+            return NULL;
+        }
+        --low;
     }
     return &maps.data[low];
 }

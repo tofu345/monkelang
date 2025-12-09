@@ -227,7 +227,7 @@ multigetline(char **input, size_t *input_cap,
         }
 
         // blank line and no data to read.
-        if (line_len == 1 && ret != 1) {
+        if (line_len == 1 && ret == 0) {
             (*input)[len] = '\0';
             break;
         }

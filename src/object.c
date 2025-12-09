@@ -21,12 +21,6 @@ fprintf_integer(long i, FILE* fp) {
 }
 
 static int
-fprintf_float(double f, FILE* fp) {
-    FPRINTF(fp, "%.3f", f);
-    return 0;
-}
-
-static int
 fprintf_boolean(bool b, FILE* fp) {
     FPRINTF(fp, "%s", b ? "true" : "false");
     return 0;
@@ -67,13 +61,16 @@ fprint_array(ObjectBuffer *array, VoidPtrBuffer *seen, FILE* fp) {
     VoidPtrBufferPush(seen, array);
 
     FPRINTF(fp, "[");
-    for (int i = 0; i < array->length - 1; i++) {
+
+    int last = array->length - 1;
+    for (int i = 0; i < last; i++) {
         _object_fprint(array->data[i], seen, fp);
         FPRINTF(fp, ", ");
     }
-    if (array->length >= 1) {
-        _object_fprint(array->data[array->length - 1], seen, fp);
+    if (last >= 0) {
+        _object_fprint(array->data[last], seen, fp);
     }
+
     FPRINTF(fp, "]");
 
     --seen->length;

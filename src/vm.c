@@ -608,6 +608,10 @@ call_closure(VM *vm, Closure *cl, int num_args) {
     frame_init(vm, cl, base_pointer);
 
     if (fn->num_locals > 0) {
+        if (vm->sp + fn->num_locals >= StackSize) {
+            return new_error("stack overflow: insufficient space for local variables");
+        }
+
         // set local variables to [o_Null] to avoid use after free if GC is
         // triggered and accesses freed Compound Data Types still on the stack.
         memset(vm->stack + vm->sp, 0, fn->num_locals * sizeof(Object));
@@ -1014,9 +1018,13 @@ void print_vm_stack_trace(VM *vm) {
 
         _print_function_name(frame.cl);
 
-        Token *tok = _token(mapping);
-        printf(", line %d\n", tok->line);
-        highlight_token(tok, /* leftpad */ 2);
+        if (mapping) {
+            Token *tok = _token(mapping);
+            printf(", line %d\n", tok->line);
+            highlight_token(tok, /* leftpad */ 2);
+        } else {
+            putc('\n', stdout);
+        }
     }
 
     _print_repeats(prev_idx, idx);

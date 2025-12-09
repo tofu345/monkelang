@@ -6,15 +6,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-Token *node_token(Node n) {
-    return n.obj;
-}
-
-#define NODE_FPRINT(fp, ...) \
-    if (node_fprint( __VA_ARGS__, fp) == -1) \
+#define FPRINT_NODE(fp, ...) \
+    if (node_fprint(__VA_ARGS__, fp) == -1) \
         return -1;
 
-#define FPRINTF_TOKEN(fp, tok) \
+#define FPRINT_TOKEN(fp, tok) \
     if (fprintf(fp, "%.*s", tok.length, tok.start) <= 0) \
         return -1;
 
@@ -24,7 +20,7 @@ DEFINE_BUFFER(Pair, Pair)
 
 static int
 fprint_identifier(Identifier* i, FILE* fp) {
-    FPRINTF_TOKEN(fp, i->tok)
+    FPRINT_TOKEN(fp, i->tok)
     return 0;
 }
 
@@ -36,15 +32,14 @@ fprint_integer_literal(IntegerLiteral* il, FILE* fp) {
 
 static int
 fprint_float_literal(FloatLiteral* fl, FILE* fp) {
-    FPRINTF(fp, "%.3f", fl->value);
-    return 0;
+    return fprintf_float(fl->value, fp);
 }
 
 static int
 fprint_prefix_expression(PrefixExpression* pe, FILE* fp) {
     FPRINTF(fp, "(");
-    FPRINTF_TOKEN(fp, pe->tok);
-    NODE_FPRINT(fp, pe->right);
+    FPRINT_TOKEN(fp, pe->tok);
+    FPRINT_NODE(fp, pe->right);
     FPRINTF(fp, ")");
     return 0;
 }
@@ -52,18 +47,18 @@ fprint_prefix_expression(PrefixExpression* pe, FILE* fp) {
 static int
 fprint_infix_expression(InfixExpression* ie, FILE* fp) {
     FPRINTF(fp, "(");
-    NODE_FPRINT(fp, ie->left);
+    FPRINT_NODE(fp, ie->left);
     FPRINTF(fp, " ");
-    FPRINTF_TOKEN(fp, ie->tok)
+    FPRINT_TOKEN(fp, ie->tok)
     FPRINTF(fp, " ");
-    NODE_FPRINT(fp, ie->right);
+    FPRINT_NODE(fp, ie->right);
     FPRINTF(fp, ")");
     return 0;
 }
 
 int fprint_block_statement(BlockStatement* bs, FILE* fp) {
     for (int i = 0; i < bs->stmts.length; i++) {
-        NODE_FPRINT(fp, bs->stmts.data[i]);
+        FPRINT_NODE(fp, bs->stmts.data[i]);
     }
     return 0;
 }
@@ -71,7 +66,7 @@ int fprint_block_statement(BlockStatement* bs, FILE* fp) {
 static int
 fprint_if_expression(IfExpression* ie, FILE* fp) {
     FPRINTF(fp, "if ");
-    NODE_FPRINT(fp, ie->condition);
+    FPRINT_NODE(fp, ie->condition);
     FPRINTF(fp, " ");
     fprint_block_statement(ie->consequence, fp);
     if (ie->alternative != NULL) {
@@ -83,18 +78,22 @@ fprint_if_expression(IfExpression* ie, FILE* fp) {
 
 static int
 fprint_function_literal(FunctionLiteral* fl, FILE* fp) {
-    FPRINTF_TOKEN(fp, fl->tok);
+    FPRINT_TOKEN(fp, fl->tok);
     if (fl->name != NULL) {
         Identifier *id = fl->name;
         FPRINTF(fp, "<%.*s>", id->tok.length, id->tok.start);
     }
     FPRINTF(fp, "(");
-    for (int i = 0; i < fl->params.length - 1; i++) {
+
+    int last = fl->params.length - 1;
+    for (int i = 0; i < last; i++) {
         fprint_identifier(fl->params.data[i], fp);
         FPRINTF(fp, ", ");
     }
-    if (fl->params.length > 0)
-        fprint_identifier(fl->params.data[0], fp);
+    if (last >= 0) {
+        fprint_identifier(fl->params.data[last], fp);
+    }
+
     FPRINTF(fp, ") ");
     fprint_block_statement(fl->body, fp);
     return 0;
@@ -102,14 +101,18 @@ fprint_function_literal(FunctionLiteral* fl, FILE* fp) {
 
 static int
 fprint_call_expression(CallExpression* ce, FILE* fp) {
-    NODE_FPRINT(fp, ce->function);
+    FPRINT_NODE(fp, ce->function);
     FPRINTF(fp, "(");
-    for (int i = 0; i < ce->args.length - 1; i++) {
-        NODE_FPRINT(fp, ce->args.data[i]);
+
+    int last = ce->args.length - 1;
+    for (int i = 0; i < last; i++) {
+        FPRINT_NODE(fp, ce->args.data[i]);
         FPRINTF(fp, ", ");
     }
-    if (ce->args.length > 0)
-        NODE_FPRINT(fp, ce->args.data[ce->args.length - 1]);
+    if (last >= 0) {
+        FPRINT_NODE(fp, ce->args.data[last]);
+    }
+
     FPRINTF(fp, ")");
     return 0;
 }
@@ -117,10 +120,10 @@ fprint_call_expression(CallExpression* ce, FILE* fp) {
 static int
 fprint_let_statement(LetStatement* ls, FILE* fp) {
     FPRINTF(fp, "let ")
-    FPRINTF_TOKEN(fp, ls->name->tok)
+    FPRINT_TOKEN(fp, ls->name->tok)
     FPRINTF(fp, " = ")
     if (ls->value.obj != NULL) {
-        NODE_FPRINT(fp, ls->value);
+        FPRINT_NODE(fp, ls->value);
     }
     FPRINTF(fp, ";");
     return 0;
@@ -128,16 +131,16 @@ fprint_let_statement(LetStatement* ls, FILE* fp) {
 
 static int
 fprint_boolean(BooleanLiteral* b, FILE* fp) {
-    FPRINTF_TOKEN(fp, b->tok)
+    FPRINT_TOKEN(fp, b->tok)
     return 0;
 }
 
 static int
 fprint_return_statement(ReturnStatement* rs, FILE* fp) {
-    FPRINTF_TOKEN(fp, rs->tok)
+    FPRINT_TOKEN(fp, rs->tok)
     FPRINTF(fp, " ")
     if (rs->return_value.obj != NULL) {
-        NODE_FPRINT(fp, rs->return_value);
+        FPRINT_NODE(fp, rs->return_value);
     }
     FPRINTF(fp, ";");
     return 0;
@@ -145,7 +148,7 @@ fprint_return_statement(ReturnStatement* rs, FILE* fp) {
 
 static int
 fprint_expression_statement(ExpressionStatement* es, FILE* fp) {
-    NODE_FPRINT(fp, es->expression);
+    FPRINT_NODE(fp, es->expression);
     FPRINTF(fp, ";");
     return 0;
 }
@@ -153,10 +156,10 @@ fprint_expression_statement(ExpressionStatement* es, FILE* fp) {
 static int
 fprint_for_statement(ForStatement* fs, FILE* fp) {
     FPRINTF(fp, "for (");
-    NODE_FPRINT(fp, fs->init);
-    NODE_FPRINT(fp, fs->condition);
+    FPRINT_NODE(fp, fs->init);
+    FPRINT_NODE(fp, fs->condition);
     FPRINTF(fp, ";");
-    NODE_FPRINT(fp, fs->update);
+    FPRINT_NODE(fp, fs->update);
     FPRINTF(fp, ")");
     node_fprint(NODE(n_BlockStatement, fs->body), fp);
     return 0;
@@ -165,45 +168,52 @@ fprint_for_statement(ForStatement* fs, FILE* fp) {
 static int
 fprint_array_literal(ArrayLiteral* al, FILE* fp) {
     FPRINTF(fp, "[");
-    for (int i = 0; i < al->elements.length - 1; i++) {
-        NODE_FPRINT(fp, al->elements.data[i]);
+
+    int last = al->elements.length - 1;
+    for (int i = 0; i < last; i++) {
+        FPRINT_NODE(fp, al->elements.data[i]);
         FPRINTF(fp, ", ");
     }
-    if (al->elements.length > 0)
-        NODE_FPRINT(fp, al->elements.data[al->elements.length - 1]);
+    if (last >= 0) {
+        FPRINT_NODE(fp, al->elements.data[last]);
+    }
+
     FPRINTF(fp, "]");
     return 0;
 }
 
 static int
 fprint_index_expression(IndexExpression* ie, FILE* fp) {
-    NODE_FPRINT(fp, ie->left);
+    FPRINT_NODE(fp, ie->left);
     FPRINTF(fp, "[");
-    NODE_FPRINT(fp, ie->index);
+    FPRINT_NODE(fp, ie->index);
     FPRINTF(fp, "]");
     return 0;
 }
 
 static int
 fprint_table_literal_entry(Node key, Node value, FILE* fp) {
-    NODE_FPRINT(fp, key);
+    FPRINT_NODE(fp, key);
     FPRINTF(fp, ": ");
-    NODE_FPRINT(fp, value);
+    FPRINT_NODE(fp, value);
     return 0;
 }
 
 static int
 fprint_table_literal(TableLiteral* hl, FILE* fp) {
     FPRINTF(fp, "{");
-    for (int i = 0; i < hl->pairs.length - 1; i++) {
+
+    int last = hl->pairs.length - 1;
+    for (int i = 0; i < last; i++) {
         Pair* pair = &hl->pairs.data[i];
         fprint_table_literal_entry(pair->key, pair->val, fp);
         FPRINTF(fp, ", ");
     }
-    if (hl->pairs.length > 1) {
-        Pair* pair = &hl->pairs.data[hl->pairs.length - 1];
+    if (last >= 0) {
+        Pair* pair = &hl->pairs.data[last];
         fprint_table_literal_entry(pair->key, pair->val, fp);
     }
+
     FPRINTF(fp, "}");
     return 0;
 }
@@ -211,7 +221,7 @@ fprint_table_literal(TableLiteral* hl, FILE* fp) {
 static int
 fprint_string_literal(StringLiteral* sl, FILE* fp) {
     FPRINTF(fp, "\"");
-    FPRINTF_TOKEN(fp, sl->tok);
+    FPRINT_TOKEN(fp, sl->tok);
     FPRINTF(fp, "\"");
     return 0;
 }

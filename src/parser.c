@@ -426,15 +426,20 @@ parse_table_literal(Parser* p) {
 
 static Node
 parse_call_expression(Parser* p, Node function) {
-    CallExpression* ce = allocate(sizeof(CallExpression));
-    ce->tok = *node_token(function);
-    ce->function = function;
-    ce->args = parse_expression_list(p, t_Rparen);
-    if (ce->args.length == -1) {
+    Token tok = *node_token(function);
+
+    NodeBuffer args = parse_expression_list(p, t_Rparen);
+    if (args.length == -1) {
         node_free(function);
-        free(ce);
         return INVALID;
     }
+
+    CallExpression* ce = allocate(sizeof(CallExpression));
+    ce->function = function;
+    ce->args = args;
+
+    tok.length = (p->cur_token.position + p->cur_token.length) - tok.position;
+    ce->tok = tok;
     return NODE(n_CallExpression, ce);
 }
 
@@ -443,6 +448,7 @@ parse_index_expression(Parser* p, Node left) {
     Token tok = p->cur_token;
 
     next_token(p);
+
     Node index = parse_expression(p, p_Lowest);
     if (IS_INVALID(index) || !expect_peek(p, t_Rbracket)) {
         node_free(index);
@@ -450,10 +456,12 @@ parse_index_expression(Parser* p, Node left) {
         return INVALID;
     }
 
+    tok.length = (p->cur_token.position + p->cur_token.length) - tok.position;
+
     IndexExpression* ie = allocate(sizeof(IndexExpression));
-    ie->tok = tok;
     ie->left = left;
     ie->index = index;
+    ie->tok = tok;
     return NODE(n_IndexExpression, ie);
 }
 

@@ -27,20 +27,19 @@ CharBuffer *create_string(VM *vm, const char *text, int length) {
 }
 
 ObjectBuffer *create_array(VM *vm, Object *data, int length) {
-    int capacity = length;
     Object *objs = NULL;
 
     if (length > 0) {
-        capacity = power_of_2_ceil(length);
-        objs = vm_allocate(vm, capacity * sizeof(Object));
-        if (data) { memcpy(objs, data, length * sizeof(Object)); }
+        size_t size = length * sizeof(Object);
+        objs = vm_allocate(vm, size);
+        if (data) { memcpy(objs, data, size); }
     }
 
     ObjectBuffer *buf = new_allocation(vm, o_Array, sizeof(ObjectBuffer));
     *buf = (ObjectBuffer) {
         .data = objs,
         .length = length,
-        .capacity = capacity,
+        .capacity = length,
     };
     return buf;
 }

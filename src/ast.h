@@ -43,7 +43,9 @@ typedef struct {
 } Node;
 
 // [n.obj] must contain a `Token` as its first field
-Token *node_token(Node n);
+static inline Token *node_token(Node n) {
+    return (Token *) n.obj;
+}
 
 // Returns -1 on write to FILE err
 int node_fprint(const Node n, FILE* fp);
