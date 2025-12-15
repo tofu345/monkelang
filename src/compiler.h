@@ -48,7 +48,7 @@ void compiler_free(Compiler *c);
 
 // Compiles the Program (AST) and returns an Error if any.
 // The Bytecode is retrieved using [bytecode()].
-Error *compile(Compiler *c, Program *prog);
+error compile(Compiler *c, Program *prog);
 
 // make [Instruction] with Opcode and [int] operands into
 // [c.current_instructions].

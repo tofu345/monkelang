@@ -445,7 +445,7 @@ parse_call_expression(Parser* p, Node function) {
 
 static Node
 parse_index_expression(Parser* p, Node left) {
-    Token tok = p->cur_token;
+    Token tok = *node_token(left);
 
     next_token(p);
 
@@ -801,7 +801,7 @@ void parser_init(Parser* p) {
 
 void parser_free(Parser* p) {
     for (int i = 0; i < p->errors.length; i++) {
-        free(p->errors.data[i].message);
+        free_error(p->errors.data[i]);
     }
     free(p->errors.data);
 }
@@ -845,12 +845,9 @@ static void
 parser_error(Parser* p, char* format, ...) {
     va_list args;
     va_start(args, format);
-    char* msg = NULL;
-    if (vasprintf(&msg, format, args) == -1) die("parser_error");
+    error err = verrorf(format, args);
     va_end(args);
 
-    ErrorBufferPush(&p->errors, (Error) {
-        .token = p->cur_token,
-        .message = msg
-    });
+    error_with(&err, &p->cur_token);
+    ErrorBufferPush(&p->errors, err);
 }

@@ -20,10 +20,10 @@ static int add_constant(Compiler *c, Constant obj_const);
 static void source_map(Compiler *c, Node node);
 
 // create [Error] with [n.token]
-static Error *compiler_error(Node n, char* format, ...);
+static error c_error(Node n, char* format, ...);
 
 // emit opcodes to assign to `node`.
-static Error *perform_assignment(Compiler *c, Node node);
+static error perform_assignment(Compiler *c, Node node);
 
 DEFINE_BUFFER(Scope, CompilationScope)
 DEFINE_BUFFER(Function, CompiledFunction *)
@@ -201,9 +201,9 @@ compile_operator(Compiler *c, Token op) {
     }
 }
 
-static Error *
+static error
 _compile(Compiler *c, Node n) {
-    Error *err;
+    error err;
     switch (n.typ) {
         case n_BlockStatement:
             {
@@ -238,8 +238,7 @@ _compile(Compiler *c, Node n) {
                                             hash(id));
 
                 if (symbol->index >= GlobalsSize) {
-                    return compiler_error(
-                            (Node){.obj = id}, "too many global variables");
+                    return c_error((Node){.obj = id}, "too many global variables");
                 }
 
                 err = _compile(c, ls->value);
@@ -258,8 +257,7 @@ _compile(Compiler *c, Node n) {
                 source_map(c, n);
 
                 if (c->cur_scope_index == 0) {
-                    return compiler_error(n,
-                            "return statement outside function");
+                    return c_error(n, "return statement outside function");
                 }
 
                 ReturnStatement *rs = n.obj;
@@ -323,8 +321,7 @@ _compile(Compiler *c, Node n) {
                 Identifier *id = n.obj;
                 Symbol *symbol = sym_resolve(c->current_symbol_table, hash(id));
                 if (symbol == NULL) {
-                    return compiler_error(n,
-                            "undefined variable '%.*s'", LITERAL(id->tok));
+                    return c_error(n, "undefined variable '%.*s'", LITERAL(id->tok));
                 }
 
                 load_symbol(c, symbol);
@@ -603,7 +600,7 @@ _compile(Compiler *c, Node n) {
     }
 }
 
-static Error *
+static error
 perform_assignment(Compiler *c, Node node) {
     if (node.typ == n_Identifier) {
         Identifier *id = node.obj;
@@ -611,7 +608,7 @@ perform_assignment(Compiler *c, Node node) {
 
         Symbol *symbol = sym_resolve(c->current_symbol_table, hash(id));
         if (symbol == NULL) {
-            return compiler_error(id_node,
+            return c_error(id_node,
                     "undefined variable '%.*s' is not assignable",
                     LITERAL(id->tok));
         }
@@ -639,17 +636,17 @@ perform_assignment(Compiler *c, Node node) {
                 break;
         }
 
-        return compiler_error(id_node, format, LITERAL(id->tok));
+        return c_error(id_node, format, LITERAL(id->tok));
 
     } else if (node.typ == n_IndexExpression) {
-        Error *err = _compile(c, node);
+        error err = _compile(c, node);
         if (err) { return err; }
 
         replace_last_opcode_with(c, OpIndex, OpSetIndex);
         return 0;
     }
 
-    return compiler_error(node, "cannot assign to non-variable");
+    return c_error(node, "cannot assign to non-variable");
 }
 
 static int
@@ -713,8 +710,8 @@ SymbolTable *leave_scope(Compiler *c) {
     return tbl;
 }
 
-Error *compile(Compiler *c, Program *prog) {
-    Error *err;
+error compile(Compiler *c, Program *prog) {
+    error err;
     for (int i = 0; i < prog->stmts.length; i++) {
         err = _compile(c, prog->stmts.data[i]);
         if (err) { return err; }
@@ -739,19 +736,14 @@ source_map(Compiler *c, Node node) {
     SourceMappingBufferPush(c->cur_mapping, mapping);
 }
 
-static Error *
-compiler_error(Node n, char* format, ...) {
+static error
+c_error(Node n, char* format, ...) {
     va_list args;
     va_start(args, format);
-    char* msg = NULL;
-    if (vasprintf(&msg, format, args) == -1) die("compiler_error");
+    error err = verrorf(format, args);
     va_end(args);
 
-    Error *err = malloc(sizeof(Error));
-    *err = (Error){
-        .token = *node_token(n),
-        .message = msg
-    };
+    err->token = node_token(n);
     return err;
 }
 

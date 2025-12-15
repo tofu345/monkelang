@@ -1118,9 +1118,9 @@ void test_parser_errors(void) {
             printf("expected parser error for test: %s\n", test.input);
             pass = false;
 
-        } else if (strcmp(test.error, p.errors.data[0].message) != 0) {
+        } else if (strcmp(test.error, p.errors.data[0]->message) != 0) {
             printf("wrong parser error for test: %s\nwant= %s\ngot = %s\n",
-                    test.input, test.error, p.errors.data[0].message);
+                    test.input, test.error, p.errors.data[0]->message);
             pass = false;
         }
 

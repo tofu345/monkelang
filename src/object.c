@@ -1,6 +1,7 @@
 #include "object.h"
 #include "ast.h"
 #include "builtin.h" // provides type for "Builtin"
+#include "errors.h"
 #include "utils.h"
 #include "table.h"
 
@@ -122,6 +123,12 @@ fprint_builtin_function(const Builtin *builtin, FILE *fp) {
 }
 
 static int
+fprint_error(error err, FILE *fp) {
+    FPRINTF(fp, "<error: %s>", err->message);
+    return 0;
+}
+
+static int
 _object_fprint(Object o, VoidPtrBuffer *seen, FILE* fp) {
     switch (o.type) {
         case o_Integer:
@@ -140,8 +147,7 @@ _object_fprint(Object o, VoidPtrBuffer *seen, FILE* fp) {
             return fprintf_string(o.data.string, fp);
 
         case o_Error:
-            FPRINTF(fp, "error: %s", o.data.err);
-            return 0;
+            return fprint_error(o.data.err, fp);
 
         case o_Array:
             return fprint_array(o.data.array, seen, fp);

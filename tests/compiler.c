@@ -8,7 +8,7 @@
 
 Compiler c;
 Program prog;
-Error *err;
+error err;
 
 // initialize Program and Compiler.
 static void init(void);

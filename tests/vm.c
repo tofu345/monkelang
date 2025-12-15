@@ -924,10 +924,9 @@ vm_test(char *input, Test *expected) {
     VM vm;
     vm_init(&vm, NULL, NULL, NULL);
 
-    Error *err = compile(&c, &prog);
+    error err = compile(&c, &prog);
     if (err) {
         print_error(err);
-        free_error(err);
 
         fail = true;
         goto cleanup;
@@ -965,16 +964,17 @@ vm_test(char *input, Test *expected) {
     // }
     // putc('\n', stdout);
 
-    error e = vm_run(&vm, bytecode(&c));
-    if (e) {
-        printf("vm error: %s\n", e);
-        free(err);
+    err = vm_run(&vm, bytecode(&c));
+    if (err) {
+        printf("vm error: %s\n", err->message);
+
         fail = true;
         goto cleanup;
     }
 
     if (vm.sp != 0) {
         printf("stack pointer not zero got %d", vm.sp);
+
         fail = true;
         goto cleanup;
     }
@@ -983,6 +983,7 @@ vm_test(char *input, Test *expected) {
     fail = test_expected_object(*expected, stack_elem) == -1;
 
 cleanup:
+    free_error(err);
     vm_free(&vm);
     compiler_free(&c);
     program_free(&prog);
@@ -1002,10 +1003,9 @@ vm_test_error(char *input, char *expected_error) {
     Compiler c;
     compiler_init(&c);
 
-    Error *err = compile(&c, &prog);
+    error err = compile(&c, &prog);
     if (err) {
         print_error(err);
-        free_error(err);
         fail = true;
         goto cleanup;
     };
@@ -1013,21 +1013,21 @@ vm_test_error(char *input, char *expected_error) {
     VM vm;
     vm_init(&vm, NULL, NULL, NULL);
 
-    error e = vm_run(&vm, bytecode(&c));
-    if (!e) {
+    err = vm_run(&vm, bytecode(&c));
+    if (!err) {
         printf("expected VM error for test: %s\n", input);
         fail = true;
 
-    } else if (strcmp(e, expected_error) != 0) {
+    } else if (strcmp(err->message, expected_error) != 0) {
         printf("wrong VM error\nwant= %s\ngot = %s\n",
-                expected_error, e);
+                expected_error, err->message);
         fail = true;
     }
-    free(e);
 
     vm_free(&vm);
 
 cleanup:
+    free_error(err);
     compiler_free(&c);
     program_free(&prog);
 

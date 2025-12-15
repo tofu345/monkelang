@@ -23,7 +23,7 @@
 #include <stdbool.h>
 
 #define OBJ(t, d) (Object){ .type = t, .data = { d } }
-#define ERR(...) OBJ(o_Error, .err = new_error(__VA_ARGS__))
+#define ERR(...) OBJ(o_Error, .err = errorf(__VA_ARGS__))
 #define BOOL(b) OBJ(o_Boolean, .boolean = b)
 #define NULL_OBJ (Object){ .type = 0 }
 

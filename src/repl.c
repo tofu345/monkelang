@@ -1,5 +1,6 @@
 #include "repl.h"
 #include "compiler.h"
+#include "constants.h"
 #include "errors.h"
 #include "object.h"
 #include "parser.h"
@@ -10,6 +11,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/poll.h>
+
+static const char *parser_error_msg = "Woops! We ran into some monkey business here!";
+static const char *compiler_error_msg = "Woops! Compilation failed!";
+static const char *vm_error_msg = "Woops! Executing bytecode failed!";
 
 // Successfully compiled and run input.
 typedef struct {
@@ -40,6 +45,7 @@ void repl(FILE* in_stream, FILE* out_stream) {
 
     DoneBuffer done = {0};
 
+    error err = NULL;
     char *input = NULL;
     int len;
     size_t cap = 0;
@@ -57,26 +63,25 @@ void repl(FILE* in_stream, FILE* out_stream) {
 
         prog = parse_(&p, input, len);
         if (p.errors.length > 0) {
-            print_parser_errors(out_stream, &p);
+            puts(parser_error_msg);
+            print_parser_errors(&p);
             goto cleanup;
         } else if (prog.stmts.length == 0) {
             goto cleanup;
         }
 
-        Error *e = compile(&c, &prog);
-        if (e) {
-            fprintf(out_stream, "Woops! Compilation failed!\n");
-            print_error(e);
-            free_error(e);
+        err = compile(&c, &prog);
+        if (err) {
+            puts(compiler_error_msg);
+            print_error(err, out_stream);
             goto cleanup;
         }
 
-        error err = vm_run(&vm, bytecode(&c));
+        err = vm_run(&vm, bytecode(&c));
         if (err) {
-            fprintf(out_stream, "Woops! Executing bytecode failed!\n");
+            puts(vm_error_msg);
             print_vm_stack_trace(&vm);
-            puts(err);
-            free(err);
+            print_error(err, out_stream);
             goto cleanup;
         }
 
@@ -97,6 +102,9 @@ cleanup:
         program_free(&prog);
 
 cleanup_:
+        free_error(err);
+        err = NULL;
+
         input = NULL;
         prog = (Program){0};
 
@@ -130,6 +138,7 @@ void run(char* program) {
     Program prog;
     Compiler c;
     VM vm;
+    error err = NULL;
 
     parser_init(&p);
     compiler_init(&c);
@@ -137,30 +146,30 @@ void run(char* program) {
 
     prog = parse(&p, program);
     if (p.errors.length > 0) {
-        print_parser_errors(stdout, &p);
+        puts(parser_error_msg);
+        print_parser_errors(&p);
         goto cleanup;
     } else if (prog.stmts.length == 0) {
         goto cleanup;
     }
 
-    Error *e = compile(&c, &prog);
-    if (e) {
-        fprintf(stdout, "Woops! Compilation failed!\n");
-        print_error(e);
-        free_error(e);
+    err = compile(&c, &prog);
+    if (err) {
+        puts(compiler_error_msg);
+        print_error(err, stdout);
         goto cleanup;
     }
 
-    error err = vm_run(&vm, bytecode(&c));
+    err = vm_run(&vm, bytecode(&c));
     if (err) {
-        fprintf(stdout, "Woops! Executing bytecode failed!\n");
+        puts(vm_error_msg);
         print_vm_stack_trace(&vm);
-        puts(err);
-        free(err);
+        print_error(err, stdout);
         goto cleanup;
     }
 
 cleanup:
+    free_error(err);
     vm_free(&vm);
     compiler_free(&c);
     program_free(&prog);
@@ -169,11 +178,10 @@ cleanup:
 
 static void
 print_parser_errors(FILE* out_stream, Parser *p) {
-    fprintf(out_stream, "Woops! We ran into some monkey business here!\n");
     for (int i = 0; i < p->errors.length; i++) {
-        Error *err = &p->errors.data[i];
+        error err = p->errors.data[i];
         print_error(err);
-        free(err->message);
+        free_error(err);
     }
     p->errors.length = 0;
 }
@@ -194,6 +202,7 @@ multigetline(char **input, size_t *input_cap,
 
     // ret is 0 if there is no data to read.
     if (ret == 0) {
+        // only '\n' was entered
         if (len == 1) {
             return len;
         }
@@ -221,9 +230,9 @@ multigetline(char **input, size_t *input_cap,
         }
 
         int line_len = getline(&line, &line_cap, in_stream);
-        if (line_len == -1) {
-            free(line);
-            return -1;
+        if (line_len == -1) { // EOF or error
+            putc('\n', out_stream);
+            break;
         }
 
         // blank line and no data to read.

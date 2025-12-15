@@ -33,12 +33,12 @@ static error
 error_unknown_operation(Opcode op, Object left, Object right) {
     static const char *op_strs[] = {"+", "-", "*", "/", "==", "!=", "<", ">"};
     if (op < OpAdd || op > OpGreaterThan) {
-        return new_error("unkown operation: %s %s %s",
+        return errorf("unkown operation: %s %s %s",
                 lookup(op)->name, show_object_type(left.type),
                 show_object_type(right.type));
     }
 
-    return new_error("unkown operation: %s %s %s",
+    return errorf("unkown operation: %s %s %s",
             show_object_type(left.type), op_strs[op - OpAdd],
             show_object_type(right.type));
 }
@@ -102,7 +102,7 @@ new_frame(VM *vm) {
     ++vm->frames_index;
     if (vm->frames_index >= MaxFraxes) {
         --vm->frames_index;
-        return new_error("exceeded maximum function call stack");
+        return errorf("exceeded maximum function call stack");
     }
     return 0;
 }
@@ -110,7 +110,7 @@ new_frame(VM *vm) {
 static error
 vm_push(VM *vm, Object obj) {
     if (vm->sp >= StackSize) {
-        return new_error("stack overflow");
+        return errorf("stack overflow");
     }
 
     vm->stack[vm->sp++] = obj;
@@ -356,7 +356,7 @@ execute_comparison(VM *vm, Opcode op) {
 
     Object res = object_eq(left, right);
     if (IS_NULL(res)) {
-        return new_error("cannot compare: '%s' with '%s'",
+        return errorf("cannot compare: '%s' with '%s'",
                 show_object_type(left.type),
                 show_object_type(right.type));
     }
@@ -401,7 +401,7 @@ execute_minus_operator(VM *vm) {
             break;
 
         default:
-            return new_error("unsupported type for negation: %s",
+            return errorf("unsupported type for negation: %s",
                     show_object_type(operand.type));
     }
     return vm_push(vm, operand);
@@ -423,7 +423,7 @@ static error
 execute_table_index(VM *vm, Object obj, Object index) {
     Table *tbl = obj.data.table;
     if (!hashable(index)) {
-        return new_error("unusable as table key: %s",
+        return errorf("unusable as table key: %s",
                 show_object_type(index.type));
     }
 
@@ -442,7 +442,7 @@ execute_index_expression(VM *vm) {
         return execute_table_index(vm, left, index);
 
     } else {
-        return new_error("cannot index %s with %s",
+        return errorf("cannot index %s with %s",
                 show_object_type(left.type),
                 show_object_type(index.type));
     }
@@ -455,7 +455,7 @@ execute_set_array_index(Object array, Object index,
     int i = index.data.integer,
         max = arr->length - 1;
     if (i < 0 || i > max) {
-        return new_error("cannot set list index out of range");
+        return errorf("cannot set list index out of range");
     }
 
     arr->data[i] = elem;
@@ -466,7 +466,7 @@ static error
 execute_set_table_index(Object obj, Object index, Object val) {
     Table *tbl = obj.data.table;
     if (!hashable(index)) {
-        return new_error("unusable as table key: %s",
+        return errorf("unusable as table key: %s",
                 show_object_type(index.type));
     }
 
@@ -478,7 +478,7 @@ execute_set_table_index(Object obj, Object index, Object val) {
 
     Object result = table_set(tbl, index, val);
     if (result.type == o_Null) {
-        return new_error("could not set table index");
+        return errorf("could not set table index");
     }
     return 0;
 }
@@ -496,7 +496,7 @@ execute_set_index(VM *vm) {
         return execute_set_table_index(left, index, right);
 
     } else {
-        return new_error("index assignment not supported for %s[%s]",
+        return errorf("index assignment not supported for %s[%s]",
                 show_object_type(left.type), show_object_type(index.type));
     }
 }
@@ -588,17 +588,11 @@ static error
 call_closure(VM *vm, Closure *cl, int num_args) {
     CompiledFunction *fn = cl->func;
     if (num_args != fn->num_parameters) {
-        FunctionLiteral *lit = fn->literal;
-        if (lit->name) {
-            Identifier *id = lit->name;
-            return new_error("%.*s takes %d argument%s got %d",
-                    LITERAL(id->tok),
-                    fn->num_parameters, fn->num_parameters != 1 ? "s" : "",
-                    num_args);
-        };
-
-        return error_num_args("<anonymous function>",
-                fn->num_parameters, num_args);
+        Identifier *id = fn->literal->name;
+        if (id) {
+            return error_num_args_(&id->tok, fn->num_parameters, num_args);
+        }
+        return error_num_args("<anonymous function>", fn->num_parameters, num_args);
     }
 
     error err = new_frame(vm);
@@ -609,7 +603,7 @@ call_closure(VM *vm, Closure *cl, int num_args) {
 
     if (fn->num_locals > 0) {
         if (vm->sp + fn->num_locals >= StackSize) {
-            return new_error("stack overflow: insufficient space for local variables");
+            return errorf("stack overflow: insufficient space for local variables");
         }
 
         // set local variables to [o_Null] to avoid use after free if GC is
@@ -657,7 +651,7 @@ execute_call(VM *vm, int num_args) {
         case o_BuiltinFunction:
             return call_builtin(vm, callee.data.builtin, num_args);
         default:
-            return new_error("calling non-function and non-builtin");
+            return errorf("calling non-function and non-builtin");
     }
 }
 
@@ -666,7 +660,7 @@ vm_push_closure(VM *vm, int const_index, int num_free) {
     Constant constant = vm->constants.data[const_index];
 
     if (constant.type != c_Function) {
-        return new_error("not a function: constant %d", const_index);
+        return errorf("not a function: constant %d", const_index);
     }
 
     CompiledFunction *func = constant.data.function;
@@ -689,8 +683,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
     vm->constants = *bytecode.constants;
 
     vm->main_cl->func = bytecode.main_function;
-    vm->frames_index = 0;
-    frame_init(vm, vm->main_cl, 0);
+    frame_init(vm, vm->main_cl, vm->sp);
 
     Frame *current_frame = vm->frames;
     Instructions ins = instructions(current_frame);
@@ -944,7 +937,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 break;
 
             default:
-                return new_error("unknown opcode %d", op);
+                return errorf("unknown opcode %d", op);
         }
     }
     return 0;
@@ -989,9 +982,6 @@ _print_repeats(int first_idx, int cur_idx) {
 }
 
 void print_vm_stack_trace(VM *vm) {
-    // Similar to Python, only print a position in the source where recursion
-    // repeats only once.
-
     Closure *prev = NULL;
     int prev_ip = -1,
         prev_idx = 0;

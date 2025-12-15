@@ -3,21 +3,52 @@
 
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
-DEFINE_BUFFER(Error, Error)
+DEFINE_BUFFER(Error, error)
 
-error new_error(const char* format, ...) {
+error error_num_args_(Token *tok, int expected, int actual) {
+    return errorf("%.*s takes %d argument%s got %d",
+                  tok->length, tok->start,
+                  expected, expected == 1 ? "" : "s", actual);
+}
+
+error error_num_args(const char *name, int expected, int actual) {
+    return errorf("%s takes %d argument%s got %d",
+                  name, expected, expected == 1 ? "" : "s", actual);
+}
+
+error verrorf(const char* format, va_list args) {
+    char* msg = NULL;
+    if (vasprintf(&msg, format, args) == -1) {
+        die("verrorf vasprintf:");
+    }
+
+    struct Error *err = calloc(1, sizeof(struct Error));
+    if (err == NULL) { die("verrorf calloc error:"); }
+
+    err->message = msg;
+    return err;
+}
+
+error errorf(const char* format, ...) {
     va_list args;
     va_start(args, format);
-    char* err = NULL;
-    if (vasprintf(&err, format, args) == -1) die("new_error: vasprintf");
+    error err = verrorf(format, args);
     va_end(args);
     return err;
 }
 
-error error_num_args(const char *name, int expected, int actual) {
-    return new_error("%s takes %d argument%s got %d",
-            name, expected, expected != 1 ? "s" : "", actual);
+void error_with(error *err, Token *tok) {
+    struct with_token {
+        struct Error err;
+        Token tok;
+    } *new_err = realloc(*err, sizeof(struct with_token));
+    if (new_err == NULL) { die("error_with:"); }
+
+    new_err->tok = *tok;
+    new_err->err.token = &new_err->tok;
+    *err = (error) new_err;
 }
 
 // returns pointer to start of line of [token.start], skip spaces
@@ -68,66 +99,49 @@ end_of_line(Token *tok, int *distance) {
     return cur;
 }
 
-#define get_data(tok) \
+#define GET_DATA(tok) \
     int left, right, len; \
     const char *start = start_of_line(tok, &left); \
     end_of_line(tok, &right); \
-    len = left + right; \
-    if (len > MAX_PRINT_LENGTH) { return; } \
+    len = left + right;
 
-static void left_pad(int length) {
-    for (; length > 0; --length) { putc(' ', stdout); }
+static void left_pad(int length, FILE *s) {
+    for (; length > 0; --length) { putc(' ', s); }
 }
 
-static void highlight(int length) {
-    for (; length > 0; --length) { putc('^', stdout); }
+static void highlight(int length, FILE *s) {
+    for (; length > 0; --length) { putc('^', s); }
 }
 
-void print_token(Token *tok, int leftpad) {
-    get_data(tok);
+void print_token(Token *tok, int leftpad, FILE *s) {
+    GET_DATA(tok);
 
-    left_pad(leftpad);
-    printf("%.*s\n", len, start);
+    left_pad(leftpad, s);
+    fprintf(s, "%.*s\n", len, start);
 }
 
-void print_token_line_number(Token *tok) {
-    get_data(tok);
+void highlight_token(Token *tok, int leftpad, FILE *s) {
+    GET_DATA(tok);
 
-    printf("%4d | %.*s\n", tok->line, len, start);
-}
+    left_pad(leftpad, s);
+    fprintf(s, "%.*s\n", len, start);
 
-void highlight_token(Token *tok, int leftpad) {
-    get_data(tok);
-
-    left_pad(leftpad);
-    printf("%.*s\n", len, start);
-
-    left_pad(leftpad + left);
-    highlight(tok->length);
+    left_pad(leftpad + left, s);
+    highlight(tok->length, s);
     putc('\n', stdout);
 }
 
-void highlight_token_with_line_number(Token *tok) {
-    get_data(tok);
-
-    printf("%4d | %.*s\n", tok->line, len, start);
-
-    left_pad(left + 7); // + 'line | '
-    highlight(tok->length);
-    putc('\n', stdout);
-}
-
-void print_error(Error *err) {
-    highlight_token_with_line_number(&err->token);
-
-    if (err->message) {
-        printf("%s\n", err->message);
+void print_error(error err, FILE *s) {
+    if (err->token) {
+        highlight_token(err->token, 2, s);
     }
+
+    fprintf(s, "%s\n", err->message);
 }
 
-void free_error(Error *err) {
+void free_error(error err) {
     if (err) {
-        free(err->message);
+        free((char *) err->message);
         free(err);
     }
 }
