@@ -926,7 +926,7 @@ vm_test(char *input, Test *expected) {
 
     error err = compile(&c, &prog);
     if (err) {
-        print_error(err);
+        print_error(err, stdout);
 
         fail = true;
         goto cleanup;
@@ -1005,7 +1005,7 @@ vm_test_error(char *input, char *expected_error) {
 
     error err = compile(&c, &prog);
     if (err) {
-        print_error(err);
+        print_error(err, stdout);
         fail = true;
         goto cleanup;
     };

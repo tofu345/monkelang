@@ -128,7 +128,7 @@ vm_pop(VM *vm) {
         return vm->stack[vm->sp];
     }
 
-    print_vm_stack_trace(vm);
+    print_vm_stack_trace(vm, stdout);
     die("stack pointer below limit for current frame");
 
 #else
@@ -947,19 +947,6 @@ Object vm_last_popped(VM *vm) {
     return vm->stack[vm->sp];
 }
 
-static void
-_print_function_name(Closure *cl) {
-    FunctionLiteral *lit = cl->func->literal;
-    if (lit == NULL) {
-        printf("<main function>");
-    } else if (lit->name) {
-        Identifier *id = lit->name;
-        printf("<function: %.*s>", LITERAL(id->tok));
-    } else {
-        printf("<anonymous function>");
-    }
-}
-
 static Token *
 _token(SourceMapping *mapping) {
     switch (mapping->node.typ) {
@@ -981,14 +968,14 @@ _print_repeats(int first_idx, int cur_idx) {
     }
 }
 
-void print_vm_stack_trace(VM *vm) {
+void print_vm_stack_trace(VM *vm, FILE *s) {
     Closure *prev = NULL;
     int prev_ip = -1,
-        prev_idx = 0;
+        prev_idx = 0,
+        idx = 0;
 
-    int idx;
     SourceMapping *mapping = NULL;
-    for (idx = 0; idx <= vm->frames_index; ++idx) {
+    for (; idx <= vm->frames_index; ++idx) {
         Frame frame = vm->frames[idx];
 
         if (frame.cl == prev && frame.ip == prev_ip) {
@@ -1006,14 +993,22 @@ void print_vm_stack_trace(VM *vm) {
             prev_ip = frame.ip;
         }
 
-        _print_function_name(frame.cl);
+        FunctionLiteral *lit = frame.cl->func->literal;
+        if (lit == NULL) {
+            fprintf(s, "<main function>");
+        } else if (lit->name) {
+            Identifier *id = lit->name;
+            fprintf(s, "<function: %.*s>", LITERAL(id->tok));
+        } else {
+            fprintf(s, "<anonymous function>");
+        }
 
         if (mapping) {
             Token *tok = _token(mapping);
-            printf(", line %d\n", tok->line);
-            highlight_token(tok, /* leftpad */ 2);
+            fprintf(s, ", line %d\n", tok->line);
+            highlight_token(tok, /* leftpad */ 2, s);
         } else {
-            putc('\n', stdout);
+            putc('\n', s);
         }
     }
 

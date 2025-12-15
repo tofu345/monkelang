@@ -1214,7 +1214,7 @@ void test_source_mapping(void) {
 
     err = compile(&c, &prog);
     if (err != 0) {
-        print_error(err);
+        print_error(err, stdout);
         TEST_FAIL();
     };
 
@@ -1231,7 +1231,7 @@ void test_source_mapping(void) {
     for (int i = 0; i < len; ++i) {
         if (exp_mappings[i].position != mappings[i].position) {
             printf("SourceMapping at:\n");
-            highlight_token(node_token(mappings[i].node), 0);
+            highlight_token(node_token(mappings[i].node), 0, stdout);
             printf("has wrong position, want %d, got %d\n",
                     exp_mappings[i].position, mappings[i].position);
             TEST_FAIL();
@@ -1239,7 +1239,7 @@ void test_source_mapping(void) {
 
         if (exp_mappings[i].node.typ != mappings[i].node.typ) {
             printf("SourceMapping at:\n");
-            highlight_token(node_token(mappings[i].node), 0);
+            highlight_token(node_token(mappings[i].node), 0, stdout);
             printf("has wrong node type, want %d, got %d\n",
                     exp_mappings[i].node.typ, mappings[i].node.typ);
             TEST_FAIL();
@@ -1311,7 +1311,7 @@ static void c_test(char *input, Constants expectedConstants,
 
     err = compile(&c, &prog);
     if (err != 0) {
-        print_error(err);
+        print_error(err, stdout);
         TEST_FAIL();
     };
 

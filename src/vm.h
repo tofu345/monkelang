@@ -74,4 +74,4 @@ Object vm_last_popped(VM *vm);
 
 // Print the state function call stack where [vm_run] exited, using instruction
 // pointers and SourceMapping of Frames.
-void print_vm_stack_trace(VM *vm);
+void print_vm_stack_trace(VM *vm, FILE *stream);

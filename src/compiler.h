@@ -37,7 +37,7 @@ typedef struct {
     CompilationScope *cur_scope;
     Instructions *current_instructions; // instructions of [cur_scope]
     // [SourceMappings] of [cur_scope.function]
-    SourceMappingBuffer *cur_mapping;
+    SourceMappingBuffer *cur_mappings;
 
     // List of all Compiled functions.
     FunctionBuffer functions;
@@ -71,5 +71,5 @@ typedef struct {
 
 Bytecode bytecode(Compiler *c);
 
-void fprint_compiler_instructions(FILE *out_stream, Compiler *c,
+void fprint_compiler_instructions(FILE *stream, Compiler *c,
                                   bool print_mappings);

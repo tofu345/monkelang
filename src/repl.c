@@ -12,9 +12,9 @@
 #include <string.h>
 #include <sys/poll.h>
 
-static const char *parser_error_msg = "Woops! We ran into some monkey business here!";
-static const char *compiler_error_msg = "Woops! Compilation failed!";
-static const char *vm_error_msg = "Woops! Executing bytecode failed!";
+static const char *parser_error = "Woops! We ran into some monkey business here!";
+static const char *compiler_error = "Woops! Compilation failed!";
+static const char *vm_error = "Woops! Executing bytecode failed!";
 
 // Successfully compiled and run input.
 typedef struct {
@@ -25,15 +25,13 @@ typedef struct {
 BUFFER(Done, Eval)
 DEFINE_BUFFER(Done, Eval)
 
-static void print_parser_errors(FILE* out, Parser *p);
-
 // getline() but if there is no more data to read or the first line ends with
 // '{' or '('.  Then read and append multiple lines to [input] until a blank
 // line is encountered and there is no data left in [in_stream].
 static int multigetline(char **input, size_t *input_cap,
                         FILE *in_stream, FILE *out_stream);
 
-void repl(FILE* in_stream, FILE* out_stream) {
+void repl(FILE* in, FILE* out) {
     Parser p;
     parser_init(&p);
 
@@ -51,7 +49,7 @@ void repl(FILE* in_stream, FILE* out_stream) {
     size_t cap = 0;
     Program prog;
     while (1) {
-        len = multigetline(&input, &cap, in_stream, out_stream);
+        len = multigetline(&input, &cap, in, out);
         if (len == -1) {
             free(input);
             break;
@@ -63,7 +61,7 @@ void repl(FILE* in_stream, FILE* out_stream) {
 
         prog = parse_(&p, input, len);
         if (p.errors.length > 0) {
-            puts(parser_error_msg);
+            fputs(parser_error, out);
             print_parser_errors(&p);
             goto cleanup;
         } else if (prog.stmts.length == 0) {
@@ -72,23 +70,23 @@ void repl(FILE* in_stream, FILE* out_stream) {
 
         err = compile(&c, &prog);
         if (err) {
-            puts(compiler_error_msg);
-            print_error(err, out_stream);
+            fputs(compiler_error, out);
+            print_error(err, out);
             goto cleanup;
         }
 
         err = vm_run(&vm, bytecode(&c));
         if (err) {
-            puts(vm_error_msg);
-            print_vm_stack_trace(&vm);
-            print_error(err, out_stream);
+            fputs(vm_error, out);
+            print_vm_stack_trace(&vm, out);
+            print_error(err, out);
             goto cleanup;
         }
 
         Object stack_elem = vm_last_popped(&vm);
         if (stack_elem.type != o_Null) {
-            object_fprint(stack_elem, out_stream);
-            fputc('\n', out_stream);
+            object_fprint(stack_elem, out);
+            fputc('\n', out);
         }
 
         DoneBufferPush(&done, (Eval){
@@ -108,16 +106,22 @@ cleanup_:
         input = NULL;
         prog = (Program){0};
 
-        // reset compiler
-        for (; c.cur_scope_index > 0; --c.cur_scope_index) {
-            // free unsuccessfully [CompiledFunctions]
-            free_function(c.scopes.data[c.cur_scope_index].function);
-        }
-        c.scopes.length = 1;
-        c.current_instructions->length = 0;
-        c.cur_mapping->length = 0;
+        if (c.cur_scope_index > 0) {
+            for (; c.cur_scope_index > 0; --c.cur_scope_index) {
+                // free unsuccessfully [CompiledFunctions]
+                free_function(c.scopes.data[c.cur_scope_index].function);
+            }
+            c.cur_scope = &c.scopes.data[0];
+            c.scopes.length = 1;
 
-        // reset VM
+            CompiledFunction *main_fn = c.cur_scope->function;
+            c.current_instructions = &main_fn->instructions;
+            c.cur_mappings = &main_fn->mappings;
+        } else {
+            c.current_instructions->length = 0;
+            c.cur_mappings->length = 0;
+        }
+
         vm.sp = 0;
         vm.frames_index = 0;
         vm.stack[0] = (Object){0}; // remove stack_elem
@@ -146,7 +150,7 @@ void run(char* program) {
 
     prog = parse(&p, program);
     if (p.errors.length > 0) {
-        puts(parser_error_msg);
+        fputs(parser_error, stdout);
         print_parser_errors(&p);
         goto cleanup;
     } else if (prog.stmts.length == 0) {
@@ -155,15 +159,15 @@ void run(char* program) {
 
     err = compile(&c, &prog);
     if (err) {
-        puts(compiler_error_msg);
+        fputs(compiler_error, stdout);
         print_error(err, stdout);
         goto cleanup;
     }
 
     err = vm_run(&vm, bytecode(&c));
     if (err) {
-        puts(vm_error_msg);
-        print_vm_stack_trace(&vm);
+        fputs(vm_error, stdout);
+        print_vm_stack_trace(&vm, stdout);
         print_error(err, stdout);
         goto cleanup;
     }
@@ -176,27 +180,15 @@ cleanup:
     parser_free(&p);
 }
 
-static void
-print_parser_errors(FILE* out_stream, Parser *p) {
-    for (int i = 0; i < p->errors.length; i++) {
-        error err = p->errors.data[i];
-        print_error(err);
-        free_error(err);
-    }
-    p->errors.length = 0;
-}
-
 static int
-multigetline(char **input, size_t *input_cap,
-             FILE *in_stream, FILE *out_stream) {
+multigetline(char **input, size_t *input_cap, FILE *in, FILE *out) {
+    fprintf(out, ">> ");
 
-    fprintf(out_stream, ">> ");
-
-    int len = getline(input, input_cap, in_stream);
+    int len = getline(input, input_cap, in);
     if (len == -1) { return len; }
 
     struct pollfd fds;
-    fds.fd = fileno(in_stream);
+    fds.fd = fileno(in);
     fds.events = POLLIN;
     int ret = poll(&fds, 1, 0);
 
@@ -224,14 +216,14 @@ multigetline(char **input, size_t *input_cap,
         if (ret == 0) {
             // print '.. ' on a newline
             if ((*input)[len - 1] != '\n') {
-                putc('\n', out_stream);
+                putc('\n', out);
             }
-            fprintf(out_stream, ".. ");
+            fprintf(out, ".. ");
         }
 
-        int line_len = getline(&line, &line_cap, in_stream);
+        int line_len = getline(&line, &line_cap, in);
         if (line_len == -1) { // EOF or error
-            putc('\n', out_stream);
+            putc('\n', out);
             break;
         }
 

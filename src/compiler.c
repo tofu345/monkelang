@@ -48,7 +48,7 @@ void compiler_init(Compiler *c) {
     });
     c->cur_scope = c->scopes.data;
     c->current_instructions = &main_fn->instructions;
-    c->cur_mapping = &main_fn->mappings;
+    c->cur_mappings = &main_fn->mappings;
 }
 
 void compiler_free(Compiler *c) {
@@ -685,7 +685,7 @@ void enter_scope(Compiler *c) {
 
     c->cur_scope = &c->scopes.data[new_scope_idx];
     c->current_instructions = &fn->instructions;
-    c->cur_mapping = &fn->mappings;
+    c->cur_mappings = &fn->mappings;
 
     c->current_symbol_table = enclosed_symbol_table(c->current_symbol_table);
 }
@@ -699,7 +699,7 @@ SymbolTable *leave_scope(Compiler *c) {
 
     CompiledFunction *prev = c->cur_scope->function;
     c->current_instructions = &prev->instructions;
-    c->cur_mapping = &prev->mappings;
+    c->cur_mappings = &prev->mappings;
 
     // remove from [c.scopes], to be replaced at next [enter_scope()]
     // call.
@@ -733,7 +733,7 @@ source_map(Compiler *c, Node node) {
         .position = c->current_instructions->length,
         .node = node
     };
-    SourceMappingBufferPush(c->cur_mapping, mapping);
+    SourceMappingBufferPush(c->cur_mappings, mapping);
 }
 
 static error
@@ -747,40 +747,37 @@ c_error(Node n, char* format, ...) {
     return err;
 }
 
-void fprint_compiler_instructions(FILE *out_stream, Compiler *c,
-                                  bool print_mappings) {
-
-    putc('\n', out_stream);
-    fprintf(out_stream, "<main function> instructions\n");
+void fprint_compiler_instructions(FILE *s, Compiler *c, bool print_mappings) {
+    putc('\n', s);
+    fprintf(s, "<main function> instructions\n");
     if (print_mappings) {
         fprint_instructions_mappings(
-                out_stream, *c->cur_mapping, *c->current_instructions);
-        putc('\n', out_stream);
+                s, *c->cur_mappings, *c->current_instructions);
+        putc('\n', s);
 
     } else {
-        fprint_instructions(out_stream, *c->current_instructions);
+        fprint_instructions(s, *c->current_instructions);
     }
 
     for (int i = 0; i < c->functions.length; ++i) {
         CompiledFunction *fn = c->functions.data[i];
         FunctionLiteral *lit = fn->literal;
 
-        fputc('\n', out_stream);
+        fputc('\n', s);
         if (lit->name) {
             Identifier *id = lit->name;
-            fprintf(out_stream, "<function: %.*s>", LITERAL(id->tok));
+            fprintf(s, "<function: %.*s>", LITERAL(id->tok));
         } else {
-            fprintf(out_stream, "<anonymous function>");
+            fprintf(s, "<anonymous function>");
         }
-        fprintf(out_stream, " instructions\n");
+        fprintf(s, " instructions\n");
 
         if (print_mappings) {
-            fprint_instructions_mappings(
-                    out_stream, fn->mappings, fn->instructions);
-            putc('\n', out_stream);
+            fprint_instructions_mappings(s, fn->mappings, fn->instructions);
+            putc('\n', s);
 
         } else {
-            fprint_instructions(out_stream, fn->instructions);
+            fprint_instructions(s, fn->instructions);
         }
     }
 }

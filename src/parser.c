@@ -806,6 +806,15 @@ void parser_free(Parser* p) {
     free(p->errors.data);
 }
 
+void print_parser_errors(Parser *p) {
+    for (int i = 0; i < p->errors.length; i++) {
+        error err = p->errors.data[i];
+        print_error(err, stdout);
+        free_error(err);
+    }
+    p->errors.length = 0;
+}
+
 inline static Program
 _parse(Parser *p, const char *program, uint64_t length) {
     lexer_with(&p->l, program, length);

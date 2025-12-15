@@ -1,18 +1,10 @@
 #include "unity/unity.h"
 #include "helpers.h"
 
+#include "../src/parser.h"
+
 #include <stdint.h>
 #include <string.h>
-
-void print_parser_errors(Parser *p) {
-    printf("parser had %d errors\n", p->errors.length);
-    for (int i = 0; i < p->errors.length; i++) {
-        Error err = p->errors.data[i];
-        print_error(&err);
-        free(err.message);
-    }
-    p->errors.length = 0;
-}
 
 Program test_parse(const char *input) {
     Parser p;
@@ -21,6 +13,7 @@ Program test_parse(const char *input) {
     Program prog = parse(&p, input);
     if (p.errors.length > 0) {
         printf("test %s\n", input);
+        printf("parser had %d errors\n", p.errors.length);
         print_parser_errors(&p);
 
         program_free(&prog);

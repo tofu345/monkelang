@@ -38,6 +38,8 @@ Program parse_(Parser* p, const char *program, uint64_t length);
 
 void program_free(Program* p);
 
+void print_parser_errors(Parser *p);
+
 enum Precedence {
     p_Lowest = 1,
     p_Equals,

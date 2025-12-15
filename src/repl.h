@@ -3,4 +3,4 @@
 #include <stdio.h>
 
 void run(char* program);
-void repl(FILE* in, FILE* out);
+void repl(FILE* in_stream, FILE* out_stream);

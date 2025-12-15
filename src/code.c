@@ -276,7 +276,7 @@ fprint_instructions_mappings(FILE *out, SourceMappingBuffer mappings,
         for (; current < mappings.length
                 && mappings.data[current].position <= i; ++current) {
             putc('\n', out);
-            highlight_token(node_token(mappings.data[current].node), 0);
+            highlight_token(node_token(mappings.data[current].node), 0, out);
         }
 
         def = lookup(ins.data[i]);
