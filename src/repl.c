@@ -4,7 +4,6 @@
 #include "errors.h"
 #include "object.h"
 #include "parser.h"
-#include "utils.h"
 #include "vm.h"
 
 #include <stdio.h>
@@ -16,20 +15,19 @@ static const char *parser_error = "Woops! We ran into some monkey business here!
 static const char *compiler_error = "Woops! Compilation failed!";
 static const char *vm_error = "Woops! Executing bytecode failed!";
 
-// Successfully compiled and run input.
-typedef struct {
+// Evaluation, successful or not.
+typedef struct Eval {
     char *input;
     Program program;
+    struct Eval *prev;
 } Eval;
-
-BUFFER(Done, Eval)
-DEFINE_BUFFER(Done, Eval)
 
 // getline() but if there is no more data to read or the first line ends with
 // '{' or '('.  Then read and append multiple lines to [input] until a blank
 // line is encountered and there is no data left in [in_stream].
 static int multigetline(char **input, size_t *input_cap,
                         FILE *in_stream, FILE *out_stream);
+Eval *new_eval(Eval *prev);
 
 void repl(FILE* in, FILE* out) {
     Parser p;
@@ -41,7 +39,7 @@ void repl(FILE* in, FILE* out) {
     VM vm;
     vm_init(&vm, NULL, NULL, NULL);
 
-    DoneBuffer done = {0};
+    Eval *current = NULL;
 
     error err = NULL;
     char *input = NULL;
@@ -75,6 +73,10 @@ void repl(FILE* in, FILE* out) {
             goto cleanup;
         }
 
+        current = new_eval(current);
+        current->input = input;
+        current->program = prog;
+
         err = vm_run(&vm, bytecode(&c));
         if (err) {
             fputs(vm_error, out);
@@ -89,17 +91,7 @@ void repl(FILE* in, FILE* out) {
             fputc('\n', out);
         }
 
-        DoneBufferPush(&done, (Eval){
-            .input = input,
-            .program = prog,
-        });
-        goto cleanup_;
-
 cleanup:
-        free(input);
-        program_free(&prog);
-
-cleanup_:
         free_error(err);
         err = NULL;
 
@@ -130,11 +122,13 @@ cleanup_:
     vm_free(&vm);
     compiler_free(&c);
     parser_free(&p);
-    for (int i = 0; i < done.length; i++) {
-        free(done.data[i].input);
-        program_free(&done.data[i].program);
+    while (current) {
+        Eval *next = current->prev;
+        free(current->input);
+        program_free(&current->program);
+        free(current);
+        current = next;
     }
-    free(done.data);
 }
 
 void run(char* program) {
@@ -252,4 +246,11 @@ multigetline(char **input, size_t *input_cap, FILE *in, FILE *out) {
 
     free(line);
     return len;
+}
+
+Eval *new_eval(Eval *prev) {
+    Eval *new = malloc(sizeof(Eval));
+    if (new == NULL) { die("new_eval:"); }
+    new->prev = prev;
+    return new;
 }

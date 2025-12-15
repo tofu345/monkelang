@@ -452,14 +452,15 @@ _compile(Compiler *c, Node n) {
         case n_CallExpression:
             {
                 CallExpression *ce = n.obj;
-                err = _compile(c, ce->function);
-                if (err) { return err; }
 
                 NodeBuffer args = ce->args;
                 for (int i = 0; i < args.length; i++) {
                     err = _compile(c, args.data[i]);
                     if (err) { return err; }
                 }
+
+                err = _compile(c, ce->function);
+                if (err) { return err; }
 
                 source_map(c, n);
 

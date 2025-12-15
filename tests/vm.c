@@ -973,7 +973,7 @@ vm_test(char *input, Test *expected) {
     }
 
     if (vm.sp != 0) {
-        printf("stack pointer not zero got %d", vm.sp);
+        printf("stack pointer not zero got %d\n", vm.sp);
 
         fail = true;
         goto cleanup;

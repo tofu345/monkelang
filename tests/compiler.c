@@ -580,8 +580,8 @@ void test_function_calls(void) {
         _I(
             make(OpClosure, 0, 0),
             make(OpSetGlobal, 0),
-            make(OpGetGlobal, 0),
             make(OpConstant, 1),
+            make(OpGetGlobal, 0),
             make(OpCall, 1),
             make(OpPop)
         )
@@ -606,10 +606,10 @@ void test_function_calls(void) {
         _I(
             make(OpClosure, 0, 0),
             make(OpSetGlobal, 0),
-            make(OpGetGlobal, 0),
             make(OpConstant, 1),
             make(OpConstant, 2),
             make(OpConstant, 3),
+            make(OpGetGlobal, 0),
             make(OpCall, 3),
             make(OpPop)
         )
@@ -693,13 +693,13 @@ void test_builtins(void) {
         ",
         _C( INT(1) ),
         _I(
-            make(OpGetBuiltin, 0),
             make(OpArray, 0),
+            make(OpGetBuiltin, 0),
             make(OpCall, 1),
             make(OpPop),
-            make(OpGetBuiltin, 5),
             make(OpArray, 0),
             make(OpConstant, 0),
+            make(OpGetBuiltin, 5),
             make(OpCall, 2),
             make(OpPop)
         )
@@ -708,8 +708,8 @@ void test_builtins(void) {
         "fn() { len([]) }",
         _C(
             INS(
-                make(OpGetBuiltin, 0),
                 make(OpArray, 0),
+                make(OpGetBuiltin, 0),
                 make(OpCall, 1),
                 make(OpReturnValue)
             )
@@ -851,10 +851,10 @@ void test_recursive_functions(void) {
         _C(
             INT(1),
             INS(
-                make(OpCurrentClosure),
                 make(OpGetLocal, 0),
                 make(OpConstant, 0),
                 make(OpSub),
+                make(OpCurrentClosure),
                 make(OpCall, 1),
                 make(OpReturnValue)
             ),
@@ -863,8 +863,8 @@ void test_recursive_functions(void) {
         _I(
             make(OpClosure, 1, 0),
             make(OpSetGlobal, 0),
-            make(OpGetGlobal, 0),
             make(OpConstant, 2),
+            make(OpGetGlobal, 0),
             make(OpCall, 1),
             make(OpPop)
         )
@@ -880,10 +880,10 @@ void test_recursive_functions(void) {
         _C(
             INT(1),
             INS(
-                make(OpCurrentClosure),
                 make(OpGetLocal, 0),
                 make(OpConstant, 0),
                 make(OpSub),
+                make(OpCurrentClosure),
                 make(OpCall, 1),
                 make(OpReturnValue)
             ),
@@ -891,8 +891,8 @@ void test_recursive_functions(void) {
             INS(
                 make(OpClosure, 1, 0),
                 make(OpSetLocal, 0),
-                make(OpGetLocal, 0),
                 make(OpConstant, 2),
+                make(OpGetLocal, 0),
                 make(OpCall, 1),
                 make(OpReturnValue)
             )
@@ -1112,9 +1112,9 @@ void test_for_statements(void) {
             make(OpJumpNotTruthy, 40), // to after loop
 
             // body
-            make(OpGetBuiltin, 1),  // puts(...)
-            make(OpConstant, 2),
+            make(OpConstant, 2),    // puts(...)
             make(OpGetGlobal, 0),
+            make(OpGetBuiltin, 1),
             make(OpCall, 2),
             make(OpPop),
 
@@ -1143,8 +1143,8 @@ void test_for_statements(void) {
             make(OpJumpNotTruthy, 15), // to after loop
 
             // body
-            make(OpGetBuiltin, 1),
             make(OpConstant, 0),
+            make(OpGetBuiltin, 1),
             make(OpCall, 1),
             make(OpPop),
 
@@ -1179,9 +1179,9 @@ void test_source_mapping(void) {
 
         { 28, NODE(n_LetStatement, NULL) },         // let func = fn(a) { a + 24 };
         { 35, NODE(n_ExpressionStatement, NULL) },  // puts(type(func), "func(10):", func(10));
-        { 42, NODE(n_CallExpression, NULL) },       // puts(type(func), "func(10):", func(10));
+        { 40, NODE(n_CallExpression, NULL) },       // puts(type(func), "func(10):", func(10));
         //                                                  ^^^^
-        { 53, NODE(n_CallExpression, NULL) },       // puts(type(func), "func(10):", func(10));
+        { 51, NODE(n_CallExpression, NULL) },       // puts(type(func), "func(10):", func(10));
         //                                                                           ^^^^
         { 55, NODE(n_CallExpression, NULL) },       // puts(type(func), "func(10):", func(10));
         //                                             ^^^^
@@ -1230,9 +1230,9 @@ void test_source_mapping(void) {
     SourceMapping *mappings = main_fn->mappings.data;
     for (int i = 0; i < len; ++i) {
         if (exp_mappings[i].position != mappings[i].position) {
-            printf("SourceMapping at:\n");
+            printf("SourceMapping with type %d at:\n", mappings[i].node.typ);
             highlight_token(node_token(mappings[i].node), 0, stdout);
-            printf("has wrong position, want %d, got %d\n",
+            printf("has wrong position, expected %d, got %d\n",
                     exp_mappings[i].position, mappings[i].position);
             TEST_FAIL();
         }
@@ -1240,7 +1240,7 @@ void test_source_mapping(void) {
         if (exp_mappings[i].node.typ != mappings[i].node.typ) {
             printf("SourceMapping at:\n");
             highlight_token(node_token(mappings[i].node), 0, stdout);
-            printf("has wrong node type, want %d, got %d\n",
+            printf("has wrong node type, expected %d, got %d\n",
                     exp_mappings[i].node.typ, mappings[i].node.typ);
             TEST_FAIL();
         }

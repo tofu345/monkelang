@@ -621,22 +621,18 @@ call_builtin(VM *vm, const Builtin *builtin, int num_args) {
     Object *args = vm->stack + vm->sp - num_args;
     Object result = builtin->fn(vm, args, num_args);
 
-    // remove arguments and [Builtin] from stack.
-    vm->sp -= num_args + 1;
+    vm->sp -= num_args;
 
-    switch (result.type) {
-        case o_Error:
-            return result.data.err;
-        case o_Null:
-            return vm_push(vm, NULL_OBJ);
-        default:
-            return vm_push(vm, result);
+    if (result.type == o_Error) {
+        return result.data.err;
+    } else {
+        return vm_push(vm, result);
     }
 }
 
 static error
 execute_call(VM *vm, int num_args) {
-    Object callee = vm->stack[vm->sp - 1 - num_args];
+    Object callee = vm_pop(vm);
 
 #ifdef DEBUG
     printf("call: ");
@@ -834,8 +830,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 // return value
                 obj = vm_pop(vm);
 
-                // remove arguments and [Function] from stack.
-                vm->sp = current_frame->base_pointer - 1;
+                vm->sp = current_frame->base_pointer;
 
 #ifdef DEBUG
                 printf("return: ");
@@ -856,8 +851,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 break;
 
             case OpReturn:
-                // remove arguments and [Function] from stack.
-                vm->sp = current_frame->base_pointer - 1;
+                vm->sp = current_frame->base_pointer;
 
 #ifdef DEBUG
                 printf("return: ");
@@ -969,6 +963,8 @@ _print_repeats(int first_idx, int cur_idx) {
 }
 
 void print_vm_stack_trace(VM *vm, FILE *s) {
+    putc('\n', s);
+
     Closure *prev = NULL;
     int prev_ip = -1,
         prev_idx = 0,
@@ -988,6 +984,7 @@ void print_vm_stack_trace(VM *vm, FILE *s) {
             mapping = find_mapping(frame.cl->func->mappings, frame.ip);
 
             _print_repeats(prev_idx, idx);
+
             prev = frame.cl;
             prev_idx = idx;
             prev_ip = frame.ip;
