@@ -62,6 +62,7 @@ void repl(FILE* in, FILE* out) {
             fputs(parser_error, out);
             print_parser_errors(&p);
             goto cleanup;
+
         } else if (prog.stmts.length == 0) {
             goto cleanup;
         }
@@ -76,6 +77,10 @@ void repl(FILE* in, FILE* out) {
         current = new_eval(current);
         current->input = input;
         current->program = prog;
+
+        // reallocate on next read
+        input = NULL;
+        prog = (Program){0};
 
         err = vm_run(&vm, bytecode(&c));
         if (err) {
@@ -92,11 +97,11 @@ void repl(FILE* in, FILE* out) {
         }
 
 cleanup:
+        program_free(&prog);
+        prog.stmts.length = 0;
+
         free_error(err);
         err = NULL;
-
-        input = NULL;
-        prog = (Program){0};
 
         if (c.cur_scope_index > 0) {
             for (; c.cur_scope_index > 0; --c.cur_scope_index) {
