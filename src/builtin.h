@@ -7,10 +7,10 @@
 
 typedef Object BuiltinFn(VM *vm, Object *args, int num_args);
 
-struct Builtin {
+typedef struct Builtin {
     const char* name;
     BuiltinFn *fn;
-};
+} Builtin;
 
 // set len if not NULL, return pointer to array of Builtins.
 const Builtin *get_builtins(int *len);

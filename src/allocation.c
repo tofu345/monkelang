@@ -104,8 +104,7 @@ Object object_copy(VM* vm, Object obj) {
         case o_Table:
             {
                 Table *new_tbl = create_table(vm);
-                tbl_it it;
-                tbl_iterator(&it, obj.data.table);
+                tbl_it it = tbl_iterator(obj.data.table);
                 while (tbl_next(&it)) {
                     Object res = table_set(new_tbl, it.cur_key, it.cur_val);
                     if (IS_NULL(res)) {
@@ -165,8 +164,7 @@ trace_mark_object(Object obj) {
 
         case o_Table:
             mark(obj);
-            tbl_it it;
-            tbl_iterator(&it, obj.data.table);
+            tbl_it it = tbl_iterator(obj.data.table);
             while (tbl_next(&it)) {
                 trace_mark_object(it.cur_key);
                 trace_mark_object(it.cur_val);

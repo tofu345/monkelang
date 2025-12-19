@@ -35,7 +35,6 @@ uint64_t object_hash(Object key) {
         default:
             die("object_hash: type %s (%d) not implemented",
                     show_object_type(key.type), key.type);
-            return 0;
     }
 }
 
@@ -156,8 +155,7 @@ table_expand(Table *tbl) {
     uint64_t hash;
     Object res;
 
-    tbl_it it;
-    tbl_iterator(&it, tbl);
+    tbl_it it = tbl_iterator(tbl);
     while (tbl_next(&it)) {
         hash = it._bucket->hashes[it._index - 1]; // see [table_next]
         index = hash_index(hash, new_length);
@@ -184,11 +182,11 @@ Object
 table_set(Table *tbl, Object key, Object value) {
     if (IS_NULL(key) || IS_NULL(value)) return NULL_OBJ;
 
-    // table_expand() is run when the table fills roughly half of its
-    // buckets, not taking into account bucket overflows.
+    // table_expand() is run when the table fills roughly half of its buckets,
+    // not taking into account bucket overflows.
     //
-    // Its initial max number of elements is 64 (8 buckets with 8
-    // elements per bucket), will expand when tbl.length is 32.
+    // Its initial max number of elements is 64 (8 buckets with 8 elements per
+    // bucket, excluding overflows), will expand when tbl.length is 32.
 
     size_t half_full = tbl->length >= (tbl->_buckets_length * N) / 2;
     if (half_full) {
@@ -224,7 +222,7 @@ table_remove(Table *tbl, Object key) {
                 Object val = (Object){ bucket->v_type[i], bucket->v_data[i] };
                 _bucket_set(bucket, i, key, val);
 
-                // swap [Objects] at [i] and [last]
+                // replace `Object` at [i] with [last]
                 bucket->k_type[i] = bucket->k_type[last];
                 bucket->k_data[i] = bucket->k_data[last];
                 bucket->v_type[i] = bucket->v_type[last];
@@ -232,6 +230,7 @@ table_remove(Table *tbl, Object key) {
                 bucket->hashes[i] = bucket->hashes[last];
 
                 bucket->k_type[last] = o_Null;
+
                 tbl->length--;
                 return val;
             }
@@ -242,12 +241,13 @@ table_remove(Table *tbl, Object key) {
     return NULL_OBJ;
 }
 
-void
-tbl_iterator(tbl_it *it, Table *tbl) {
-    it->_tbl = tbl;
-    it->_bucket = tbl->buckets;
-    it->_bucket_idx = 1;
-    it->_index = 0;
+tbl_it tbl_iterator(Table *tbl) {
+    tbl_it it;
+    it._tbl = tbl;
+    it._bucket = tbl->buckets;
+    it._bucket_idx = 1;
+    it._index = 0;
+    return it;
 }
 
 static bool

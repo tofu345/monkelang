@@ -14,25 +14,25 @@
 
 bool hashable(Object key);
 
-// `k_type[i]` is [o_Null] if empty
+// Separated `Object` into `ObjectType` and `ObjectData` to avoid excessive
+// padding.
+//
+// `k_type[i]` is [o_Null] for empty entries.
 typedef struct table_bucket {
     uint64_t hashes[N]; // for faster comparisons.
-
-    // Separated [ObjectType] and [ObjectData] to avoid excessive padding.
     ObjectType k_type[N];
     ObjectData k_data[N];
     ObjectType v_type[N];
     ObjectData v_data[N];
-
     struct table_bucket *overflow;
 } table_bucket;
 
-struct Table {
+typedef struct Table {
     size_t length; // number of filled entries
 
     table_bucket *buckets;
     size_t _buckets_length;
-};
+} Table;
 
 // returns NULL or err.
 void *table_init(Table *tbl);
@@ -62,8 +62,8 @@ typedef struct {
     int _index;            // index of current entry into `_bucket.entries`
 } tbl_it;
 
-// Initialize new iterator (for use with table_next).
-void tbl_iterator(tbl_it *it, Table *tbl);
+// Initialize new iterator (for use with tbl_next()).
+tbl_it tbl_iterator(Table *tbl);
 
 // Move iterator to next item in table, update iterator's [cur_key] and
 // [cur_val] current item, and return true.  If there are no more items, return

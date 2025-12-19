@@ -76,8 +76,7 @@ test_table_iterator_and_expand(void) {
     bool found[num];
     memset(found, 0, num);
 
-    tbl_it it;
-    tbl_iterator(&it, &tbl);
+    tbl_it it = tbl_iterator(&tbl);
     while (tbl_next(&it)) {
         found[it.cur_key.data.integer] = true;
     }
@@ -110,7 +109,7 @@ test_table_remove(void) {
     for (i = num - 1; i >= 0; --i) {
         expect_remove(OBJ(o_Integer, i));
 
-        tbl_iterator(&it, &tbl);
+        it = tbl_iterator(&tbl);
         while (tbl_next(&it)) {
             found[it.cur_key.data.integer] = true;
         }

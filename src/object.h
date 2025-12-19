@@ -22,22 +22,6 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#define OBJ(t, d) (Object){ .type = t, .data = { d } }
-#define ERR(...) OBJ(o_Error, .err = errorf(__VA_ARGS__))
-#define BOOL(b) OBJ(o_Boolean, .boolean = b)
-#define NULL_OBJ (Object){ .type = 0 }
-
-#define IS_ERR(obj) (obj.type == o_Error)
-#define IS_NULL(obj) (obj.type == o_Null)
-
-typedef struct Object Object;
-typedef struct Table Table;
-typedef struct Closure Closure;
-typedef struct Builtin Builtin;
-
-BUFFER(Object, Object)
-BUFFER(Char, char)
-
 typedef enum __attribute__ ((__packed__)) {
     // Primitive data types:
     o_Null,
@@ -46,7 +30,7 @@ typedef enum __attribute__ ((__packed__)) {
     o_Boolean,
     o_BuiltinFunction,
 
-    // A wrapper around [error], which is simply a [char *]
+    // A wrapper around `error`
     o_Error,
 
     // Compound data types:
@@ -56,32 +40,47 @@ typedef enum __attribute__ ((__packed__)) {
     o_Closure,
 } ObjectType;
 
+struct Object;
+struct Table;
+struct Closure;
+struct Builtin;
+BUFFER(Object, struct Object)
+BUFFER(Char, char)
+
 typedef union {
     long integer;
     double floating;
     bool boolean;
-    const Builtin *builtin;
+    const struct Builtin *builtin;
     error err;
 
-    CharBuffer* string;
-    ObjectBuffer* array;
-    Table* table;
-    Closure *closure;
+    CharBuffer *string;
+    ObjectBuffer *array;
+    struct Table *table;
+    struct Closure *closure;
 
     void *ptr; // generic pointer
 } ObjectData;
 
-struct Object {
+typedef struct Object {
     ObjectType type;
     ObjectData data;
-};
+} Object;
 
-struct Closure {
+typedef struct Closure {
     CompiledFunction *func;
 
     int num_free;
     Object free[];
-};
+} Closure;
+
+#define OBJ(t, d) (Object){ .type = t, .data = { d } }
+#define ERR(...) OBJ(o_Error, .err = errorf(__VA_ARGS__))
+#define BOOL(b) OBJ(o_Boolean, .boolean = b)
+#define NULL_OBJ (Object){0}
+
+#define IS_ERR(obj) (obj.type == o_Error)
+#define IS_NULL(obj) (obj.type == o_Null)
 
 bool is_truthy(Object obj);
 

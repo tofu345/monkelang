@@ -6,6 +6,7 @@
 
 #include "object.h"
 #include "vm.h"
+#include "table.h"
 
 #include <stdint.h>
 

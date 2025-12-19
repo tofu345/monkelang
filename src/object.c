@@ -87,8 +87,7 @@ fprint_table(Table *tbl, VoidPtrBuffer *seen, FILE* fp) {
     VoidPtrBufferPush(seen, tbl);
 
     FPRINTF(fp, "{");
-    tbl_it it;
-    tbl_iterator(&it, tbl);
+    tbl_it it = tbl_iterator(tbl);
     size_t last = tbl->length - 1;
     for (size_t i = 0; tbl_next(&it); i++) {
         _object_fprint(it.cur_key, seen, fp);
