@@ -284,11 +284,11 @@ test_calling_functions_without_bindings(void) {
             let minusOne = fn() {\
                 let num = 1;\
                 globalSeed - num;\
-            }\
+            };\
             let minusTwo = fn() {\
                 let num = 2;\
                 globalSeed - num;\
-            }\
+            };\
             minusOne() + minusTwo();\
         ",
         TEST(int, 97)
@@ -326,7 +326,7 @@ test_calling_functions_with_bindings(void) {
             let sum = fn(a, b) {\
                 let c = a + b;\
                 c;\
-            }\
+            };\
             sum(1, 2) + sum(3, 4);\
             ",
         TEST(int, 10)
@@ -454,7 +454,7 @@ test_closures(void) {
                 fn(f) { e + f; };\
             };\
         };\
-        let newAdderInner = newAdderOuter(1, 2)\
+        let newAdderInner = newAdderOuter(1, 2);\
         let adder = newAdderInner(3);\
         adder(8);\
         ",
@@ -468,7 +468,7 @@ test_closures(void) {
                 fn(d) { a + b + c + d };\
             };\
         };\
-        let newAdderInner = newAdderOuter(2)\
+        let newAdderInner = newAdderOuter(2);\
         let adder = newAdderInner(3);\
         adder(8);\
         ",
@@ -627,7 +627,7 @@ test_free_variable_list(void) {
         "\
         fn() {\
             let arr = [];\
-            fn() { push(arr, 1); }()\
+            fn() { push(arr, 1); }();\
             arr\
         }()\
         ",
@@ -637,7 +637,7 @@ test_free_variable_list(void) {
         "\
         fn() {\
             let arr = [1, 2, 3];\
-            fn() { arr[0] = 4; }()\
+            fn() { arr[0] = 4; }();\
             arr\
         }()\
         ",
@@ -646,8 +646,8 @@ test_free_variable_list(void) {
     vm_test(
         "\
         fn() {\
-            let tbl = {1: 2, 3: 4}\
-            fn() { tbl[1] = true; }()\
+            let tbl = {1: 2, 3: 4};\
+            fn() { tbl[1] = true; }();\
             tbl[1]\
         }()\
         ",
@@ -659,7 +659,7 @@ test_free_variable_list(void) {
         "\
         fn() {\
             let arr = [];\
-            fn() { arr = [1]; }()\
+            fn() { arr = [1]; }();\
             arr\
         }()\
         ",
@@ -669,7 +669,7 @@ test_free_variable_list(void) {
         "\
         fn() {\
             let num = 1;\
-            fn() { num = 2; }()\
+            fn() { num = 2; }();\
             num\
         }()\
         ",
@@ -684,7 +684,7 @@ test_for_statement(void) {
         let a = 5;\
         for (let b = 1; b < 5; b += 1) {\
             a = a + b;\
-        }\
+        };\
         a\
         ",
         TEST(int, 15)
@@ -692,7 +692,7 @@ test_for_statement(void) {
     vm_test(
         "\
         let a = 0;\
-        for (; a < 5; a += 1) {}\
+        for (; a < 5; a += 1) {};\
         a\
         ",
         TEST(int, 5)
@@ -702,7 +702,7 @@ test_for_statement(void) {
         let a = 0;\
         for (; a < 5; ) {\
             a += 1;\
-        }\
+        };\
         a\
         ",
         TEST(int, 5)

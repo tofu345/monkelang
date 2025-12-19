@@ -1066,10 +1066,9 @@ void test_parser_errors(void) {
     } tests[] = {
         {"let x = =;", "unexpected token '='"},
         {"let = = 1;", "expected next token to be 'Identifier', got '=' instead"},
-        {"return", "expected next token to be ';', got 'Eof' instead"},
         {
             "return let;",
-            "expected next token to be ';', got 'let' instead"
+            "multiple statements on the same line must be separated by a ';'"
         },
 
         {"1..5", "could not parse '1..5' as float"},
@@ -1094,7 +1093,7 @@ void test_parser_errors(void) {
         {"add(4 5);", "expected next token to be ')', got 'Integer' instead"},
         {"add(return)", "unexpected token 'return'"},
 
-        {"\"hello world\"\";", "missing closing '\"'"},
+        {"let hello_world = \";", "missing closing '\"'"},
         {"[1 2]", "expected next token to be ']', got 'Integer' instead"},
         {"[1, 1 2]", "expected next token to be ']', got 'Integer' instead"},
         {"[ return; ]", "unexpected token 'return'"},
@@ -1120,9 +1119,9 @@ void test_parser_errors(void) {
             printf("expected parser error for test: %s\n", test.input);
             pass = false;
 
-        } else if (strcmp(test.error, p.errors.data[0]->message) != 0) {
+        } else if (strcmp(test.error, p.errors.data[0].message) != 0) {
             printf("wrong parser error for test: %s\nwant= %s\ngot = %s\n",
-                    test.input, test.error, p.errors.data[0]->message);
+                    test.input, test.error, p.errors.data[0].message);
             pass = false;
         }
 

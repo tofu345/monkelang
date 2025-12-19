@@ -5,8 +5,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-DEFINE_BUFFER(Error, error)
-
 error error_num_args_(Token *tok, int expected, int actual) {
     return errorf("%.*s takes %d argument%s got %d",
                   tok->length, tok->start,

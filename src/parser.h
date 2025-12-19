@@ -13,6 +13,14 @@ typedef struct Parser Parser;
 typedef Node PrefixParseFn (Parser* p);
 typedef Node InfixParseFn (Parser* p, Node left);
 
+typedef struct {
+    const char *message;
+    Token token;
+    bool allocated; // lots of padding
+} ParserError;
+
+BUFFER(Error, ParserError)
+
 // All `parse_*` functions must return with `p->cur_token` in use or freed
 struct Parser {
     Lexer l;

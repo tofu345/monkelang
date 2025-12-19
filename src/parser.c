@@ -10,11 +10,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+DEFINE_BUFFER(Error, ParserError)
+
 #define INVALID (Node){ .obj = NULL }
 #define IS_INVALID(n) (n.obj == NULL)
 
-// create [ParserError] with [p.cur_token]
+// `ParserError` with msg `asprintf(format, ...)` with [p.cur_token]
 static void parser_error(Parser* p, char* format, ...);
+
+// `ParserError` with [message] with [p.cur_token]
+static void parser_error_(Parser* p, const char* message);
 
 static Node parse_statement(Parser* p);
 static Node parse_expression(Parser* p, enum Precedence precedence);
@@ -107,13 +112,6 @@ expect_peek(Parser* p, TokenType t) {
     } else {
         peek_error(p, t);
         return false;
-    }
-}
-
-inline static void
-peek_semicolon(Parser *p) {
-    if (peek_token_is(p, t_Semicolon)) {
-        next_token(p);
     }
 }
 
@@ -355,7 +353,7 @@ parse_string_literal(Parser* p) {
         --p->cur_token.position;
         p->cur_token.length = 1;
 
-        parser_error(p, "missing closing '\"'");
+        parser_error_(p, "missing closing '\"'");
         return INVALID;
     }
 
@@ -524,7 +522,7 @@ parse_if_expression(Parser* p) {
     next_token(p);
 
     if (cur_token_is(p, t_Rparen)) {
-        parser_error(p, "empty if statement");
+        parser_error_(p, "empty if statement");
         return INVALID;
     }
 
@@ -596,12 +594,6 @@ parse_let_statement(Parser* p) {
             FunctionLiteral *fl = stmt->value.obj;
             fl->name = stmt->name;
         }
-
-        peek_semicolon(p);
-
-    // empty let statement, must end with ';'
-    } else if (!expect_peek(p, t_Semicolon)) {
-        goto invalid;
     }
 
     return NODE(n_LetStatement, stmt);
@@ -622,13 +614,8 @@ parse_return_statement(Parser* p) {
 
         stmt->return_value = parse_expression(p, p_Lowest);
         if (IS_INVALID(stmt->return_value)) { goto invalid; }
-
-    // empty return statement, must end with ';'
-    } else if (!expect_peek(p, t_Semicolon)) {
-        goto invalid;
     }
 
-    peek_semicolon(p);
     return NODE(n_ReturnStatement, stmt);
 
 invalid:
@@ -645,10 +632,7 @@ parse_assignment(Parser *p, Node left) {
     p->peek_token = lexer_next_token(&p->l);
 
     Node right = parse_expression(p, p_Lowest);
-    if (IS_INVALID(right)) {
-        node_free(left);
-        return INVALID;
-    }
+    if (IS_INVALID(right)) { goto invalid; }
 
     if (left.typ == n_Identifier && right.typ == n_FunctionLiteral) {
         FunctionLiteral *fl = right.obj;
@@ -659,8 +643,11 @@ parse_assignment(Parser *p, Node left) {
     as->left = left;
     as->tok = tok;
     as->right = right;
-    peek_semicolon(p);
     return NODE(n_Assignment, as);
+
+invalid:
+    node_free(left);
+    return INVALID;
 }
 
 static Node
@@ -672,17 +659,18 @@ parse_operator_assignment(Parser *p, Node left) {
     p->peek_token = lexer_next_token(&p->l);
 
     Node right = parse_expression(p, p_Lowest);
-    if (IS_INVALID(right)) {
-        node_free(left);
-        return INVALID;
-    }
+    if (IS_INVALID(right)) { goto invalid; }
 
     OperatorAssignment *stmt = allocate(sizeof(OperatorAssignment));
     stmt->tok = tok;
     stmt->left = left;
     stmt->right = right;
-    peek_semicolon(p);
+
     return NODE(n_OperatorAssignment, stmt);
+
+invalid:
+    node_free(left);
+    return INVALID;
 }
 
 static Node
@@ -690,7 +678,6 @@ parse_expression_statement(__attribute__ ((unused)) Parser* p, Node left) {
     ExpressionStatement *es = allocate(sizeof(ExpressionStatement));
     es->tok = *node_token(left);
     es->expression = left;
-    peek_semicolon(p);
     return NODE(n_ExpressionStatement, es);
 }
 
@@ -737,8 +724,8 @@ fail:
 }
 
 // on failure, return Node with `n.obj` == NULL
-static Node
-parse_statement(Parser* p) {
+inline static Node
+parse_statement_(Parser *p) {
     switch (p->cur_token.type) {
     case t_Let:
         return parse_let_statement(p);
@@ -771,6 +758,40 @@ parse_statement(Parser* p) {
             }
         }
     }
+}
+
+inline static bool
+peek_semicolon_or_newline(Parser *p) {
+    if (peek_token_is(p, t_Semicolon)) {
+        next_token(p);
+        return true;
+
+    } else if (p->peek_token.line == p->cur_token.line) {
+        // the exceptions
+        switch (p->peek_token.type) {
+            case t_Eof:
+            case t_Rbracket:
+            case t_Rbrace:
+            case t_Rparen:
+                return true;
+            default:
+                parser_error_(p,
+                        "multiple statements on the same line must be separated by a ';'");
+                return false;
+        }
+    }
+
+    return true;
+}
+
+static Node
+parse_statement(Parser* p) {
+    Node stmt = parse_statement_(p);
+    if (stmt.obj && !peek_semicolon_or_newline(p)) {
+        node_free(stmt);
+        return INVALID;
+    }
+    return stmt;
 }
 
 void parser_init(Parser* p) {
@@ -807,16 +828,24 @@ void parser_init(Parser* p) {
 
 void parser_free(Parser* p) {
     for (int i = 0; i < p->errors.length; i++) {
-        free_error(p->errors.data[i]);
+        ParserError err = p->errors.data[i];
+        if (err.allocated) {
+            free((char *) err.message);
+        }
     }
     free(p->errors.data);
 }
 
 void print_parser_errors(Parser *p) {
     for (int i = 0; i < p->errors.length; i++) {
-        error err = p->errors.data[i];
-        print_error(err, stdout);
-        free_error(err);
+        ParserError err = p->errors.data[i];
+
+        highlight_token(&err.token, 2, stdout);
+        printf("%s\n", err.message);
+
+        if (err.allocated) {
+            free((char *) err.message);
+        }
     }
     p->errors.length = 0;
 }
@@ -857,12 +886,27 @@ void program_free(Program* p) {
 }
 
 static void
+parser_error_(Parser* p, const char* message) {
+    ErrorBufferPush(&p->errors, (ParserError) {
+        .message = message,
+        .token = p->cur_token,
+        .allocated = false,
+    });
+}
+
+static void
 parser_error(Parser* p, char* format, ...) {
     va_list args;
     va_start(args, format);
-    error err = verrorf(format, args);
+    char* msg = NULL;
+    if (vasprintf(&msg, format, args) == -1) {
+        die("parser_error vasprintf:");
+    }
     va_end(args);
 
-    error_with(&err, &p->cur_token);
-    ErrorBufferPush(&p->errors, err);
+    ErrorBufferPush(&p->errors, (ParserError) {
+        .message = msg,
+        .token = p->cur_token,
+        .allocated = true
+    });
 }
