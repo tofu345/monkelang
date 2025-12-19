@@ -837,7 +837,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 printf("return: ");
                 debug_print_args(
                         OBJ(o_Closure, .closure = current_frame->cl),
-                        vm->stack + vm->sp + 1,
+                        vm->stack + vm->sp,
                         current_frame->cl->func->num_parameters);
                 printf(" -> ");
                 object_fprint(obj, stdout);
@@ -858,7 +858,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 printf("return: ");
                 debug_print_args(
                         OBJ(o_Closure, .closure = current_frame->cl),
-                        vm->stack + vm->sp + 1,
+                        vm->stack + vm->sp,
                         current_frame->cl->func->num_parameters);
                 printf(" -> nothing");
                 putc('\n', stdout);
