@@ -16,7 +16,7 @@ void test_lexer_next_token(void) {
     char input[] = "let five = 5;\
 let ten = 10;\
 let digitAnd20 = 50;\
-let nullVariable = null;\
+let emptyVariable = nothing;\
 let e = 2;\
 \
 let add = fn(x, y) {\
@@ -72,9 +72,9 @@ for (let i = 0; i < 10; i = i + 1) {\
 	{t_Integer, "50", 2},
 	{t_Semicolon, ";", 1},
 	{t_Let, "let", 3},
-	{t_Ident, "nullVariable", 12},
+	{t_Ident, "emptyVariable", 13},
 	{t_Assign, "=", 1},
-	{t_Null, "null", 4},
+	{t_Nothing, "nothing", 7},
 	{t_Semicolon, ";", 1},
 	{t_Let, "let", 3},
 	{t_Ident, "e", 1},

@@ -3,7 +3,7 @@
 // This module defines types for Object.  A C variable of that type contains an
 // ObjectType and ObjectData of the following categories:
 //
-// Primitive data types: null, integers and floats and booleans are stored
+// Primitive data types: nothing, integers and floats and booleans are stored
 // entirely in ObjectData, so copies are deep copies.
 //
 // Compound data types: strings, arrays, tables (hashmaps) and closures contain
@@ -24,7 +24,7 @@
 
 typedef enum __attribute__ ((__packed__)) {
     // Primitive data types:
-    o_Null,
+    o_Nothing,
     o_Integer,
     o_Float,
     o_Boolean,
@@ -75,12 +75,9 @@ typedef struct Closure {
 } Closure;
 
 #define OBJ(t, d) (Object){ .type = t, .data = { d } }
-#define ERR(...) OBJ(o_Error, .err = errorf(__VA_ARGS__))
-#define BOOL(b) OBJ(o_Boolean, .boolean = b)
-#define NULL_OBJ (Object){0}
-
-#define IS_ERR(obj) (obj.type == o_Error)
-#define IS_NULL(obj) (obj.type == o_Null)
+#define OBJ_ERR(...) OBJ(o_Error, .err = errorf(__VA_ARGS__))
+#define OBJ_BOOL(b) OBJ(o_Boolean, .boolean = b)
+#define OBJ_NOTHING (Object){0}
 
 bool is_truthy(Object obj);
 

@@ -76,7 +76,7 @@ Object object_copy(VM* vm, Object obj) {
 #endif
 
     switch (obj.type) {
-        case o_Null:
+        case o_Nothing:
         case o_Integer:
         case o_Float:
         case o_Boolean:
@@ -107,8 +107,8 @@ Object object_copy(VM* vm, Object obj) {
                 tbl_it it = tbl_iterator(obj.data.table);
                 while (tbl_next(&it)) {
                     Object res = table_set(new_tbl, it.cur_key, it.cur_val);
-                    if (IS_NULL(res)) {
-                        return ERR("could not set table value: %s");
+                    if (!res.type) {
+                        return OBJ_ERR("could not set table value: %s");
                     }
                 }
                 return OBJ(o_Table, .table = new_tbl);
@@ -117,7 +117,7 @@ Object object_copy(VM* vm, Object obj) {
         default:
             die("object_copy: object type not handled %s (%d)\n",
                     show_object_type(obj.type), obj.type);
-            return NULL_OBJ;
+            return OBJ_NOTHING;
     }
 }
 
@@ -138,7 +138,7 @@ void mark(Object obj) {
 static void
 trace_mark_object(Object obj) {
     switch (obj.type) {
-        case o_Null:
+        case o_Nothing:
         case o_Integer:
         case o_Float:
         case o_Boolean:

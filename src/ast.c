@@ -308,8 +308,8 @@ int node_fprint(const Node n, __attribute__ ((unused)) FILE* fp) {
         case n_OperatorAssignment:
             return fprint_operator_assignment(n.obj, fp);
 
-        case n_NullLiteral:
-            FPRINTF(fp, "null");
+        case n_NothingLiteral:
+            FPRINTF(fp, "nothing");
             return 0;
 
         default:

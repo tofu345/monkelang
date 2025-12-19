@@ -75,8 +75,8 @@ test_conditionals(void) {
     vm_test("if (1 < 2) { 10 }", TEST(int, 10));
     vm_test("if (1 < 2) { 10 } else { 20 }", TEST(int, 10));
     vm_test("if (1 > 2) { 10 } else { 20.7 }", TEST(float, 20.7));
-    vm_test("if (1 > 2) { 10 }", TEST_NULL);
-    vm_test("if (false) { 10 }", TEST_NULL);
+    vm_test("if (1 > 2) { 10 }", TEST_NOTHING);
+    vm_test("if (false) { 10 }", TEST_NOTHING);
     vm_test("!(if (false) { 5; })", TEST(bool, true));
     vm_test("if ((if (false) { 10 })) { 10 } else { 20 }", TEST(int, 20));
 }
@@ -85,7 +85,7 @@ test_conditionals(void) {
 // - boolean true
 // - numbers not 0 (C-like)
 // - arrays and tables with more than one element
-// - everything else except null.
+// - everything else except nothing.
 static void
 test_truthy(void) {
     vm_test("if (true) {1}", TEST(int, 1));
@@ -97,11 +97,11 @@ test_truthy(void) {
     vm_test("if ({1: 2}) {1}", TEST(int, 1));
     vm_test("if (fn(){}) {1}", TEST(int, 1));
 
-    vm_test("if (false) {1}", TEST_NULL);
-    vm_test("if (0) {1}", TEST_NULL);
-    vm_test("if ([]) {1}", TEST_NULL);
-    vm_test("if ({}) {1}", TEST_NULL);
-    vm_test("if (null) {1}", TEST_NULL);
+    vm_test("if (false) {1}", TEST_NOTHING);
+    vm_test("if (0) {1}", TEST_NOTHING);
+    vm_test("if ([]) {1}", TEST_NOTHING);
+    vm_test("if ({}) {1}", TEST_NOTHING);
+    vm_test("if (nothing) {1}", TEST_NOTHING);
 }
 
 static void
@@ -148,13 +148,13 @@ test_index_expressions(void) {
     vm_test("[1, 2, 3][1]", TEST(int, 2));
     vm_test("[1, 2, 3][0 + 2]", TEST(int, 3));
     vm_test("[[1.5, 1, 1]][0][0]", TEST(float, 1.5));
-    vm_test("[][0]", TEST_NULL);
-    vm_test("[1, 2, 3][99]", TEST_NULL);
-    vm_test("[1][-1]", TEST_NULL);
+    vm_test("[][0]", TEST_NOTHING);
+    vm_test("[1, 2, 3][99]", TEST_NOTHING);
+    vm_test("[1][-1]", TEST_NOTHING);
     vm_test("{1: 1, 2: 2}[1]", TEST(int, 1));
     vm_test("{1: 1, 2: 2.1}[2]", TEST(float, 2.1));
-    vm_test("{1: 1}[0]", TEST_NULL);
-    vm_test("{}[0]", TEST_NULL);
+    vm_test("{1: 1}[0]", TEST_NOTHING);
+    vm_test("{}[0]", TEST_NOTHING);
 }
 
 static void
@@ -206,7 +206,7 @@ test_functions_without_return_value(void) {
             let noReturn = fn() { };\
             noReturn();\
         ",
-        TEST_NULL
+        TEST_NOTHING
     );
     vm_test(
         "\
@@ -215,7 +215,7 @@ test_functions_without_return_value(void) {
             noReturn();\
             noReturnTwo();\
         ",
-        TEST_NULL
+        TEST_NOTHING
     );
 
     vm_test_error(
@@ -383,11 +383,11 @@ test_builtin_functions(void) {
     vm_test("len(\"hello world\")", TEST(int, 11));
     vm_test("len([1, 2, 3])", TEST(int, 3));
     vm_test("len([])", TEST(int, 0));
-    vm_test("puts(\"hello\", \"world!\")", TEST_NULL);
+    vm_test("puts(\"hello\", \"world!\")", TEST_NOTHING);
     vm_test("first([1, 2, 3])", TEST(int, 1));
-    vm_test("first([])", TEST_NULL);
+    vm_test("first([])", TEST_NOTHING);
     vm_test("last([1, 2, 3])", TEST(int, 3));
-    vm_test("last([])", TEST_NULL);
+    vm_test("last([])", TEST_NOTHING);
     vm_test("rest([1, 2, 3])", TEST_ARR(2, 3));
     vm_test("rest([])", TEST_ARR(0));
     vm_test("push([], 1)", TEST_ARR(1));
@@ -561,7 +561,7 @@ test_recursive_fibonacci(void) {
 static void
 test_assignments(void) {
     vm_test("let a = 15; a = 5; a", TEST(int, 5));
-    vm_test("let a = null; a = 5;", TEST(int, 5));
+    vm_test("let a; a = 5;", TEST(int, 5));
 
     // assign index expressions
     vm_test("let arr = [1, 2, 3]; arr[0] = 5; arr[0]", TEST(int, 5));
@@ -570,7 +570,7 @@ test_assignments(void) {
     vm_test(
         "\
         let hash = {1: 2, 3: 4};\
-        hash[1] = null;\
+        hash[1] = nothing;\
         hash\
         ",
         TEST_TABLE(3, 4)
@@ -612,11 +612,11 @@ test_assignments(void) {
 
     vm_test_error(
         "let var = []; var[0] += 2;",
-        "unkown operation: null + integer"
+        "unkown operation: nothing + integer"
     );
     vm_test_error(
         "let var = {1: 2}; var[2] += 2;",
-        "unkown operation: null + integer"
+        "unkown operation: nothing + integer"
     );
 }
 
@@ -833,8 +833,8 @@ test_expected_object(Test expected, Object actual) {
         case test_str:
             return test_string_object(expected.val._str, actual);
 
-        case test_null:
-            if (!expect_object_is(o_Null, actual)) {
+        case test_nothing:
+            if (!expect_object_is(o_Nothing, actual)) {
                 return -1;
             }
             return 0;
@@ -888,7 +888,7 @@ test_expected_object(Test expected, Object actual) {
                     Object value =
                         table_get(tbl, OBJ(o_Integer, exp_pairs.data[i]));
 
-                    if (value.type == o_Null) {
+                    if (value.type == o_Nothing) {
                         printf("no pair for key %d (%d)\n", i, exp_pairs.data[i]);
                         return -1;
                     }

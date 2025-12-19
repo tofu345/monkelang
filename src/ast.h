@@ -13,7 +13,7 @@
 enum NodeType {
     // Expressions
     n_Identifier = 1,
-    n_NullLiteral,
+    n_NothingLiteral,
     n_IntegerLiteral,
     n_BooleanLiteral,
     n_FloatLiteral,
@@ -200,5 +200,5 @@ typedef struct {
 void free_table_literal(TableLiteral* hl);
 
 typedef struct {
-    Token tok; // the 'null' token
-} NullLiteral;
+    Token tok; // the 'nothing' token
+} NothingLiteral;

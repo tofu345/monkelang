@@ -11,7 +11,7 @@ typedef enum __attribute__ ((__packed__)) {
     t_Ident, // identifiers (variable names)
 
     // literals
-    t_Null,
+    t_Nothing,
     t_True,
     t_False,
     t_String,

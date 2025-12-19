@@ -11,9 +11,9 @@
 #include <string.h>
 #include <sys/poll.h>
 
-static const char *parser_error = "Woops! We ran into some monkey business here!";
-static const char *compiler_error = "Woops! Compilation failed!";
-static const char *vm_error = "Woops! Executing bytecode failed!";
+static const char *parser_error = "Woops! We ran into some monkey business here!\n";
+static const char *compiler_error = "Woops! Compilation failed!\n";
+static const char *vm_error = "Woops! Executing bytecode failed!\n";
 
 // Evaluation, successful or not.
 typedef struct Eval {
@@ -86,7 +86,7 @@ void repl(FILE* in, FILE* out) {
         }
 
         Object stack_elem = vm_last_popped(&vm);
-        if (stack_elem.type != o_Null) {
+        if (stack_elem.type != o_Nothing) {
             object_fprint(stack_elem, out);
             fputc('\n', out);
         }

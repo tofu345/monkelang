@@ -33,9 +33,9 @@ typedef enum {
     OpMinus,
     OpBang,
 
-    OpTrue, // Push a [true] Boolean Object.
-    OpFalse, // Push a [false] Boolean Object.
-    OpNull, // Push a Null Object.
+    OpTrue, // Push a true Boolean Object.
+    OpFalse, // Push a false Boolean Object.
+    OpNothing, // Push an Object with Nothing.
 
     // OpJumpNotTruthy: pop an Object, and jump to specified position in the
     // current functions instructions if the Object [is_truthy], see vm.h.
@@ -81,7 +81,7 @@ typedef enum {
     // - set the value of array `A` at index `B` to `C`, or
     //
     // - set the value of table `A` at key `B` to `C`.
-    //   NOTE: if `C` is null the key `B` is removed from table `A`.
+    //   NOTE: if `C` is nothing the key `B` is removed from table `A`.
     OpSetIndex,
 
     // OpCall: call a Compiled or Builtin function with specified number of
@@ -96,8 +96,8 @@ typedef enum {
     // Frame and push the popped Object onto the stack.
     OpReturnValue,
 
-    // OpReturn: return to the previous Frame and push a Null Object onto the
-    // stack.
+    // OpReturn: return to the previous Frame and push an Object with Nothing
+    // onto the stack.
     OpReturn,
 
     // OpGetBuiltin: Push the Builtin Function with specified index onto the

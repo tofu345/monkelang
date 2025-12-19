@@ -111,7 +111,7 @@ test_node(Node n, Test *test) {
         case test_bool:
             test_boolean_literal(n, test->val._bool);
             break;
-        case test_null:
+        case test_nothing:
             TEST_ASSERT_NULL_MESSAGE(n.obj, "Node not NULL");
             break;
         default:
@@ -229,7 +229,8 @@ void test_return_statements(void) {
         const char *input;
         Test *expectedVal;
     } tests[] = {
-        {"return;", TEST_NULL},
+        {"return;", TEST_NOTHING}, // empty return statements must end with a
+                                   // semicolon.
         {"return 5;", TEST(int, 5)},
         {"return 10;", TEST(int, 10)},
         {"return 993322;", TEST(int, 993322)},
@@ -264,6 +265,7 @@ void test_let_statements(void) {
         const char *expectedIdent;
         Test *expectedVal;
     } tests[] = {
+        {"let x;", "x", TEST_NOTHING},
         {"let x = 5;", "x", TEST(int, 5)},
         {"let x = 5.000;", "x", TEST(float, 5.0)},
         {"let y = true;", "y", TEST(bool, true)},
@@ -980,8 +982,8 @@ void test_parsing_operator_assignment(void) {
     }
 }
 
-void test_parsing_null_literals(void) {
-    char *input = "null";
+void test_parsing_nothing_literals(void) {
+    char *input = "nothing";
 
     parser_init(&p);
     prog = parse(&p, input);
@@ -991,11 +993,11 @@ void test_parsing_null_literals(void) {
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
     ExpressionStatement* es = n.obj;
 
-    ASSERT_NODE_TYPE(n_NullLiteral, es->expression);
-    NullLiteral *nl = es->expression.obj;
+    ASSERT_NODE_TYPE(n_NothingLiteral, es->expression);
+    NothingLiteral *nl = es->expression.obj;
 
-    if (!test_token_literal(&nl->tok, "null")) {
-        puts("wrong NullLiteral.Token.value");
+    if (!test_token_literal(&nl->tok, "nothing")) {
+        puts("wrong NothingLiteral.Token.value");
         TEST_FAIL();
     }
 }
@@ -1043,9 +1045,9 @@ void test_empty_for_statement(void) {
     ASSERT_NODE_TYPE(n_ForStatement, n);
     ForStatement* fs = n.obj;
 
-    test_node(fs->init, TEST_NULL);
-    test_node(fs->condition, TEST_NULL);
-    test_node(fs->update, TEST_NULL);
+    test_node(fs->init, TEST_NOTHING);
+    test_node(fs->condition, TEST_NOTHING);
+    test_node(fs->update, TEST_NOTHING);
 
     BlockStatement *bs = fs->body;
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, bs->stmts.length, "wrong BlockStatement length");
@@ -1064,10 +1066,10 @@ void test_parser_errors(void) {
     } tests[] = {
         {"let x = =;", "unexpected token '='"},
         {"let = = 1;", "expected next token to be 'Identifier', got '=' instead"},
+        {"return", "expected next token to be ';', got 'Eof' instead"},
         {
-            "return let;", // empty return statement followed by invalid let
-                           // statement
-            "expected next token to be 'Identifier', got ';' instead"
+            "return let;",
+            "expected next token to be ';', got 'let' instead"
         },
 
         {"1..5", "could not parse '1..5' as float"},
@@ -1158,7 +1160,7 @@ int main(void) {
     RUN_TEST(test_parsing_assignment);
     RUN_TEST(test_parsing_index_assignment);
     RUN_TEST(test_parsing_operator_assignment);
-    RUN_TEST(test_parsing_null_literals);
+    RUN_TEST(test_parsing_nothing_literals);
     RUN_TEST(test_for_statement);
     RUN_TEST(test_empty_for_statement);
     RUN_TEST(test_parser_errors);

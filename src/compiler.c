@@ -111,7 +111,7 @@ remove_last_expression_stmt_pop(Compiler *c, BlockStatement *bs) {
         c->cur_scope->last_instruction = c->cur_scope->previous_instruction;
 
     } else {
-        emit(c, OpNull);
+        emit(c, OpNothing);
     }
 }
 
@@ -234,15 +234,19 @@ _compile(Compiler *c, Node n) {
                 LetStatement *ls = n.obj;
 
                 Identifier *id = ls->name;
-                Symbol *symbol = sym_define(c->current_symbol_table, &id->tok,
-                                            hash(id));
+                Symbol *symbol =
+                    sym_define(c->current_symbol_table, &id->tok, hash(id));
 
                 if (symbol->index >= GlobalsSize) {
                     return c_error((Node){.obj = id}, "too many global variables");
                 }
 
-                err = _compile(c, ls->value);
-                if (err) { return err; }
+                if (ls->value.obj) {
+                    err = _compile(c, ls->value);
+                    if (err) { return err; }
+                } else {
+                    emit(c, OpNothing);
+                }
 
                 if (symbol->scope == GlobalScope) {
                     emit(c, OpSetGlobal, symbol->index);
@@ -421,7 +425,7 @@ _compile(Compiler *c, Node n) {
                 change_operand(c, jump_not_truthy_pos, after_consequence_pos);
 
                 if (ie->alternative == NULL) {
-                    emit(c, OpNull);
+                    emit(c, OpNothing);
                 } else {
                     err = _compile(c, NODE(n_BlockStatement, ie->alternative));
                     if (err) { return err; }
@@ -468,8 +472,8 @@ _compile(Compiler *c, Node n) {
                 return 0;
             }
 
-        case n_NullLiteral:
-            emit(c, OpNull);
+        case n_NothingLiteral:
+            emit(c, OpNothing);
             return 0;
 
         case n_ArrayLiteral:

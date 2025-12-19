@@ -126,7 +126,7 @@ test_table_remove(void) {
 
     // table_remove() on empty table
     Object res = table_remove(&tbl, OBJ(o_Integer, 0));
-    if (res.type != o_Null) {
+    if (res.type != o_Nothing) {
         printf("got object: ");
         object_fprint(res, stdout);
         printf("after table_remove() on empty table\n");
@@ -143,7 +143,7 @@ test_table_remove(void) {
 static void
 expect_set(Object key, Object val) {
     Object res = table_set(&tbl, key, val);
-    if (res.type == o_Null) {
+    if (res.type == o_Nothing) {
         printf("table_set fail: ");
         object_fprint(key, stdout);
         printf(": ");
@@ -180,7 +180,7 @@ expect_remove(Object key) {
 
     Object res = table_remove(&tbl, key);
 
-    if (res.type == o_Null) {
+    if (res.type == o_Nothing) {
         printf("could not assign object: ");
         object_fprint(res, stdout);
         putc('\n', stdout);

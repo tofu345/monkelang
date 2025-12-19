@@ -288,7 +288,7 @@ execute_binary_operation(VM *vm, Opcode op) {
 
     vm->sp -= 2;
 
-    if (IS_ERR(result)) {
+    if (result.type == o_Error) {
         return result.data.err;
     }
     return vm_push(vm, result);
@@ -300,16 +300,16 @@ execute_integer_comparison(VM *vm, Opcode op, Object left, Object right) {
 
     switch (op) {
         case OpEqual:
-            result = BOOL(left.data.integer == right.data.integer);
+            result = OBJ_BOOL(left.data.integer == right.data.integer);
             break;
         case OpNotEqual:
-            result = BOOL(left.data.integer != right.data.integer);
+            result = OBJ_BOOL(left.data.integer != right.data.integer);
             break;
         case OpLessThan:
-            result = BOOL(left.data.integer < right.data.integer);
+            result = OBJ_BOOL(left.data.integer < right.data.integer);
             break;
         case OpGreaterThan:
-            result = BOOL(left.data.integer > right.data.integer);
+            result = OBJ_BOOL(left.data.integer > right.data.integer);
             break;
         default:
             die("unkown integer comparison operator: %s (%d)",
@@ -324,16 +324,16 @@ execute_float_comparison(VM *vm, Opcode op, Object left, Object right) {
 
     switch (op) {
         case OpEqual:
-            result = BOOL(left.data.floating == right.data.floating);
+            result = OBJ_BOOL(left.data.floating == right.data.floating);
             break;
         case OpNotEqual:
-            result = BOOL(left.data.floating != right.data.floating);
+            result = OBJ_BOOL(left.data.floating != right.data.floating);
             break;
         case OpLessThan:
-            result = BOOL(left.data.floating < right.data.floating);
+            result = OBJ_BOOL(left.data.floating < right.data.floating);
             break;
         case OpGreaterThan:
-            result = BOOL(left.data.floating > right.data.floating);
+            result = OBJ_BOOL(left.data.floating > right.data.floating);
             break;
         default:
             die("unkown float comparison operator: %s (%d)",
@@ -355,7 +355,7 @@ execute_comparison(VM *vm, Opcode op) {
     }
 
     Object res = object_eq(left, right);
-    if (IS_NULL(res)) {
+    if (res.type == o_Error) {
         return errorf("cannot compare: '%s' with '%s'",
                 show_object_type(left.type),
                 show_object_type(right.type));
@@ -381,10 +381,10 @@ execute_bang_operator(VM *vm) {
         case o_Boolean:
             operand.data.boolean = !operand.data.boolean;
             return vm_push(vm, operand);
-        case o_Null:
-            return vm_push(vm, BOOL(true));
+        case o_Nothing:
+            return vm_push(vm, OBJ_BOOL(true));
         default:
-            return vm_push(vm, BOOL(false));
+            return vm_push(vm, OBJ_BOOL(false));
     }
 }
 
@@ -413,7 +413,7 @@ execute_array_index(VM *vm, Object array, Object index) {
     int i = index.data.integer,
         max = arr->length - 1;
     if (i < 0 || i > max) {
-        return vm_push(vm, NULL_OBJ);
+        return vm_push(vm, OBJ_NOTHING);
     }
 
     return vm_push(vm, arr->data[i]);
@@ -470,14 +470,14 @@ execute_set_table_index(Object obj, Object index, Object val) {
                 show_object_type(index.type));
     }
 
-    // [table] cannot have [o_Null] key or value.
-    if (val.type == o_Null) {
+    // [table] cannot have [o_Nothing] key or value.
+    if (val.type == o_Nothing) {
         table_remove(tbl, index);
         return 0;
     }
 
     Object result = table_set(tbl, index, val);
-    if (result.type == o_Null) {
+    if (result.type == o_Nothing) {
         return errorf("could not set table index");
     }
     return 0;
@@ -553,25 +553,26 @@ static Object
 build_table(VM *vm, int start_index, int end_index) {
     Table *tbl = create_table(vm);
 
-    Object key, val;
+    Object key, val, res;
     for (int i = start_index; i < end_index; i += 2) {
         key = vm->stack[i];
         val = vm->stack[i + 1];
 
         if (!hashable(key)) {
-            return ERR("cannot use type as table key: %s",
+            return OBJ_ERR("cannot use type as table key: %s",
                     show_object_type(key.type));
         }
 
-        // [table] cannot have [o_Null] key or value.
-        if (val.type == o_Null) {
+        // [table] cannot have [o_Nothing] key or value.
+        if (val.type == o_Nothing) {
             continue;
         }
 
         // FIXME: die() instead?
         // should only happen if allocation of bucket overflow fails.
-        if (IS_NULL(table_set(tbl, key, val))) {
-            return ERR("could not set table value: %s",
+        res = table_set(tbl, key, val);
+        if (res.type == o_Error) {
+            return OBJ_ERR("could not set table value: %s",
                     show_object_type(val.type));
         }
     }
@@ -606,7 +607,7 @@ call_closure(VM *vm, Closure *cl, int num_args) {
             return errorf("stack overflow: insufficient space for local variables");
         }
 
-        // set local variables to [o_Null] to avoid use after free if GC is
+        // set local variables to [o_Nothing] to avoid use after free if GC is
         // triggered and accesses freed Compound Data Types still on the stack.
         memset(vm->stack + vm->sp, 0, fn->num_locals * sizeof(Object));
     }
@@ -718,11 +719,11 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 break;
 
             case OpTrue:
-                err = vm_push(vm, BOOL(true));
+                err = vm_push(vm, OBJ_BOOL(true));
                 if (err) { return err; };
                 break;
             case OpFalse:
-                err = vm_push(vm, BOOL(false));
+                err = vm_push(vm, OBJ_BOOL(false));
                 if (err) { return err; };
                 break;
 
@@ -757,8 +758,8 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 }
                 break;
 
-            case OpNull:
-                err = vm_push(vm, NULL_OBJ);
+            case OpNothing:
+                err = vm_push(vm, OBJ_NOTHING);
                 if (err) { return err; };
                 break;
 
@@ -797,9 +798,9 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 current_frame->ip += 2;
 
                 obj = build_table(vm, vm->sp - num, vm->sp);
-                if (IS_ERR(obj)) { return obj.data.err; };
-                vm->sp -= num;
+                if (obj.type == o_Error) { return obj.data.err; };
 
+                vm->sp -= num;
                 err = vm_push(vm, obj);
                 if (err) { return err; };
                 break;
@@ -859,14 +860,14 @@ error vm_run(VM *vm, Bytecode bytecode) {
                         OBJ(o_Closure, .closure = current_frame->cl),
                         vm->stack + vm->sp + 1,
                         current_frame->cl->func->num_parameters);
-                printf(" -> null");
+                printf(" -> nothing");
                 putc('\n', stdout);
 #endif
 
                 current_frame = pop_frame(vm);
                 ins = instructions(current_frame);
 
-                err = vm_push(vm, NULL_OBJ);
+                err = vm_push(vm, OBJ_NOTHING);
                 if (err) { return err; };
                 break;
 

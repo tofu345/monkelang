@@ -179,7 +179,7 @@ void test_conditionals(void) {
             // 0007
             make(OpJump, 11),
             // 0010
-            make(OpNull),
+            make(OpNothing),
             // 0011
             make(OpPop),
             // 0012
@@ -950,10 +950,10 @@ void test_assignments(void) {
         )
     );
     c_test(
-        "let a = null; a = 5;",
+        "let a = nothing; a = 5;",
         _C( INT(5) ),
         _I(
-            make(OpNull, 0),
+            make(OpNothing, 0),
             make(OpSetGlobal, 0),
             make(OpConstant, 0),
             make(OpSetGlobal, 0)
@@ -1066,7 +1066,7 @@ void test_operator_assignments(void) {
 
 void test_return_statements(void) {
     c_test(
-        "fn() { if (true) { return } else { 20 }; 3333; }",
+        "fn() { if (true) { return; } else { 20 }; 3333; }",
         _C(
             INT(20),
             INT(3333),
@@ -1074,7 +1074,7 @@ void test_return_statements(void) {
                 make(OpTrue),
                 make(OpJumpNotTruthy, 9),
                 make(OpReturn),
-                make(OpNull),
+                make(OpNothing),
                 make(OpJump, 12),
                 make(OpConstant, 0),
                 make(OpPop),
@@ -1088,7 +1088,7 @@ void test_return_statements(void) {
         )
     );
 
-    c_test_error("return", "return statement outside function");
+    c_test_error("return;", "return statement outside function");
 }
 
 void test_for_statements(void) {

@@ -17,7 +17,7 @@ bool hashable(Object key);
 // Separated `Object` into `ObjectType` and `ObjectData` to avoid excessive
 // padding.
 //
-// `k_type[i]` is [o_Null] for empty entries.
+// `k_type[i]` is [o_Nothing] for empty entries.
 typedef struct table_bucket {
     uint64_t hashes[N]; // for faster comparisons.
     ObjectType k_type[N];
@@ -38,7 +38,8 @@ typedef struct Table {
 void *table_init(Table *tbl);
 void table_free(Table *tbl);
 
-// Get item with [key]. Return value, or [o_Null Object] if not found.
+// Get item with [key]. Return value, or [o_Nothing Object] if not
+// found.
 Object table_get(Table *tbl, Object key);
 
 // Returns [Null Object] if:

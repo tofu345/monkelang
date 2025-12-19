@@ -110,7 +110,7 @@ expect_peek(Parser* p, TokenType t) {
     }
 }
 
-static void
+inline static void
 peek_semicolon(Parser *p) {
     if (peek_token_is(p, t_Semicolon)) {
         next_token(p);
@@ -569,10 +569,10 @@ parse_if_expression(Parser* p) {
 }
 
 static Node
-parse_null_literal(Parser *p) {
-    NullLiteral* nl = allocate(sizeof(NullLiteral));
+parse_nothing_literal(Parser *p) {
+    NothingLiteral* nl = allocate(sizeof(NothingLiteral));
     nl->tok = p->cur_token;
-    return NODE(n_NullLiteral, nl);
+    return NODE(n_NothingLiteral, nl);
 }
 
 static Node
@@ -580,33 +580,35 @@ parse_let_statement(Parser* p) {
     LetStatement* stmt = allocate(sizeof(LetStatement));
     stmt->tok = p->cur_token;
 
-    if (!expect_peek(p, t_Ident)) {
-        free(stmt);
-        return INVALID;
-    }
+    if (!expect_peek(p, t_Ident)) { goto invalid; }
 
     stmt->name = parse_identifier(p).obj;
 
-    if (!expect_peek(p, t_Assign)) {
-        free(stmt->name);
-        free(stmt);
-        return INVALID;
-    }
-    next_token(p);
+    if (peek_token_is(p, t_Assign)) {
+        // (x2) next_token() to skip t_Assign
+        p->cur_token = lexer_next_token(&p->l);
+        p->peek_token = lexer_next_token(&p->l);
 
-    stmt->value = parse_expression(p, p_Lowest);
-    if (IS_INVALID(stmt->value)) {
-        node_free(NODE(n_LetStatement, stmt));
-        return INVALID;
+        stmt->value = parse_expression(p, p_Lowest);
+        if (IS_INVALID(stmt->value)) { goto invalid; }
+
+        if (stmt->value.typ == n_FunctionLiteral) {
+            FunctionLiteral *fl = stmt->value.obj;
+            fl->name = stmt->name;
+        }
+
+        peek_semicolon(p);
+
+    // empty let statement, must end with ';'
+    } else if (!expect_peek(p, t_Semicolon)) {
+        goto invalid;
     }
 
-    if (stmt->value.typ == n_FunctionLiteral) {
-        FunctionLiteral *fl = stmt->value.obj;
-        fl->name = stmt->name;
-    }
-
-    peek_semicolon(p);
     return NODE(n_LetStatement, stmt);
+
+invalid:
+    node_free(NODE(n_LetStatement, stmt));
+    return INVALID;
 }
 
 static Node
@@ -614,20 +616,24 @@ parse_return_statement(Parser* p) {
     ReturnStatement* stmt = allocate(sizeof(ReturnStatement));
     stmt->tok = p->cur_token;
 
-    // empty return statement if the expression after 'return' cannot be
-    // parsed.
+    // the expression after the 'return' can be parsed
     if (p->prefix_parse_fns[p->peek_token.type]) {
         next_token(p);
 
         stmt->return_value = parse_expression(p, p_Lowest);
-        if (IS_INVALID(stmt->return_value)) {
-            free(stmt);
-            return INVALID;
-        }
+        if (IS_INVALID(stmt->return_value)) { goto invalid; }
+
+    // empty return statement, must end with ';'
+    } else if (!expect_peek(p, t_Semicolon)) {
+        goto invalid;
     }
 
     peek_semicolon(p);
     return NODE(n_ReturnStatement, stmt);
+
+invalid:
+    node_free(NODE(n_ReturnStatement, stmt));
+    return INVALID;
 }
 
 static Node
@@ -785,7 +791,7 @@ void parser_init(Parser* p) {
     p->prefix_parse_fns[t_String] = parse_string_literal;
     p->prefix_parse_fns[t_Lbracket] = parse_array_literal;
     p->prefix_parse_fns[t_Lbrace] = parse_table_literal;
-    p->prefix_parse_fns[t_Null] = parse_null_literal;
+    p->prefix_parse_fns[t_Nothing] = parse_nothing_literal;
 
     p->infix_parse_fns[t_Plus] = parse_infix_expression;
     p->infix_parse_fns[t_Minus] = parse_infix_expression;

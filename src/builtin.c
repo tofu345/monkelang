@@ -18,7 +18,7 @@ builtin_exit(__attribute__ ((unused)) VM *vm, __attribute__ ((unused)) Object
     }
 
     if (args[0].type != o_Integer) {
-        return ERR("builtin exit() expects argument of %s got %s",
+        return OBJ_ERR("builtin exit() expects argument of %s got %s",
                 show_object_type(o_Integer), show_object_type(args[0].type));
     }
 
@@ -60,7 +60,7 @@ builtin_len(__attribute__ ((unused)) VM *vm, Object *args, int num_args) {
             }
 
         default:
-            return ERR("builtin len(): argument of %s not supported",
+            return OBJ_ERR("builtin len(): argument of %s not supported",
                     show_object_type(args[0].type));
     }
 }
@@ -78,12 +78,12 @@ builtin_first(__attribute__ ((unused)) VM *vm, Object *args, int num_args) {
                 if (arr->length > 0) {
                     return arr->data[0];
                 }
-                return NULL_OBJ;
+                return OBJ_NOTHING;
             }
             break;
 
         default:
-            return ERR("builtin first(): argument of %s not supported",
+            return OBJ_ERR("builtin first(): argument of %s not supported",
                     show_object_type(args[0].type));
     }
 
@@ -102,11 +102,11 @@ builtin_last(__attribute__ ((unused)) VM *vm, Object *args, int num_args) {
                 if (arr->length > 0) {
                     return arr->data[arr->length - 1];
                 }
-                return NULL_OBJ;
+                return OBJ_NOTHING;
             }
 
         default:
-            return ERR("builtin last(): argument of %s not supported",
+            return OBJ_ERR("builtin last(): argument of %s not supported",
                     show_object_type(args[0].type));
     }
 }
@@ -132,7 +132,7 @@ builtin_rest(VM *vm, Object *args, int num_args) {
             }
 
         default:
-            return ERR("builtin rest(): argument of %s not supported",
+            return OBJ_ERR("builtin rest(): argument of %s not supported",
                     show_object_type(args[0].type));
     }
 }
@@ -144,7 +144,7 @@ builtin_push(__attribute__ ((unused)) VM *vm, Object *args, int num_args) {
     }
 
     if (args[0].type != o_Array) {
-        return ERR("builtin push() expects first argument to be %s got %s",
+        return OBJ_ERR("builtin push() expects first argument to be %s got %s",
                 show_object_type(o_Array), show_object_type(args[0].type));
     }
 
@@ -172,7 +172,7 @@ builtin_puts(__attribute__ ((unused)) VM *vm, Object *args, int num_args) {
         _puts(args[end]);
 
     putc('\n', stdout);
-    return NULL_OBJ;
+    return OBJ_NOTHING;
 }
 
 Object

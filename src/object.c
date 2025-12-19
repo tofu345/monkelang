@@ -28,8 +28,8 @@ fprintf_boolean(bool b, FILE* fp) {
 }
 
 static int
-fprintf_null(FILE* fp) {
-    FPRINTF(fp, "null");
+fprintf_nothing(FILE* fp) {
+    FPRINTF(fp, "nothing");
     return 0;
 }
 
@@ -139,8 +139,8 @@ _object_fprint(Object o, VoidPtrBuffer *seen, FILE* fp) {
         case o_Boolean:
             return fprintf_boolean(o.data.boolean, fp);
 
-        case o_Null:
-            return fprintf_null(fp);
+        case o_Nothing:
+            return fprintf_nothing(fp);
 
         case o_String:
             return fprintf_string(o.data.string, fp);
@@ -178,7 +178,7 @@ bool is_truthy(Object obj) {
     switch (obj.type) {
         case o_Boolean:
             return obj.data.boolean;
-        case o_Null:
+        case o_Nothing:
             return false;
 
         case o_Array:
@@ -197,51 +197,51 @@ bool is_truthy(Object obj) {
 }
 
 Object object_eq(Object left, Object right) {
-    if (left.type != right.type) return BOOL(false);
+    if (left.type != right.type) return OBJ_BOOL(false);
 
     switch (left.type) {
         case o_Float:
-            return BOOL(left.data.floating == right.data.floating);
+            return OBJ_BOOL(left.data.floating == right.data.floating);
 
         case o_Integer:
-            return BOOL(left.data.integer == right.data.integer);
+            return OBJ_BOOL(left.data.integer == right.data.integer);
 
         case o_Boolean:
-            return BOOL(left.data.boolean == right.data.boolean);
+            return OBJ_BOOL(left.data.boolean == right.data.boolean);
 
-        case o_Null:
-            return BOOL(true);
+        case o_Nothing:
+            return OBJ_BOOL(true);
 
         case o_String:
-            return BOOL(strcmp(left.data.string->data, right.data.string->data) == 0);
+            return OBJ_BOOL(strcmp(left.data.string->data, right.data.string->data) == 0);
 
         case o_Array:
             {
                 ObjectBuffer* l_arr = left.data.array;
                 ObjectBuffer* r_arr = right.data.array;
                 if (l_arr->length != r_arr->length) {
-                    return BOOL(false);
+                    return OBJ_BOOL(false);
                 }
                 Object eq;
                 for (int i = 0; i < l_arr->length; i++) {
                     eq = object_eq(l_arr->data[i], r_arr->data[i]);
-                    if (IS_ERR(eq)) {
+                    if (eq.type == o_Error) {
                         return eq;
 
                     } else if (!eq.data.boolean) {
                         return eq;
                     }
                 }
-                return BOOL(true);
+                return OBJ_BOOL(true);
             }
 
         default:
-            return NULL_OBJ;
+            return OBJ_NOTHING;
     }
 }
 
 const char* object_types[] = {
-    "null",
+    "nothing",
     "integer",
     "float",
     "boolean",

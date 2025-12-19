@@ -13,7 +13,7 @@ typedef struct {
 } IntArray;
 
 typedef enum {
-    test_null,
+    test_nothing,
     test_int,
     test_float,
     test_str,
@@ -38,7 +38,7 @@ typedef struct {
 } Test;
 
 #define TEST(t, v) &(Test){ test_##t, { ._##t = v } }
-#define TEST_NULL &(Test){0}
+#define TEST_NOTHING &(Test){0}
 
 typedef struct {
     Test *data;

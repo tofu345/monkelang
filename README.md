@@ -112,6 +112,7 @@ puts("global is", global) // => global is 2
 
 // Assignment to free variables.
 fn() {
+  let empty;
   let num = 1;
   let array = [];
   fn() {
@@ -126,27 +127,30 @@ fn() {
     // has an effect, because the free list contains a shallow copy.
     push(array, 1);
 
-    array = {}; // no effect
+    // no effect
+    array = {};
+    empty = 3;
   }()
+  puts("empty is", empty); // empty is nothing
   puts("num is", num); // num is 1
   puts("array is", array); // array is [1]
 }()
 
 // Empty return statements
 let sayIf = fn(message, condition) {
-  // !object is true only if object is null or false
+  // !object is true only if object is nothing or false
   if (!condition) { return; }
   puts(message);
 }
-sayIf("hi!", true); // => "hi"
-sayIf("hi!", null); // =>
+sayIf("hi!", true);     // => "hi"
+sayIf("hi!", nothing);  // =>
 
 // Double `a`
 let a = [1, 2, 3, 4];
 let double = fn(x) { x * 2 };
 let map = fn(f, arr) {
   let length = len(arr);
-  let result = [null] * length;           // initialize array of given length
+  let result = [nothing] * length;           // initialize array of given length
   for (let i = 0; i < length; i += 1) { // operator assignment
     result[i] = f(arr[i]);
   }
