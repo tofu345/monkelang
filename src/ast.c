@@ -339,8 +339,7 @@ void free_block_statement(BlockStatement* bs) {
     free(bs);
 }
 
-static void
-free_if_expression(IfExpression* ie) {
+void free_if_expression(IfExpression* ie) {
     node_free(ie->condition);
     if (ie->consequence != NULL)
         free_block_statement(ie->consequence);

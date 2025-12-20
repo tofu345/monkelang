@@ -17,12 +17,13 @@ DEFINE_BUFFER(Error, ParserError)
 
 // `ParserError` with msg `asprintf(format, ...)` with [p.cur_token]
 static void parser_error(Parser* p, char* format, ...);
-
 // `ParserError` with [message] with [p.cur_token]
 static void parser_error_(Parser* p, const char* message);
 
 static Node parse_statement(Parser* p);
 static Node parse_expression(Parser* p, enum Precedence precedence);
+
+// [NodeBuffer.length] is -1 on err.
 static NodeBuffer parse_expression_list(Parser* p, TokenType end);
 
 static void *
@@ -305,15 +306,13 @@ parse_function_parameters(Parser* p, FunctionLiteral* fl) {
     while (peek_token_is(p, t_Comma)) {
         next_token(p);
 
-        if (!expect_peek(p, t_Ident))
-            return -1;
+        if (!expect_peek(p, t_Ident)) { return -1; }
 
         ident = parse_identifier(p).obj;
         ParamBufferPush(&fl->params, ident);
     }
 
-    if (!expect_peek(p, t_Rparen))
-        return -1;
+    if (!expect_peek(p, t_Rparen)) { return -1; }
 
     return 0;
 }
@@ -322,27 +321,20 @@ static Node
 parse_function_literal(Parser* p) {
     FunctionLiteral* fl = allocate(sizeof(FunctionLiteral));
     fl->tok = p->cur_token;
-    fl->name = NULL;
 
-    if (!expect_peek(p, t_Lparen)) {
-        free(fl);
-        return INVALID;
-    }
+    if (!expect_peek(p, t_Lparen)) { goto invalid; }
 
     int err = parse_function_parameters(p, fl);
-    if (err == -1 || !expect_peek(p, t_Lbrace)) {
-        fl->body = NULL;
-        free_function_literal(fl);
-        return INVALID;
-    }
+    if (err == -1 || !expect_peek(p, t_Lbrace)) { goto invalid; }
 
     fl->body = parse_block_statement(p);
-    if (fl->body == NULL) {
-        free_function_literal(fl);
-        return INVALID;
-    }
+    if (!fl->body) { goto invalid; }
 
     return NODE(n_FunctionLiteral, fl);
+
+invalid:
+    free_function_literal(fl);
+    return INVALID;
 }
 
 static Node
@@ -376,22 +368,18 @@ parse_array_literal(Parser* p) {
 
 static Node
 parse_table_literal(Parser* p) {
-    TableLiteral* hl = allocate(sizeof(TableLiteral));
-    hl->tok = p->cur_token;
+    TableLiteral* tbl = allocate(sizeof(TableLiteral));
+    tbl->tok = p->cur_token;
 
     while (!peek_token_is(p, t_Rbrace)) {
         next_token(p);
 
         Node key = parse_expression(p, p_Lowest);
-        if (IS_INVALID(key)) {
-            free_table_literal(hl);
-            return INVALID;
-        }
+        if (IS_INVALID(key)) { goto invalid; }
 
         if (!expect_peek(p, t_Colon)) {
             node_free(key);
-            free_table_literal(hl);
-            return INVALID;
+            goto invalid;
         }
 
         next_token(p);
@@ -399,27 +387,25 @@ parse_table_literal(Parser* p) {
         Node value = parse_expression(p, p_Lowest);
         if (IS_INVALID(value)) {
             node_free(key);
-            free_table_literal(hl);
-            return INVALID;
+            goto invalid;
         }
 
-        PairBufferPush(&hl->pairs, (Pair){ key, value });
+        PairBufferPush(&tbl->pairs, (Pair){ key, value });
 
         if (peek_token_is(p, t_Rbrace)) {
             break;
-
         } else if (!expect_peek(p, t_Comma)) {
-            free_table_literal(hl);
-            return INVALID;
+            goto invalid;
         }
     }
 
-    if (!expect_peek(p, t_Rbrace)) {
-        free_table_literal(hl);
-        return INVALID;
-    }
+    if (!expect_peek(p, t_Rbrace)) { goto invalid; }
 
-    return NODE(n_TableLiteral, hl);
+    return NODE(n_TableLiteral, tbl);
+
+invalid:
+    free_table_literal(tbl);
+    return INVALID;
 }
 
 static Node
@@ -432,11 +418,11 @@ parse_call_expression(Parser* p, Node function) {
         return INVALID;
     }
 
+    tok.length = (p->cur_token.position + p->cur_token.length) - tok.position;
+
     CallExpression* ce = allocate(sizeof(CallExpression));
     ce->function = function;
     ce->args = args;
-
-    tok.length = (p->cur_token.position + p->cur_token.length) - tok.position;
     ce->tok = tok;
     return NODE(n_CallExpression, ce);
 }
@@ -464,20 +450,6 @@ parse_index_expression(Parser* p, Node left) {
 }
 
 static NodeBuffer
-__free_elements_in(NodeBuffer buf) {
-    if (buf.data != NULL) {
-        for (int i = 0; i < buf.length; i++) {
-            node_free(buf.data[i]);
-        }
-        free(buf.data);
-        buf.data = NULL;
-    }
-    buf.length = -1;
-    return buf;
-}
-
-// [NodeBuffer.length] is -1 on err.
-static NodeBuffer
 parse_expression_list(Parser* p, TokenType end) {
     NodeBuffer list = {0};
 
@@ -489,8 +461,7 @@ parse_expression_list(Parser* p, TokenType end) {
     next_token(p);
 
     Node exp = parse_expression(p, p_Lowest);
-    if (IS_INVALID(exp))
-        return __free_elements_in(list);
+    if (IS_INVALID(exp)) { goto invalid; }
 
     NodeBufferPush(&list, exp);
 
@@ -499,71 +470,63 @@ parse_expression_list(Parser* p, TokenType end) {
         next_token(p);
 
         Node exp = parse_expression(p, p_Lowest);
-        if (IS_INVALID(exp))
-            return __free_elements_in(list);
+        if (IS_INVALID(exp)) { goto invalid; }
 
         NodeBufferPush(&list, exp);
     }
 
-    if (!expect_peek(p, end))
-        return __free_elements_in(list);
+    if (!expect_peek(p, end)) { goto invalid; }
 
+    return list;
+
+invalid:
+    for (int i = 0; i < list.length; i++) {
+        node_free(list.data[i]);
+    }
+    free(list.data);
+    list.data = NULL;
+    list.length = -1;
     return list;
 }
 
 static Node
 parse_if_expression(Parser* p) {
-    Token tok = p->cur_token;
+    IfExpression* ie = allocate(sizeof(IfExpression));
+    ie->tok = p->cur_token;
 
-    if (!expect_peek(p, t_Lparen)) {
-        return INVALID;
-    }
+    if (!expect_peek(p, t_Lparen)) { goto invalid; }
 
     next_token(p);
 
     if (cur_token_is(p, t_Rparen)) {
         parser_error_(p, "empty if statement");
-        return INVALID;
+        goto invalid;
     }
 
-    Node condition = parse_expression(p, p_Lowest);
-    if (IS_INVALID(condition)
+    ie->condition = parse_expression(p, p_Lowest);
+    if (IS_INVALID(ie->condition)
             || !expect_peek(p, t_Rparen)
             || !expect_peek(p, t_Lbrace)) {
-
-        node_free(condition);
-        return INVALID;
+        goto invalid;
     }
 
-    BlockStatement *consequence = parse_block_statement(p);
-    if (consequence == NULL) {
-        node_free(condition);
-        return INVALID;
-    }
-
-    IfExpression* ie = allocate(sizeof(IfExpression));
-    *ie = (IfExpression) {
-        .tok = tok,
-        .condition = condition,
-        .consequence = consequence
-    };
+    ie->consequence = parse_block_statement(p);
+    if (!ie->consequence) { goto invalid; }
 
     if (peek_token_is(p, t_Else)) {
         next_token(p);
 
-        if (!expect_peek(p, t_Lbrace)) {
-            node_free(NODE(n_IfExpression, ie));
-            return INVALID;
-        }
+        if (!expect_peek(p, t_Lbrace)) { goto invalid; }
 
         ie->alternative = parse_block_statement(p);
-        if (ie->alternative == NULL) {
-            node_free(NODE(n_IfExpression, ie));
-            return INVALID;
-        }
+        if (!ie->alternative) { goto invalid; }
     }
 
     return NODE(n_IfExpression, ie);
+
+invalid:
+    free_if_expression(ie);
+    return INVALID;
 }
 
 static Node
@@ -687,13 +650,13 @@ parse_for_statement(Parser *p) {
     fs->tok = p->cur_token;
 
     // for ( ...
-    if (!expect_peek(p, t_Lparen)) { goto fail; }
+    if (!expect_peek(p, t_Lparen)) { goto invalid; }
     next_token(p);
 
     // for ( [optional init] ; ...
     if (!cur_token_is(p, t_Semicolon)) {
         fs->init = parse_statement(p);
-        if (IS_INVALID(fs->init)) { goto fail; }
+        if (IS_INVALID(fs->init)) { goto invalid; }
     }
     next_token(p);
 
@@ -701,24 +664,26 @@ parse_for_statement(Parser *p) {
     if (!cur_token_is(p, t_Semicolon)) {
         fs->condition = parse_expression(p, p_Lowest);
         if (IS_INVALID(fs->condition)
-                || !expect_peek(p, t_Semicolon)) { goto fail; }
+                || !expect_peek(p, t_Semicolon)) { goto invalid; }
     }
 
     // ...; [optional update] ) {
     if (!peek_token_is(p, t_Rparen)) {
         next_token(p);
         fs->update = parse_statement(p);
-        if (IS_INVALID(fs->update)) { goto fail; }
+        if (IS_INVALID(fs->update)) { goto invalid; }
     }
-    if (!expect_peek(p, t_Rparen)) { goto fail; }
+
+    // ) {
+    if (!expect_peek(p, t_Rparen)) { goto invalid; }
     next_token(p);
 
     fs->body = parse_block_statement(p);
-    if (fs->body == NULL) { goto fail; }
+    if (!fs->body) { goto invalid; }
 
     return NODE(n_ForStatement, fs);
 
-fail:
+invalid:
     free_for_statement(fs);
     return INVALID;
 }
@@ -760,6 +725,7 @@ parse_statement_(Parser *p) {
     }
 }
 
+// inspired by https://youtu.be/6CV8HyqJ_9w?si=XJWE1RCAcCOsvzVp
 inline static bool
 peek_semicolon_or_newline(Parser *p) {
     if (peek_token_is(p, t_Semicolon)) {
@@ -767,14 +733,15 @@ peek_semicolon_or_newline(Parser *p) {
         return true;
 
     } else if (p->peek_token.line == p->cur_token.line) {
-        // the exceptions
         switch (p->peek_token.type) {
+            // the exceptions
             case t_Eof:
             case t_Rbracket:
             case t_Rbrace:
             case t_Rparen:
                 return true;
             default:
+                next_token(p); // highlight the statement that follows.
                 parser_error_(p,
                         "multiple statements on the same line must be separated by a ';'");
                 return false;

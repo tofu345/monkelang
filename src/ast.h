@@ -152,6 +152,8 @@ typedef struct {
 
 BUFFER(Param, Identifier*)
 
+void free_if_expression(IfExpression* ie);
+
 typedef struct {
     Token tok; // the 'fn' token
     ParamBuffer params;
