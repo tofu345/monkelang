@@ -55,7 +55,7 @@ typedef struct {
 
     // The current number of bytes to allocate till before GC is run.
     int bytesTillGC;
-    // most recent [Allocation] in linked list of all allocated objects.
+    // Linked list of all allocated objects.
     Allocation *last;
 
     // The Closure of the main function.

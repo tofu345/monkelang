@@ -112,7 +112,7 @@ puts("global is", global) // => global is 2
 
 // Assignment to free variables.
 fn() {
-  let empty;
+  let empty; // initialized with `nothing`, yes nothing
   let num = 1;
   let array = [];
   fn() {
@@ -150,7 +150,7 @@ let a = [1, 2, 3, 4];
 let double = fn(x) { x * 2 };
 let map = fn(f, arr) {
   let length = len(arr);
-  let result = [nothing] * length;           // initialize array of given length
+  let result = [nothing] * length;      // initialize array of given length
   for (let i = 0; i < length; i += 1) { // operator assignment
     result[i] = f(arr[i]);
   }
