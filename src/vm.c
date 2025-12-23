@@ -366,12 +366,6 @@ execute_comparison(VM *vm, Opcode op) {
     }
 
     Object res = object_eq(left, right);
-    if (res.type == o_Error) {
-        return errorf("cannot compare: '%s' with '%s'",
-                show_object_type(left.type),
-                show_object_type(right.type));
-    }
-
     switch (op) {
         case OpEqual:
             return vm_push(vm, res);

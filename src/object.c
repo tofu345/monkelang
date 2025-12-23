@@ -1,6 +1,6 @@
 #include "object.h"
 #include "ast.h"
-#include "builtin.h" // provides type for "Builtin"
+#include "builtin.h"
 #include "errors.h"
 #include "utils.h"
 #include "table.h"
@@ -197,7 +197,7 @@ bool is_truthy(Object obj) {
 }
 
 Object object_eq(Object left, Object right) {
-    if (left.type != right.type) return OBJ_BOOL(false);
+    if (left.type != right.type) { return OBJ_BOOL(false); }
 
     switch (left.type) {
         case o_Float:
@@ -222,6 +222,7 @@ Object object_eq(Object left, Object right) {
                 if (l_arr->length != r_arr->length) {
                     return OBJ_BOOL(false);
                 }
+
                 Object eq;
                 for (int i = 0; i < l_arr->length; i++) {
                     eq = object_eq(l_arr->data[i], r_arr->data[i]);
@@ -235,8 +236,10 @@ Object object_eq(Object left, Object right) {
                 return OBJ_BOOL(true);
             }
 
+        // NOTE: must only be for types that use up the entirety of
+        // `ObjectData`
         default:
-            return OBJ_NOTHING;
+            return OBJ_BOOL(memcmp(&left.data, &right.data, sizeof(ObjectData)) == 0);
     }
 }
 

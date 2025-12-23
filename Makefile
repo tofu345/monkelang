@@ -14,7 +14,7 @@ build/%.o: src/%.c src/%.h
 
 TEST_DEPS = tests/helpers.c tests/unity/unity.c src/hash-table/ht.c
 
-test_%: tests/%.c .FORCE
+test_%: tests/%.c $(OBJS) .FORCE
 	@ $(CC) $(CFLAGS) $< $(OBJS) $(TEST_DEPS) -o build/$@
 
 .FORCE:
