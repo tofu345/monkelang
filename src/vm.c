@@ -175,6 +175,7 @@ execute_binary_float_operation(Opcode op, Object left, Object right) {
             result = left.data.floating * right.data.floating;
             break;
         case OpDiv:
+            if (right.data.integer == 0) { return OBJ_ERR("division by zero"); }
             result = left.data.floating / right.data.floating;
             break;
         default:
@@ -191,15 +192,25 @@ execute_binary_integer_operation(Opcode op, Object left, Object right) {
 
     switch (op) {
         case OpAdd:
-            result = left.data.integer + right.data.integer;
+            if (__builtin_add_overflow(left.data.integer, right.data.integer,
+                                       &result)) {
+                return OBJ_ERR("integer overflow");
+            }
             break;
         case OpSub:
-            result = left.data.integer - right.data.integer;
+            if (__builtin_sub_overflow(left.data.integer, right.data.integer,
+                                       &result)) {
+                return OBJ_ERR("integer underflow");
+            }
             break;
         case OpMul:
-            result = left.data.integer * right.data.integer;
+            if (__builtin_mul_overflow(left.data.integer, right.data.integer,
+                                       &result)) {
+                return OBJ_ERR("integer overflow: multiplication");
+            }
             break;
         case OpDiv:
+            if (right.data.integer == 0) { return OBJ_ERR("division by zero"); }
             result = left.data.integer / right.data.integer;
             break;
         default:

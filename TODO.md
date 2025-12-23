@@ -14,7 +14,6 @@
 - Classes
 
 - char datatype
-- print more than four decimal places in floats
 - table_expand() move all elements in previous buckets gradually.
 
 # Compiler
@@ -31,14 +30,9 @@
 
 # VM
 
-- check for integer overflow, underflow.
-
 # Other
 
 - ErrorType
-
-- highlight `[...]` in index expressions and `(...)` in call expressions in
-  stack trace
 
 - repl tests
 - repl: don't display result of for loop condition

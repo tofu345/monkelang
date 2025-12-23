@@ -30,6 +30,11 @@ test_integer_arithmetic(void) {
     vm_test("-10", TEST(int, -10));
     vm_test("-50 + 100 + -50", TEST(int, 0));
     vm_test("(5 + 10 * 2 + 15 / 3) * 2 + -10", TEST(int, 50));
+
+    vm_test_error("9223372036854775807 + 1", "integer overflow");
+    vm_test_error("-9223372036854775807 - 2", "integer underflow");
+    vm_test_error("1 / 0", "division by zero");
+    vm_test_error("0 / 0", "division by zero");
 }
 
 static void
