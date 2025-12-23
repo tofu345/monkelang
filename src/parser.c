@@ -301,7 +301,7 @@ parse_function_parameters(Parser* p, FunctionLiteral* fl) {
     }
 
     Identifier* ident = parse_identifier(p).obj;
-    ParamBufferPush(&fl->params, ident);
+    BufferPush(&fl->params, ident);
 
     while (peek_token_is(p, t_Comma)) {
         next_token(p);
@@ -309,7 +309,7 @@ parse_function_parameters(Parser* p, FunctionLiteral* fl) {
         if (!expect_peek(p, t_Ident)) { return -1; }
 
         ident = parse_identifier(p).obj;
-        ParamBufferPush(&fl->params, ident);
+        BufferPush(&fl->params, ident);
     }
 
     if (!expect_peek(p, t_Rparen)) { return -1; }

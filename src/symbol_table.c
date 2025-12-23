@@ -7,8 +7,6 @@
 #include <stdint.h>
 #include <string.h>
 
-DEFINE_BUFFER(Symbol, Symbol *)
-
 SymbolTable *
 symbol_table_new() {
     SymbolTable *st = calloc(1, sizeof(SymbolTable));
@@ -79,7 +77,7 @@ new_symbol(SymbolTable *st, void *name, uint64_t hash, int index,
 static Symbol *
 define_free(SymbolTable *st, Symbol *original, uint64_t hash) {
     int index = st->free_symbols.length;
-    SymbolBufferPush(&st->free_symbols, original);
+    BufferPush(&st->free_symbols, original);
     return new_symbol(st, original->name, hash, index, FreeScope);
 }
 

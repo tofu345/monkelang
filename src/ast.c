@@ -14,7 +14,6 @@
     if (fprintf(fp, "%.*s", tok.length, tok.start) <= 0) \
         return -1;
 
-DEFINE_BUFFER(Param, Identifier*)
 DEFINE_BUFFER(Node, Node)
 DEFINE_BUFFER(Pair, Pair)
 

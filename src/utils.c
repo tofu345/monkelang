@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-DEFINE_BUFFER(VoidPtr, void *)
+DEFINE_BUFFER(, void *)
 
 #define FNV_OFFSET 14695981039346656037UL
 #define FNV_PRIME 1099511628211UL

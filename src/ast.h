@@ -150,13 +150,11 @@ typedef struct {
     BlockStatement* alternative;
 } IfExpression;
 
-BUFFER(Param, Identifier*)
-
 void free_if_expression(IfExpression* ie);
 
 typedef struct {
     Token tok; // the 'fn' token
-    ParamBuffer params;
+    Buffer params;
     BlockStatement* body;
 
     // if [FunctionLiteral] is in [LetStatement] or [AssignStatement],

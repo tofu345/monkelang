@@ -35,8 +35,6 @@
 
 # Other
 
-- Replace Pointer Buffers with VoidPtrBuffer
-
 - ErrorType
 
 - highlight `[...]` in index expressions and `(...)` in call expressions in

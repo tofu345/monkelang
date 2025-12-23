@@ -20,7 +20,6 @@ typedef struct {
 } CompilationScope;
 
 BUFFER(Scope, CompilationScope)
-BUFFER(Function, CompiledFunction *)
 
 typedef struct {
     // Constants in the AST: numbers, strings and functions.
@@ -40,7 +39,7 @@ typedef struct {
     SourceMappingBuffer *cur_mappings;
 
     // List of all Compiled functions.
-    FunctionBuffer functions;
+    Buffer functions;
 } Compiler;
 
 void compiler_init(Compiler *c);

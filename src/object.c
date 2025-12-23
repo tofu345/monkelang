@@ -13,7 +13,7 @@
 DEFINE_BUFFER(Object, Object)
 DEFINE_BUFFER(Char, char)
 
-static int _object_fprint(Object o, VoidPtrBuffer *print_stack, FILE* fp);
+static int _object_fprint(Object o, Buffer *print_stack, FILE* fp);
 
 static int
 fprintf_integer(long i, FILE* fp) {
@@ -44,7 +44,7 @@ fprintf_string(CharBuffer *str, FILE* fp) {
 }
 
 inline static int
-in_seen(void *cur, VoidPtrBuffer *seen) {
+in_seen(void *cur, Buffer *seen) {
     for (int i = seen->length - 1; i >= 0; --i) {
         if (cur == seen->data[i]) {
             return 1;
@@ -54,12 +54,12 @@ in_seen(void *cur, VoidPtrBuffer *seen) {
 }
 
 static int
-fprint_array(ObjectBuffer *array, VoidPtrBuffer *seen, FILE* fp) {
+fprint_array(ObjectBuffer *array, Buffer *seen, FILE* fp) {
     if (in_seen(array, seen)) {
         FPRINTF(fp, "[...]");
         return 0;
     }
-    VoidPtrBufferPush(seen, array);
+    BufferPush(seen, array);
 
     FPRINTF(fp, "[");
 
@@ -79,12 +79,12 @@ fprint_array(ObjectBuffer *array, VoidPtrBuffer *seen, FILE* fp) {
 }
 
 static int
-fprint_table(Table *tbl, VoidPtrBuffer *seen, FILE* fp) {
+fprint_table(Table *tbl, Buffer *seen, FILE* fp) {
     if (in_seen(tbl, seen)) {
         FPRINTF(fp, "{...}");
         return 0;
     }
-    VoidPtrBufferPush(seen, tbl);
+    BufferPush(seen, tbl);
 
     FPRINTF(fp, "{");
     tbl_it it = tbl_iterator(tbl);
@@ -128,7 +128,7 @@ fprint_error(error err, FILE *fp) {
 }
 
 static int
-_object_fprint(Object o, VoidPtrBuffer *seen, FILE* fp) {
+_object_fprint(Object o, Buffer *seen, FILE* fp) {
     switch (o.type) {
         case o_Integer:
             return fprintf_integer(o.data.integer, fp);
@@ -168,7 +168,7 @@ _object_fprint(Object o, VoidPtrBuffer *seen, FILE* fp) {
 }
 
 int object_fprint(Object o, FILE* fp) {
-    VoidPtrBuffer seen = {0};
+    Buffer seen = {0};
     int res = _object_fprint(o, &seen, fp);
     free(seen.data);
     return res;

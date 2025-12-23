@@ -26,7 +26,6 @@ static error c_error(Node n, char* format, ...);
 static error perform_assignment(Compiler *c, Node node);
 
 DEFINE_BUFFER(Scope, CompilationScope)
-DEFINE_BUFFER(Function, CompiledFunction *)
 
 void compiler_init(Compiler *c) {
     memset(c, 0, sizeof(Compiler));
@@ -557,10 +556,9 @@ _compile(Compiler *c, Node n) {
                                       hash(fl->name));
                 }
 
-                ParamBuffer params = fl->params;
                 Identifier *cur;
-                for (int i = 0; i < params.length; i++) {
-                    cur = params.data[i];
+                for (int i = 0; i < fl->params.length; i++) {
+                    cur = fl->params.data[i];
                     sym_define(c->current_symbol_table, &cur->tok, hash(cur));
                 }
 
@@ -575,14 +573,14 @@ _compile(Compiler *c, Node n) {
 
                 CompiledFunction *fn = c->cur_scope->function;
                 fn->num_locals = c->current_symbol_table->num_definitions;
-                fn->num_parameters = params.length;
+                fn->num_parameters = fl->params.length;
                 fn->literal = fl;
 
                 // add to list of compiled functions
-                FunctionBufferPush(&c->functions, fn);
+                BufferPush(&c->functions, fn);
 
                 SymbolTable *tbl = leave_scope(c);
-                SymbolBuffer free_symbols = tbl->free_symbols;
+                Buffer free_symbols = tbl->free_symbols;
 
                 // push free_symbols onto the stack, to go into [Closure].
                 for (int i = 0; i < free_symbols.length; i++) {

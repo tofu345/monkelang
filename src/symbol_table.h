@@ -36,15 +36,13 @@ typedef struct {
     int index;
 } Symbol;
 
-BUFFER(Symbol, Symbol *)
-
 typedef struct SymbolTable {
     struct SymbolTable *outer;
 
     ht *store;
     int num_definitions;
 
-    SymbolBuffer free_symbols;
+    Buffer free_symbols;
 } SymbolTable;
 
 SymbolTable *symbol_table_new();
