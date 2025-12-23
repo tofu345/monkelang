@@ -34,7 +34,7 @@ typedef struct {
     int base_pointer;
 } Frame;
 
-typedef struct Allocation Allocation;
+struct Allocation;
 
 typedef struct {
     // A copy of the Bytecode Constants for (hopefully) faster retrieval.
@@ -56,7 +56,7 @@ typedef struct {
     // The current number of bytes to allocate till before GC is run.
     int bytesTillGC;
     // Linked list of all allocated objects.
-    Allocation *last;
+    struct Allocation *last;
 
     // The Closure of the main function.
     Closure *main_cl;

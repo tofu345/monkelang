@@ -16,7 +16,7 @@ Object object_copy(VM* vm, Object obj);
 // Every compound data type when created has an [Allocation] prepended to its
 // allocated memory, this stores information like the [ObjectType], for the use
 // in the garbage collector.
-struct Allocation {
+typedef struct Allocation {
     ObjectType type;
     bool is_marked;
 
@@ -24,7 +24,7 @@ struct Allocation {
     struct Allocation *next;
 
     void *object_data[]; // used to access data after struct.
-};
+} Allocation;
 
 // [malloc(size)] and call GC if necessary.
 void *vm_allocate(VM *vm, size_t size);

@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
-// [vm_allocate()], memset 0 and create [Allocation] with [type].
+// [vm_allocate()] and create [Allocation] with [type].
 static void *new_allocation(VM *vm, ObjectType type, size_t size);
 
 CharBuffer *create_string(VM *vm, const char *text, int length) {
@@ -230,20 +230,26 @@ void mark_and_sweep(VM *vm) {
 #ifdef DEBUG
     puts("stack:");
 #endif
-
     mark_objs(vm->stack, vm->sp);
 
 #ifdef DEBUG
     puts("\nglobals:");
 #endif
-
     mark_objs(vm->globals, vm->num_globals);
+
+#ifdef DEBUG
+    puts("\nframes:");
+#endif
+    // exclude main function
+    for (int i = 1; i <= vm->frames_index; ++i) {
+        trace_mark_object(OBJ(o_Closure, .closure = vm->frames[i].cl));
+    }
 
 #ifdef DEBUG
     puts("\nsweep:");
 #endif
 
-    // sweep and rebuild Linked list of [Allocations].
+    // sweep and rebuild Linked list of [Allocations] (in reverse).
     Allocation *cur = vm->last,
                *prev_marked = NULL;
     while (cur) {
