@@ -68,8 +68,8 @@ typedef struct {
 
 typedef struct {
     Token tok; // the 't_Let' token
-    Identifier* name;
-    Node value; // Expression
+    Buffer names; // Identifiers
+    NodeBuffer values; // Expression
 } LetStatement;
 
 // e.g. a = 1

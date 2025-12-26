@@ -255,7 +255,23 @@ void test_global_let_statements(void) {
             make(OpPop)
         )
     );
+    c_test(
+        "\
+        let one = 1, two = one;\
+        two;\
+        ",
+        _C( INT(1) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpSetGlobal, 0),
+            make(OpGetGlobal, 0),
+            make(OpSetGlobal, 1),
+            make(OpGetGlobal, 1),
+            make(OpPop)
+        )
+    );
 
+    c_test_error("let b = b", "undefined variable 'b'");
     c_test_error("b", "undefined variable 'b'");
 }
 
@@ -1167,7 +1183,7 @@ void test_source_mapping(void) {
     ";
 
     SourceMapping exp_mappings[] = {
-        { 0, NODE(n_LetStatement, NULL) },          // let a = 0;
+        { 0, NODE(n_Identifier, NULL) },            // let a = 0;
         { 12, NODE(n_OperatorAssignment, NULL) },   // a += 2;
         { 13, NODE(n_OperatorAssignment, NULL) },
 
@@ -1177,7 +1193,7 @@ void test_source_mapping(void) {
         { 26, NODE(n_InfixExpression, NULL) },      // 1 + 2 * a;
         //                                               ^
 
-        { 28, NODE(n_LetStatement, NULL) },         // let func = fn(a) { a + 24 };
+        { 28, NODE(n_Identifier, NULL) },           // let func = fn(a) { a + 24 };
         { 35, NODE(n_ExpressionStatement, NULL) },  // puts(type(func), "func(10):", func(10));
         { 40, NODE(n_CallExpression, NULL) },       // puts(type(func), "func(10):", func(10));
         //                                                  ^^^^
@@ -1198,7 +1214,7 @@ void test_source_mapping(void) {
         //                                               ^
 
         { 68, NODE(n_ForStatement, NULL) },         // for (let i = 0; i < 5; i += 1) {}
-        { 68, NODE(n_LetStatement, NULL) },         // for (let i = 0; i < 5; i += 1) {}
+        { 68, NODE(n_Identifier, NULL) },           // for (let i = 0; i < 5; i += 1) {}
         //                                                  ^^^
         { 80, NODE(n_InfixExpression, NULL) },      // for (let i = 0; i < 5; i += 1) {}
         //                                                               ^

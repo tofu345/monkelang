@@ -946,19 +946,6 @@ Object vm_last_popped(VM *vm) {
     return vm->stack[vm->sp];
 }
 
-static Token *
-_token(SourceMapping *mapping) {
-    switch (mapping->node.typ) {
-        case n_LetStatement:
-            {
-                LetStatement *ls = mapping->node.obj;
-                return node_token(ls->value);
-            }
-        default:
-            return node_token(mapping->node);
-    }
-}
-
 static void
 _print_repeats(int first_idx, int cur_idx) {
     int repeats = cur_idx - first_idx - 1;
@@ -1003,7 +990,7 @@ void print_vm_stack_trace(VM *vm, FILE *s) {
         }
 
         if (mapping) {
-            Token *tok = _token(mapping);
+            Token *tok = node_token(mapping->node);
             fprintf(s, ", line %d\n", tok->line);
             highlight_token(tok, /* leftpad */ 2, s);
         } else {

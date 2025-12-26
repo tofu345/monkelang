@@ -114,6 +114,7 @@ test_global_let_statements(void) {
     vm_test("let one = 1; one", TEST(int, 1));
     vm_test("let one = 1; let two = 2; one + two", TEST(int, 3));
     vm_test("let one = 1; let two = one + one; one + two", TEST(int, 3));
+    vm_test("let one = 1, two = one + one; one + two", TEST(int, 3));
 }
 
 static void
@@ -688,6 +689,16 @@ test_for_statement(void) {
         "\
         let a = 5;\
         for (let b = 1; b < 5; b += 1) {\
+            a = a + b;\
+        };\
+        a\
+        ",
+        TEST(int, 15)
+    );
+    vm_test(
+        "\
+        let a = 5, b = 1;\
+        for (; b < 5; b += 1) {\
             a = a + b;\
         };\
         a\

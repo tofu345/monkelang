@@ -228,29 +228,33 @@ _compile(Compiler *c, Node n) {
 
         case n_LetStatement:
             {
-                source_map(c, n);
-
                 LetStatement *ls = n.obj;
 
-                Identifier *id = ls->name;
-                Symbol *symbol =
-                    sym_define(c->current_symbol_table, &id->tok, hash(id));
+                for (int i = 0; i < ls->names.length; ++i) {
+                    Identifier *id = ls->names.data[i];
+                    source_map(c, NODE(n_Identifier, id));
 
-                if (symbol->index >= GlobalsSize) {
-                    return c_error((Node){.obj = id}, "too many global variables");
-                }
+                    Node value = ls->values.data[i];
+                    if (value.obj) {
+                        err = _compile(c, value);
+                        if (err) { return err; }
+                    } else {
+                        emit(c, OpNothing);
+                    }
 
-                if (ls->value.obj) {
-                    err = _compile(c, ls->value);
-                    if (err) { return err; }
-                } else {
-                    emit(c, OpNothing);
-                }
+                    Symbol *symbol =
+                        sym_define(c->current_symbol_table, &id->tok, hash(id));
 
-                if (symbol->scope == GlobalScope) {
-                    emit(c, OpSetGlobal, symbol->index);
-                } else {
-                    emit(c, OpSetLocal, symbol->index);
+                    if (symbol->index >= GlobalsSize) {
+                        return c_error((Node){.obj = id},
+                                "too many global variables");
+                    }
+
+                    if (symbol->scope == GlobalScope) {
+                        emit(c, OpSetGlobal, symbol->index);
+                    } else {
+                        emit(c, OpSetLocal, symbol->index);
+                    }
                 }
                 return 0;
             }

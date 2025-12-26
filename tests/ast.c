@@ -21,22 +21,30 @@ void test_print(void) {
                     .start = "let",
                     .length = 3
                 },
-                .name = &(Identifier){
-                    .tok = {
-                        .type = t_Ident,
-                        .start = "myVar",
-                        .length = 5
-                    },
-                },
-                .value = {
-                    n_Identifier,
-                    &(Identifier){
-                        .tok = {
-                            .type = t_Ident,
-                            .start = "anotherVar",
-                            .length = 10
+                .names = {
+                    .data = (void*[]) {
+                        &(Identifier){
+                            .tok = {
+                                .type = t_Ident,
+                                .start = "myVar",
+                                .length = 5
+                            },
                         },
                     },
+                    .length = 1,
+                },
+                .values = {
+                    .data = (Node[]) {
+                        n_Identifier,
+                        &(Identifier){
+                            .tok = {
+                                .type = t_Ident,
+                                .start = "anotherVar",
+                                .length = 10
+                            },
+                        },
+                    },
+                    .length = 1,
                 }
             }
         }

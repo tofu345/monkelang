@@ -117,13 +117,30 @@ fprint_call_expression(CallExpression* ce, FILE* fp) {
 }
 
 static int
-fprint_let_statement(LetStatement* ls, FILE* fp) {
-    FPRINTF(fp, "let ")
-    FPRINT_TOKEN(fp, ls->name->tok)
-    FPRINTF(fp, " = ")
-    if (ls->value.obj != NULL) {
-        FPRINT_NODE(fp, ls->value);
+_fprint_let_stmt(LetStatement *ls, int idx, FILE *fp) {
+    Identifier *id = ls->names.data[idx];
+    FPRINT_TOKEN(fp, id->tok);
+    FPRINTF(fp, " = ");
+    Node value = ls->values.data[idx];
+    if (value.obj != NULL) {
+        FPRINT_NODE(fp, value);
     }
+    return 0;
+}
+
+static int
+fprint_let_statement(LetStatement* ls, FILE* fp) {
+    FPRINTF(fp, "let ");
+
+    int last = ls->names.length - 1;
+    for (int i = 0; i < last; i++) {
+        _fprint_let_stmt(ls, i, fp);
+        FPRINTF(fp, ", ");
+    }
+    if (last >= 0) {
+        _fprint_let_stmt(ls, last, fp);
+    }
+
     FPRINTF(fp, ";");
     return 0;
 }
@@ -371,10 +388,14 @@ free_call_expression(CallExpression* ce) {
 
 static void
 free_let_statement(LetStatement* ls) {
-    if (ls->name != NULL) {
-        free(ls->name);
+    for (int i = 0; i < ls->names.length; ++i) {
+        free(ls->names.data[i]);
     }
-    node_free(ls->value);
+    free(ls->names.data);
+    for (int i = 0; i < ls->values.length; ++i) {
+        node_free(ls->values.data[i]);
+    }
+    free(ls->values.data);
     free(ls);
 }
 

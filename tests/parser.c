@@ -20,9 +20,12 @@ test_token_literal(Token *tok, const char *expected) {
     return strncmp(expected, tok->start, tok->length) == 0;
 }
 
-static void
+static int
 test_integer_literal(Node n, long value) {
-    ASSERT_NODE_TYPE(n_IntegerLiteral, n);
+    if (n.typ != n_IntegerLiteral) {
+        printf("type not IntegerLiteral got %d\n", n.typ);
+        return false;
+    }
 
     Token *tok = node_token(n);
     char* exp = NULL;
@@ -33,20 +36,25 @@ test_integer_literal(Node n, long value) {
     if (!eq) {
         printf("wrong IntegerLiteral.literal want %ld, got %.*s\n",
                 value, tok->length, tok->start);
-        TEST_FAIL();
+        return false;
     }
 
     IntegerLiteral* il = n.obj;
     if (il->value != value) {
         printf("wrong IntegerLiteral.value want %ld, got %ld\n",
                 value, il->value);
-        TEST_FAIL();
+        return false;
     }
+
+    return true;
 }
 
-static void
+static int
 test_float_literal(Node n, double value) {
-    ASSERT_NODE_TYPE(n_FloatLiteral, n);
+    if (n.typ != n_FloatLiteral) {
+        printf("type not FloatLiteral got %d\n", n.typ);
+        return false;
+    }
 
     Token *tok = node_token(n);
     char* exp = NULL;
@@ -57,32 +65,42 @@ test_float_literal(Node n, double value) {
     if (!eq) {
         printf("wrong FloatLiteral.literal want %f, got %.*s\n",
                 value, tok->length, tok->start);
-        TEST_FAIL();
+        return false;
     }
 
     FloatLiteral* lit = n.obj;
     if (lit->value != value) {
         printf("wrong FloatLiteral.value want %f, got %f\n",
                 value, lit->value);
-        TEST_FAIL();
+        return false;
     }
+
+    return true;
 }
 
-static void
-test_identifier(Node n, const char* value) {
-    ASSERT_NODE_TYPE(n_Identifier, n);
+static int
+test_string_or_identifier(Node n, const char* value) {
+    if (!(n.typ == n_Identifier || n.typ == n_StringLiteral)) {
+        printf("type not Identifier or StringLiteral got %d\n", n.typ);
+        return false;
+    }
 
     Token *tok = node_token(n);
     if (!test_token_literal(tok, value)) {
-        printf("wrong Identifier.literal want %s, got %.*s\n",
+        printf("wrong token literal want %s, got %.*s\n",
                 value, tok->length, tok->start);
-        TEST_FAIL();
+        return false;
     }
+
+    return true;
 }
 
-static void
+static int
 test_boolean_literal(Node n, bool exp) {
-    ASSERT_NODE_TYPE(n_BooleanLiteral, n);
+    if (n.typ != n_BooleanLiteral) {
+        printf("type not BooleanLiteral got %d\n", n.typ);
+        return false;
+    }
 
     BooleanLiteral* b = n.obj;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
@@ -92,28 +110,27 @@ test_boolean_literal(Node n, bool exp) {
     if (!test_token_literal(&b->tok, exp_lit)) {
         printf("wrong BooleanLiteral.Token.literal want %s, got %.*s\n",
                 exp_lit, LITERAL(b->tok));
-        TEST_FAIL();
+        return false;
     }
+
+    return true;
 }
 
-static void
+static bool
 test_node(Node n, Test *test) {
     switch (test->typ) {
         case test_int:
-            test_integer_literal(n, test->val._int);
-            break;
+            return test_integer_literal(n, test->val._int);
         case test_float:
-            test_float_literal(n, test->val._float);
-            break;
+            return test_float_literal(n, test->val._float);
         case test_str:
-            test_identifier(n, test->val._str);
-            break;
+            return test_string_or_identifier(n, test->val._str);
         case test_bool:
-            test_boolean_literal(n, test->val._bool);
-            break;
+            return test_boolean_literal(n, test->val._bool);
         case test_nothing:
-            TEST_ASSERT_NULL_MESSAGE(n.obj, "Node not NULL");
-            break;
+            if (n.obj == NULL) { return true; }
+            printf("test_node: node is not null\n");
+            return false;
         default:
             die("test_literal: type %d not handled", test->typ);
     }
@@ -135,9 +152,10 @@ test_infix_expression(Node n, Test *left, char* operator, Test *right) {
 }
 
 static void
-test_let_statement(Node n, const char* exp_name) {
+test_let_statement(Node n, const char* names[], Test *values[], int num) {
     ASSERT_NODE_TYPE(n_LetStatement, n);
 
+    LetStatement *ls = n.obj;
     Token *tok = node_token(n);
     if (!test_token_literal(tok, "let")) {
         printf("wrong LetStatement.Token.literal want 'let' got %.*s\n",
@@ -145,12 +163,27 @@ test_let_statement(Node n, const char* exp_name) {
         TEST_FAIL();
     }
 
-    LetStatement *stmt = n.obj;
-    tok = &stmt->name->tok;
-    if (!test_token_literal(tok, exp_name)) {
-        printf("wrong LetStatement.Identifier.Token.literal want %s, got %.*s\n",
-                exp_name, tok->length, tok->start);
+    if (ls->values.length != num) {
+        printf("let statement has %d values expected %d\n", ls->values.length, num);
         TEST_FAIL();
+    }
+
+    for (int i = 0; i < num; ++i) {
+        Identifier *id = ls->names.data[i];
+        tok = &id->tok;
+        if (!test_token_literal(tok, names[i])) {
+            printf("wrong LetStatement.Identifier.Token.literal want %s, got %.*s\n",
+                    names[i], tok->length, tok->start);
+            TEST_FAIL();
+        }
+
+        if (values) {
+            if (!test_node(ls->values.data[i], values[i])) {
+                printf("wrong LetStatement value for %.*s\n",
+                        tok->length, tok->start);
+                TEST_FAIL();
+            }
+        }
     }
 }
 
@@ -193,7 +226,7 @@ void test_identifier_expression(void) {
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
 
     ExpressionStatement* es = n.obj;
-    test_identifier(es->expression, "foobar");
+    test_string_or_identifier(es->expression, "foobar");
 }
 
 void test_integer_literal_expression(void) {
@@ -259,7 +292,7 @@ void test_return_statements(void) {
     }
 }
 
-void test_let_statements(void) {
+void test_single_let_statements(void) {
     struct Test {
         const char *input;
         const char *expectedIdent;
@@ -281,13 +314,32 @@ void test_let_statements(void) {
         check(&p, &prog);
 
         Node stmt = prog.stmts.data[0];
-        test_let_statement(stmt, test.expectedIdent);
 
-        LetStatement* ls = stmt.obj;
-        test_node(ls->value, test.expectedVal);
+        test_let_statement(stmt, &test.expectedIdent, &test.expectedVal, 1);
 
         _program_free();
     }
+}
+
+void test_multiple_let_statements(void) {
+    char *input = "let a = 1.5, b = 2, c; let d = \"abc\", e = \"def\", f = true;";
+
+    parser_init(&p);
+    prog = parse(&p, input);
+    if (p.errors.length > 0) {
+        print_parser_errors(&p);
+        TEST_FAIL();
+    }
+
+    Node n = prog.stmts.data[0];
+
+    test_let_statement(n, (const char *[]){ "a", "b", "c" },
+            (Test *[]) { TEST(float, 1.5), TEST(int, 2), TEST_NOTHING }, 3);
+
+    n = prog.stmts.data[1];
+
+    test_let_statement(n, (const char *[]){ "d", "e", "f" },
+            (Test *[]) { TEST(str, "abc"), TEST(str, "def"), TEST(bool, true) }, 3);
 }
 
 void test_parsing_prefix_expressions(void) {
@@ -579,7 +631,7 @@ void test_if_expression(void) {
 
     ASSERT_NODE_TYPE(n_ExpressionStatement, consequence.data[0]);
     ExpressionStatement* stmt = consequence.data[0].obj;
-    test_identifier(stmt->expression, "x");
+    test_string_or_identifier(stmt->expression, "x");
 
     TEST_ASSERT_NULL_MESSAGE(ie->alternative, "Alternative is not NULL");
 }
@@ -604,14 +656,14 @@ void test_if_else_expression(void) {
 
     ASSERT_NODE_TYPE(n_ExpressionStatement, consequence.data[0]);
     ExpressionStatement* stmt = consequence.data[0].obj;
-    test_identifier(stmt->expression, "x");
+    test_string_or_identifier(stmt->expression, "x");
 
     NodeBuffer alternative = ie->alternative->stmts;
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, alternative.length, "wrong Alternative length");
 
     ASSERT_NODE_TYPE(n_ExpressionStatement, alternative.data[0]);
     stmt = ie->alternative->stmts.data[0].obj;
-    test_identifier(stmt->expression, "y");
+    test_string_or_identifier(stmt->expression, "y");
 }
 
 void test_function_literal_parsing(void) {
@@ -631,8 +683,8 @@ void test_function_literal_parsing(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             2, fl->params.length, "wrong FunctionLiteral.parems.length");
 
-    test_identifier(NODE(n_Identifier, fl->params.data[0]), "x");
-    test_identifier(NODE(n_Identifier, fl->params.data[1]), "y");
+    test_string_or_identifier(NODE(n_Identifier, fl->params.data[0]), "x");
+    test_string_or_identifier(NODE(n_Identifier, fl->params.data[1]), "y");
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             1, fl->body->stmts.length, "wrong FunctionLiteral.body.len");
@@ -652,11 +704,12 @@ void test_function_literal_with_name(void) {
     check(&p, &prog);
 
     Node n = prog.stmts.data[0];
-    ASSERT_NODE_TYPE(n_LetStatement, n);
-    LetStatement* ls = n.obj;
 
-    ASSERT_NODE_TYPE(n_FunctionLiteral, ls->value);
-    FunctionLiteral* fl = ls->value.obj;
+    test_let_statement(n, (const char *[]){ "myFunction" }, NULL, 1);
+
+    LetStatement* ls = n.obj;
+    ASSERT_NODE_TYPE(n_FunctionLiteral, ls->values.data[0]);
+    FunctionLiteral* fl = ls->values.data[0].obj;
     Token *tok = &fl->name->tok;
     if (!test_token_literal(tok, "myFunction")) {
         printf("function literal name wrong. want 'myFunction', got='%.*s'\n",
@@ -696,7 +749,7 @@ void test_function_parameter_parsing(void) {
                 "wrong FunctionLiteral.paremeters_len");
 
         for (int i = 0; i < test.len; i++) {
-            test_identifier(
+            test_string_or_identifier(
 		    NODE(n_Identifier, fl->params.data[i]),
                     test.expectedParams[i]);
         }
@@ -719,7 +772,7 @@ void test_call_expression_parsing(void) {
     ASSERT_NODE_TYPE(n_CallExpression, es->expression);
     CallExpression* ce = es->expression.obj;
 
-    test_identifier(ce->function, "add");
+    test_string_or_identifier(ce->function, "add");
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(
             3, ce->args.length, "wrong CallExpression.args_len");
@@ -742,12 +795,7 @@ void test_string_literal_expression(void) {
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
     ExpressionStatement* es = n.obj;
 
-    ASSERT_NODE_TYPE(n_StringLiteral, es->expression);
-    StringLiteral* sl = es->expression.obj;
-    if (!test_token_literal(&sl->tok, "hello world")) {
-        puts("wrong StringLiteral.Value");
-        TEST_FAIL();
-    }
+    test_node(es->expression, TEST(str, "hello world"));
 }
 
 void test_parsing_array_literals(void) {
@@ -786,7 +834,7 @@ void test_parsing_index_expressions(void) {
     ASSERT_NODE_TYPE(n_IndexExpression, es->expression);
     IndexExpression* ie = es->expression.obj;
 
-    test_identifier(ie->left, "myArray");
+    test_string_or_identifier(ie->left, "myArray");
     test_infix_expression(ie->index, TEST(int, 1), "+", TEST(int, 1));
 }
 
@@ -971,7 +1019,7 @@ void test_parsing_operator_assignment(void) {
         ASSERT_NODE_TYPE(n_OperatorAssignment, n);
         OperatorAssignment *stmt = n.obj;
 
-        test_identifier(stmt->left, test.ident);
+        test_string_or_identifier(stmt->left, test.ident);
 
         TEST_ASSERT_EQUAL_STRING_LEN(
                 test.operator, stmt->tok.start, strlen(test.operator));
@@ -1013,15 +1061,13 @@ void test_for_statement(void) {
     ASSERT_NODE_TYPE(n_ForStatement, n);
     ForStatement* fs = n.obj;
 
-    LetStatement* ls = fs->init.obj;
-    test_let_statement(fs->init, "i");
-    test_node(ls->value, TEST(int, 0));
+    test_let_statement(fs->init, (const char*[]){ "i" }, (Test*[]){ TEST(int, 0) }, 1);
 
     test_infix_expression(fs->condition, TEST(str, "i"), "<", TEST(int, 5));
 
     ASSERT_NODE_TYPE(n_Assignment, fs->update);
     Assignment* as = fs->update.obj;
-    test_identifier(as->left, "i");
+    test_string_or_identifier(as->left, "i");
     test_infix_expression(as->right, TEST(str, "i"), "+", TEST(int, 1));
 
     BlockStatement *bs = fs->body;
@@ -1135,7 +1181,8 @@ void test_parser_errors(void) {
 
 int main(void) {
     UNITY_BEGIN();
-    RUN_TEST(test_let_statements);
+    RUN_TEST(test_single_let_statements);
+    RUN_TEST(test_multiple_let_statements);
     RUN_TEST(test_return_statements);
     RUN_TEST(test_identifier_expression);
     RUN_TEST(test_integer_literal_expression);

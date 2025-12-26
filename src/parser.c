@@ -536,26 +536,44 @@ parse_nothing_literal(Parser *p) {
     return NODE(n_NothingLiteral, nl);
 }
 
+inline static int
+_parse_let_statement(Parser *p, LetStatement *ls) {
+    if (!expect_peek(p, t_Ident)) { return -1; }
+
+    Identifier *name = parse_identifier(p).obj;
+    BufferPush(&ls->names, name);
+
+    if (!peek_token_is(p, t_Assign)) {
+        NodeBufferPush(&ls->values, (Node){0});
+        return 0;
+    }
+
+    // (x2) next_token() to skip t_Assign
+    p->cur_token = lexer_next_token(&p->l);
+    p->peek_token = lexer_next_token(&p->l);
+
+    Node value = parse_expression(p, p_Lowest);
+    if (IS_INVALID(value)) { return -1; }
+    NodeBufferPush(&ls->values, value);
+
+    if (value.typ == n_FunctionLiteral) {
+        FunctionLiteral *fl = value.obj;
+        fl->name = name;
+    }
+    return 0;
+}
+
 static Node
 parse_let_statement(Parser* p) {
     LetStatement* stmt = allocate(sizeof(LetStatement));
     stmt->tok = p->cur_token;
 
-    if (!expect_peek(p, t_Ident)) { goto invalid; }
+    if (_parse_let_statement(p, stmt) == -1) { goto invalid; }
 
-    stmt->name = parse_identifier(p).obj;
-
-    if (peek_token_is(p, t_Assign)) {
-        // (x2) next_token() to skip t_Assign
-        p->cur_token = lexer_next_token(&p->l);
-        p->peek_token = lexer_next_token(&p->l);
-
-        stmt->value = parse_expression(p, p_Lowest);
-        if (IS_INVALID(stmt->value)) { goto invalid; }
-
-        if (stmt->value.typ == n_FunctionLiteral) {
-            FunctionLiteral *fl = stmt->value.obj;
-            fl->name = stmt->name;
+    while (peek_token_is(p, t_Comma)) {
+        next_token(p);
+        if (_parse_let_statement(p, stmt) == -1) {
+            goto invalid;
         }
     }
 
@@ -736,6 +754,7 @@ peek_semicolon_or_newline(Parser *p) {
         switch (p->peek_token.type) {
             // the exceptions
             case t_Eof:
+            case t_Comma:
             case t_Rbracket:
             case t_Rbrace:
             case t_Rparen:
