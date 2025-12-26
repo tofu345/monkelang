@@ -87,4 +87,6 @@ Object object_eq(Object left, Object right);
 // print [Object] to [fp], returns -1 on error
 int object_fprint(Object o, FILE* fp);
 
+int fprint_closure(Closure *cl, FILE *fp);
+
 const char* show_object_type(ObjectType t);

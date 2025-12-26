@@ -517,7 +517,6 @@ vm_push_constant(VM *vm, Constant c) {
 
         case c_String:
             {
-
                 Token *str_tok = c.data.string;
                 CharBuffer *new_str =
                     create_string(vm, str_tok->start, str_tok->length);
@@ -999,11 +998,8 @@ void print_vm_stack_trace(VM *vm, FILE *s) {
         FunctionLiteral *lit = frame.cl->func->literal;
         if (lit == NULL) {
             fprintf(s, "<main function>");
-        } else if (lit->name) {
-            Identifier *id = lit->name;
-            fprintf(s, "<function: %.*s>", LITERAL(id->tok));
         } else {
-            fprintf(s, "<anonymous function>");
+            fprint_closure(frame.cl, stdout);
         }
 
         if (mapping) {

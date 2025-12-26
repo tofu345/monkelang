@@ -103,8 +103,7 @@ fprint_table(Table *tbl, Buffer *seen, FILE* fp) {
     return 0;
 }
 
-static int
-fprint_closure(Closure *cl, FILE *fp) {
+int fprint_closure(Closure *cl, FILE *fp) {
     FunctionLiteral *lit = cl->func->literal;
     if (lit->name) {
         Identifier *id = lit->name;
