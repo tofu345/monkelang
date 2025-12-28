@@ -1,6 +1,5 @@
 #include "repl.h"
 #include "compiler.h"
-#include "constants.h"
 #include "errors.h"
 #include "object.h"
 #include "parser.h"

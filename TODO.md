@@ -7,7 +7,6 @@
 - else if
 - lookup_ident with hashmap
 - reduce parser infix and prefix fns array size.
-- store Identifiers in hashmap
 
 # Object
 
@@ -18,7 +17,6 @@
 
 # Compiler
 
-- remove duplicate constants
 - store more information in symbol table
 - while loops
 - break, continue in loops

@@ -4,6 +4,7 @@
 // the AST created by the Parser and compiles it into Bytecode.
 
 #include "constants.h"
+#include "object.h"
 #include "symbol_table.h"
 #include "errors.h"
 
@@ -23,20 +24,19 @@ BUFFER(Scope, CompilationScope)
 
 typedef struct {
     // Constants in the AST: numbers, strings and functions.
-    ConstantBuffer constants;
+    Constants constants;
 
-    // The Symbol Table of the current CompilationScope.  A new SymbolTable is
-    // created for the each function encountered and destroyed when its
-    // compilation is completed.
+    // The Symbol Table of the current CompilationScope.
+    // A new SymbolTable is created for the each function encountered and
+    // destroyed when its compilation is completed.
     SymbolTable *current_symbol_table;
 
-    // List of Functions currently being compiled.
+    // Functions currently being compiled.
     ScopeBuffer scopes;
     int cur_scope_index; // index of current CompilationScope.
     CompilationScope *cur_scope;
     Instructions *current_instructions; // instructions of [cur_scope]
-    // [SourceMappings] of [cur_scope.function]
-    SourceMappingBuffer *cur_mappings;
+    SourceMappingBuffer *cur_mappings;  // [SourceMappings] of [cur_scope.function]
 
     // List of all Compiled functions.
     Buffer functions;
@@ -68,7 +68,9 @@ typedef struct {
     int num_globals; // [num_definitions] of global symbol table
 } Bytecode;
 
-Bytecode bytecode(Compiler *c);
+// Retrieve the result of the Compilation. Must only be called after a
+// successful compile().
+Bytecode bytecode(Compiler *);
 
 void fprint_compiler_instructions(FILE *stream, Compiler *c,
                                   bool print_mappings);

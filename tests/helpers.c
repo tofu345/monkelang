@@ -48,24 +48,24 @@ Instructions concat(Instructions first, ...) {
     return concatted;
 }
 
-Constants
+Tests
 constants(Test *t, ...) {
-    Constants c = {0};
+    Tests buf = {0};
     int capacity = 0;
 
     va_list ap;
     va_start(ap, t);
     do {
-        if (c.length == capacity) {
-            capacity = power_of_2_ceil(c.length + 1);
-            c.data = realloc(c.data, capacity * sizeof(Test));
-            if (c.data == NULL) die("realloc");
+        if (buf.length == capacity) {
+            capacity = power_of_2_ceil(buf.length + 1);
+            buf.data = realloc(buf.data, capacity * sizeof(Test));
+            if (buf.data == NULL) die("realloc");
         }
 
-        c.data[c.length++] = *t;
+        buf.data[buf.length++] = *t;
         t = va_arg(ap, Test *);
     } while (t);
     va_end(ap);
 
-    return c;
+    return buf;
 }

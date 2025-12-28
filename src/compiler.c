@@ -2,8 +2,9 @@
 #include "ast.h"
 #include "builtin.h"
 #include "code.h"
-#include "constants.h"
 #include "errors.h"
+#include "hash-table/ht.h"
+#include "object.h"
 #include "symbol_table.h"
 #include "utils.h"
 
@@ -13,19 +14,26 @@
 #include <stdlib.h>
 #include <string.h>
 
-static int add_constant(Compiler *c, Constant obj_const);
-
-// new [SourceMapping] with [c.current_instructions.length] (will point to next
-// emitted instruction) and [node.token].
-static void source_map(Compiler *c, Node node);
-
 // create [Error] with [n.token]
-static error c_error(Node n, char* format, ...);
+static error c_error(Node, char* format, ...);
 
-// emit opcodes to assign to `node`.
-static error perform_assignment(Compiler *c, Node node);
+// create `SourceMapping` to point to next emitted instruction and
+// [Node.token].
+static void source_map(Compiler *, Node);
 
+// emit opcodes to assign to `Node`.
+static error perform_assignment(Compiler *, Node);
+
+int add_constant(Compiler *, Constant);
+
+DEFINE_BUFFER(Constant, Constant)
 DEFINE_BUFFER(Scope, CompilationScope)
+
+CompiledFunction *new_function() {
+    CompiledFunction *fn = calloc(1, sizeof(CompiledFunction));
+    if (fn == NULL) { die("malloc"); }
+    return fn;
+}
 
 void compiler_init(Compiler *c) {
     memset(c, 0, sizeof(Compiler));
@@ -40,14 +48,24 @@ void compiler_init(Compiler *c) {
         sym_builtin(c->current_symbol_table, builtins[i].name, i);
     }
 
+    ht *tbl = ht_create();
+    if (tbl == NULL) { die("compiler_init - create constants table:"); }
+    c->constants = (Constants){ .table = tbl, .buffer = (ConstantBuffer){0} };
+
     CompiledFunction *main_fn = new_function();
 
-    ScopeBufferPush(&c->scopes, (CompilationScope){
+    ScopeBufferPush(&c->scopes, (CompilationScope) {
         .function = main_fn
     });
     c->cur_scope = c->scopes.data;
     c->current_instructions = &main_fn->instructions;
     c->cur_mappings = &main_fn->mappings;
+}
+
+void free_function(CompiledFunction *fn) {
+    free(fn->instructions.data);
+    free(fn->mappings.data);
+    free(fn);
 }
 
 void compiler_free(Compiler *c) {
@@ -66,7 +84,8 @@ void compiler_free(Compiler *c) {
         cur = next;
     }
 
-    free(c->constants.data);
+    ht_destroy(c->constants.table);
+    free(c->constants.buffer.data);
 
     for (i = 0; i < c->functions.length; i++) {
         free_function(c->functions.data[i]);
@@ -656,12 +675,6 @@ perform_assignment(Compiler *c, Node node) {
     return c_error(node, "cannot assign to non-variable");
 }
 
-static int
-add_constant(Compiler *c, Constant obj_const) {
-    ConstantBufferPush(&c->constants, obj_const);
-    return c->constants.length - 1;
-}
-
 static void
 set_last_instruction(Compiler *c, Opcode op, int pos) {
     c->cur_scope->previous_instruction = c->cur_scope->last_instruction;
@@ -729,7 +742,7 @@ error compile(Compiler *c, Program *prog) {
 Bytecode bytecode(Compiler *c) {
     return (Bytecode) {
         .main_function = c->cur_scope->function,
-        .constants = &c->constants,
+        .constants = &c->constants.buffer,
         .num_globals = c->current_symbol_table->num_definitions,
     };
 }
@@ -787,4 +800,38 @@ void fprint_compiler_instructions(FILE *s, Compiler *c, bool print_mappings) {
             fprint_instructions(s, fn->instructions);
         }
     }
+}
+
+int add_constant(Compiler *c, Constant constant) {
+    uint64_t hash;
+    switch (constant.type) {
+        case c_String:
+            hash = hash_string_fnv1a(constant.data.string->start,
+                                     constant.data.string->length);
+            break;
+        case c_Integer:
+        case c_Float:
+        case c_Function:
+            hash = constant.data.integer;
+            break;
+        default:
+            die("add_constant - constant type not handled %d:", constant.type);
+    }
+
+    long position;
+    void *res = ht_get_hash(c->constants.table, hash);
+    if (errno == ENOKEY) {
+        position = c->constants.buffer.length;
+        ConstantBufferPush(&c->constants.buffer, constant);
+
+        ht_set_hash(c->constants.table, NULL, (void *) position, hash);
+        if (errno == ENOMEM) { die("add_constant - ht_set_hash:"); }
+
+    } else {
+        position = (long) res;
+    }
+
+    // code.c defines OpConstant with two bytes in the Bytecode,
+    // so truncating to an `int` is fine.
+    return position;
 }

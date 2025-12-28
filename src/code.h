@@ -69,19 +69,19 @@ typedef enum {
 
     // OpIndex:
     //
-    // Pop two Objects `A` and `B`.
-    // - get the value of array `A` at index `B`, or
-    // - get the value of table `A` at key `B`.
+    // Pop two Objects `L` and `R`.
+    // - get the value of array `L` at `R`
+    // - get the value of table `L` at `R`.
     OpIndex,
 
     // OpSetIndex:
     //
-    // Pop three Objects `A`, `B` and `C`.
+    // Pop three Objects `L`, `I` and `R` (in that order).
     //
-    // - set the value of array `A` at index `B` to `C`, or
+    // - set the value of array `L` at `I` to `R`
     //
-    // - set the value of table `A` at key `B` to `C`.
-    //   NOTE: if `C` is nothing the key `B` is removed from table `A`.
+    // - set the value of table `L` at `I` to `R`.
+    //   NOTE: if `R` is `nothing` the key `I` is removed from table `L`.
     OpSetIndex,
 
     // OpCall: call a Compiled or Builtin function with specified number of

@@ -13,7 +13,7 @@ error err;
 // initialize Program and Compiler.
 static void init(void);
 
-static void c_test(char *input, Constants expectedConstants,
+static void c_test(char *input, Tests expectedConstants,
                    Instructions expectedInstructions);
 static void c_test_error(const char *input, const char *expected_error);
 
@@ -379,14 +379,14 @@ void test_table_literals(void) {
 void test_index_expressions(void) {
     c_test(
         "[1, 2, 3][1 + 1]",
-        _C( INT(1), INT(2), INT(3), INT(1), INT(1) ),
+        _C( INT(1), INT(2), INT(3) ),
         _I(
             make(OpConstant, 0),
             make(OpConstant, 1),
             make(OpConstant, 2),
             make(OpArray, 3),
-            make(OpConstant, 3),
-            make(OpConstant, 4),
+            make(OpConstant, 0),
+            make(OpConstant, 0),
             make(OpAdd),
             make(OpIndex),
             make(OpPop)
@@ -394,13 +394,13 @@ void test_index_expressions(void) {
     );
     c_test(
         "{1: 2}[2 - 1]",
-        _C( INT(1), INT(2), INT(2), INT(1) ),
+        _C( INT(1), INT(2) ),
         _I(
             make(OpConstant, 0),
             make(OpConstant, 1),
             make(OpTable, 2),
-            make(OpConstant, 2),
-            make(OpConstant, 3),
+            make(OpConstant, 1),
+            make(OpConstant, 0),
             make(OpSub),
             make(OpIndex),
             make(OpPop)
@@ -873,13 +873,12 @@ void test_recursive_functions(void) {
                 make(OpCurrentClosure),
                 make(OpCall, 1),
                 make(OpReturnValue)
-            ),
-            INT(1)
+            )
         ),
         _I(
             make(OpClosure, 1, 0),
             make(OpSetGlobal, 0),
-            make(OpConstant, 2),
+            make(OpConstant, 0),
             make(OpGetGlobal, 0),
             make(OpCall, 1),
             make(OpPop)
@@ -903,18 +902,17 @@ void test_recursive_functions(void) {
                 make(OpCall, 1),
                 make(OpReturnValue)
             ),
-            INT(1),
             INS(
                 make(OpClosure, 1, 0),
                 make(OpSetLocal, 0),
-                make(OpConstant, 2),
+                make(OpConstant, 0),
                 make(OpGetLocal, 0),
                 make(OpCall, 1),
                 make(OpReturnValue)
             )
         ),
         _I(
-            make(OpClosure, 3, 0),
+            make(OpClosure, 2, 0),
             make(OpSetGlobal, 0),
             make(OpGetGlobal, 0),
             make(OpCall, 0),
@@ -936,7 +934,7 @@ void test_assignments(void) {
     );
     c_test(
         "let foobar = [0, 1, 2]; foobar[0] = 5;",
-        _C( INT(0), INT(1), INT(2), INT(5), INT(0) ),
+        _C( INT(0), INT(1), INT(2), INT(5) ),
         _I(
             make(OpConstant, 0),
             make(OpConstant, 1),
@@ -944,15 +942,15 @@ void test_assignments(void) {
             make(OpArray, 3),
             make(OpSetGlobal, 0),
 
-            make(OpConstant, 3),
-            make(OpGetGlobal, 0),
-            make(OpConstant, 4),
+            make(OpConstant, 3),  // 5
+            make(OpGetGlobal, 0), // foobar
+            make(OpConstant, 0),  // 0
             make(OpSetIndex)
         )
     );
     c_test(
         "let foobar = {0: 1}; foobar[0] = 5;",
-        _C( INT(0), INT(1), INT(5), INT(0) ),
+        _C( INT(0), INT(1), INT(5) ),
         _I(
             make(OpConstant, 0),
             make(OpConstant, 1),
@@ -961,7 +959,7 @@ void test_assignments(void) {
 
             make(OpConstant, 2),
             make(OpGetGlobal, 0),
-            make(OpConstant, 3),
+            make(OpConstant, 0),
             make(OpSetIndex)
         )
     );
@@ -1035,10 +1033,7 @@ void test_operator_assignments(void) {
         let var = [1];\
         var[0] += 2;\
         ",
-        _C(
-            // really need to remove duplicate constants
-            INT(1), INT(0), INT(2), INT(0)
-        ),
+        _C( INT(1), INT(0), INT(2) ),
         _I(
             make(OpConstant, 0),
             make(OpArray, 1),
@@ -1049,9 +1044,8 @@ void test_operator_assignments(void) {
             make(OpIndex),
             make(OpConstant, 2),
             make(OpAdd),
-
             make(OpGetGlobal, 0),
-            make(OpConstant, 3),
+            make(OpConstant, 1),
             make(OpSetIndex)
         )
     );
@@ -1060,7 +1054,7 @@ void test_operator_assignments(void) {
         let var = {1: 2};\
         var[1] += 2;\
         ",
-        _C( INT(1), INT(2), INT(1), INT(2), INT(1) ),
+        _C( INT(1), INT(2) ),
         _I(
             make(OpConstant, 0),
             make(OpConstant, 1),
@@ -1068,13 +1062,12 @@ void test_operator_assignments(void) {
             make(OpSetGlobal, 0),
 
             make(OpGetGlobal, 0),
-            make(OpConstant, 2),
+            make(OpConstant, 0),
             make(OpIndex),
-            make(OpConstant, 3),
+            make(OpConstant, 1),
             make(OpAdd),
-
             make(OpGetGlobal, 0),
-            make(OpConstant, 4),
+            make(OpConstant, 0),
             make(OpSetIndex)
         )
     );
@@ -1264,7 +1257,7 @@ void test_source_mapping(void) {
 }
 
 static int test_instructions(Instructions expected, Instructions actual);
-static int test_constants(Constants expected, ConstantBuffer *actual);
+static int test_constants(Tests expected, ConstantBuffer *actual);
 
 // Because each test contains multiple c_test() and c_test_error() which must
 // reinitialize before running.
@@ -1319,7 +1312,7 @@ c_test_error(const char *input, const char *expected_error) {
     cleanup();
 }
 
-static void c_test(char *input, Constants expectedConstants,
+static void c_test(char *input, Tests expectedConstants,
                    Instructions expectedInstructions) {
     init();
 
@@ -1416,7 +1409,7 @@ test_integer_constant(long expected, Constant actual) {
 }
 
 static int
-test_constants(Constants expected, ConstantBuffer *actual) {
+test_constants(Tests expected, ConstantBuffer *actual) {
     if (actual->length != expected.length) {
         printf("wrong constants length.\nwant=%d\ngot =%d\n",
                 expected.length, actual->length);

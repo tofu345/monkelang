@@ -16,7 +16,6 @@
 
 #include "ast.h"
 #include "code.h"
-#include "constants.h"
 #include "errors.h"
 
 #include <stdio.h>
@@ -29,9 +28,7 @@ typedef enum __attribute__ ((__packed__)) {
     o_Float,
     o_Boolean,
     o_BuiltinFunction,
-
-    // A wrapper around `error`
-    o_Error,
+    o_Error, // A wrapper around `error`
 
     // Compound data types:
     o_String,
@@ -67,6 +64,35 @@ typedef struct Object {
     ObjectData data;
 } Object;
 
+#define OBJ(t, d) (Object){ .type = t, .data = { d } }
+#define OBJ_ERR(...) OBJ(o_Error, .err = errorf(__VA_ARGS__))
+#define OBJ_BOOL(b) OBJ(o_Boolean, .boolean = b)
+#define OBJ_NOTHING (Object){0}
+
+bool is_truthy(Object obj);
+Object object_eq(Object left, Object right);
+
+// print `Object` to `FILE *`, returns -1 on error
+int object_fprint(Object, FILE *);
+
+const char* show_object_type(ObjectType t);
+
+// A Compiled FunctionLiteral.
+typedef struct {
+    Instructions instructions;
+    int num_locals;
+    int num_parameters;
+
+    // Where in the source code the function was defined.
+    FunctionLiteral *literal;
+
+    // [SourceMapping] for all statements in [literal.body].
+    SourceMappingBuffer mappings;
+} CompiledFunction;
+
+CompiledFunction *new_function();
+void free_function(CompiledFunction *fn);
+
 typedef struct Closure {
     CompiledFunction *func;
 
@@ -74,19 +100,4 @@ typedef struct Closure {
     Object free[];
 } Closure;
 
-#define OBJ(t, d) (Object){ .type = t, .data = { d } }
-#define OBJ_ERR(...) OBJ(o_Error, .err = errorf(__VA_ARGS__))
-#define OBJ_BOOL(b) OBJ(o_Boolean, .boolean = b)
-#define OBJ_NOTHING (Object){0}
-
-bool is_truthy(Object obj);
-
-// compare [left] and [right]. returns [Null Object] otherwise
-Object object_eq(Object left, Object right);
-
-// print [Object] to [fp], returns -1 on error
-int object_fprint(Object o, FILE* fp);
-
 int fprint_closure(Closure *cl, FILE *fp);
-
-const char* show_object_type(ObjectType t);

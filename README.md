@@ -149,8 +149,7 @@ sayIf("hi!", nothing);  // =>
 let a = [1, 2, 3, 4];
 let double = fn(x) { x * 2 };
 let map = fn(f, arr) {
-  let length = len(arr);
-  let result = [nothing] * length;      // initialize array of given length
+  let length = len(arr), result = [nothing] * length; // create array of given length
   for (let i = 0; i < length; i += 1) { // operator assignment
     result[i] = f(arr[i]);
   }

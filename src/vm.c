@@ -2,7 +2,6 @@
 #include "ast.h"
 #include "builtin.h"
 #include "code.h"
-#include "constants.h"
 #include "errors.h"
 #include "object.h"
 #include "table.h"
@@ -531,7 +530,6 @@ vm_push_constant(VM *vm, Constant c) {
 
         default:
             die("vm_push_constant: type %d not handled", c.type);
-            return 0;
     }
 }
 

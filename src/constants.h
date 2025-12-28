@@ -4,23 +4,8 @@
 
 #include "ast.h"
 #include "code.h"
+#include "object.h"
 #include "utils.h"
-
-// A Compiled FunctionLiteral.
-typedef struct {
-    Instructions instructions;
-    int num_locals;
-    int num_parameters;
-
-    // Where in the source code the function was defined.
-    FunctionLiteral *literal;
-
-    // [SourceMapping] for all statements in [literal.body].
-    SourceMappingBuffer mappings;
-} CompiledFunction;
-
-CompiledFunction *new_function();
-void free_function(CompiledFunction *fn);
 
 typedef enum {
     c_Integer = 1,
@@ -29,14 +14,24 @@ typedef enum {
     c_Function,
 } ConstantType;
 
+typedef union {
+    long integer;
+    double floating;
+    Token *string;
+    CompiledFunction *function;
+} ConstantData;
+
 typedef struct {
     ConstantType type;
-    union {
-        long integer;
-        double floating;
-        Token *string;
-        CompiledFunction *function;
-    } data;
+    ConstantData data;
 } Constant;
 
 BUFFER(Constant, Constant)
+
+typedef struct {
+    // used to check for duplicates
+    ht *table;
+
+    // stores concrete values of [Constant]s
+    ConstantBuffer buffer;
+} Constants;

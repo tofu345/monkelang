@@ -39,7 +39,6 @@ void *table_init(Table *tbl);
 void table_free(Table *tbl);
 
 // Get item with [key]. Return value, or [o_Nothing Object] if not
-// found.
 Object table_get(Table *tbl, Object key);
 
 // Returns [Null Object] if:

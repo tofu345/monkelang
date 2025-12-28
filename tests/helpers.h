@@ -43,14 +43,14 @@ typedef struct {
 typedef struct {
     Test *data;
     int length;
-} Constants;
+} Tests;
 
 #define _C(...) constants(__VA_ARGS__, NULL)
-#define NO_CONSTANTS (Constants){0}
+#define NO_CONSTANTS (Tests){0}
 #define _I(...) concat(__VA_ARGS__, NULL)
 
 Instructions concat(Instructions first, ...);
-Constants constants(Test *t, ...);
+Tests constants(Test *t, ...);
 
 Program test_parse(const char *input);
 
