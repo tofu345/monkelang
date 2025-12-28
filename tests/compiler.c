@@ -294,6 +294,16 @@ void test_string_expressions(void) {
             make(OpPop)
         )
     );
+    c_test(
+        "\"monkey\" + \"monkey\"",
+        _C( STR("monkey") ),
+        _I(
+            make(OpConstant, 0),
+            make(OpConstant, 0),
+            make(OpAdd),
+            make(OpPop)
+        )
+    );
 }
 
 void test_array_literals(void) {
