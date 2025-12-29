@@ -9,6 +9,7 @@
 #include "utils.h"
 
 #include <assert.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -24,7 +25,8 @@ static void source_map(Compiler *, Node);
 // emit opcodes to assign to `Node`.
 static error perform_assignment(Compiler *, Node);
 
-int add_constant(Compiler *, Constant);
+// add `Constant` or return c_error(n, ...)
+error add_constant(Compiler *, Constant, Node, int *result);
 
 DEFINE_BUFFER(Constant, Constant)
 DEFINE_BUFFER(Scope, CompilationScope)
@@ -530,7 +532,11 @@ _compile(Compiler *c, Node n) {
                     .type = c_Integer,
                     .data = { .integer = il->value }
                 };
-                emit(c, OpConstant, add_constant(c, integer));
+                int idx;
+                err = add_constant(c, integer, n, &idx);
+                if (err) { return err; }
+
+                emit(c, OpConstant, idx);
                 return 0;
             }
 
@@ -541,7 +547,11 @@ _compile(Compiler *c, Node n) {
                     .type = c_Float,
                     .data = { .floating = il->value }
                 };
-                emit(c, OpConstant, add_constant(c, floating));
+                int idx;
+                err = add_constant(c, floating, n, &idx);
+                if (err) { return err; }
+
+                emit(c, OpConstant, idx);
                 return 0;
             }
 
@@ -563,7 +573,11 @@ _compile(Compiler *c, Node n) {
                     .type = c_String,
                     .data = { .string = &sl->tok }
                 };
-                emit(c, OpConstant, add_constant(c, str_const));
+                int idx;
+                err = add_constant(c, str_const, n, &idx);
+                if (err) { return err; }
+
+                emit(c, OpConstant, idx);
                 return 0;
             }
 
@@ -615,8 +629,11 @@ _compile(Compiler *c, Node n) {
                     .type = c_Function,
                     .data = { .function = fn }
                 };
-                int const_index = add_constant(c, fn_const);
-                emit(c, OpClosure, const_index, free_symbols.length);
+                int idx;
+                err = add_constant(c, fn_const, n, &idx);
+                if (err) { return err; }
+
+                emit(c, OpClosure, idx, free_symbols.length);
                 return 0;
             }
 
@@ -801,7 +818,7 @@ void fprint_compiler_instructions(FILE *s, Compiler *c, bool print_mappings) {
     }
 }
 
-int add_constant(Compiler *c, Constant constant) {
+error add_constant(Compiler *c, Constant constant, Node n, int *result) {
     uint64_t hash;
     switch (constant.type) {
         case c_String:
@@ -831,7 +848,9 @@ int add_constant(Compiler *c, Constant constant) {
         position = res.data.integer;
     }
 
-    // code.c defines OpConstant with two bytes in the Bytecode,
-    // so truncating to an `int` is fine.
-    return position;
+    if (position <= INT_MAX) {
+        *result = position;
+        return 0;
+    }
+    return c_error(n, "too many constant variables");
 }
