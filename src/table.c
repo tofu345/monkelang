@@ -83,11 +83,14 @@ bucket_get_value(table_bucket *bucket, uint64_t hash, ObjectType type) {
     return OBJ_NOTHING;
 }
 
-Object table_get(Table *tbl, Object key) {
+Object table_get_hash(Table *tbl, Object key, uint64_t hash) {
     if (key.type == o_Nothing) return OBJ_NOTHING;
-    uint64_t hash = object_hash(key);
     size_t index = hash_index(hash, tbl->_buckets_length);
     return bucket_get_value(tbl->buckets + index, hash, key.type);
+}
+
+Object table_get(Table *tbl, Object key) {
+    return table_get_hash(tbl, key, object_hash(key));
 }
 
 static void
@@ -177,8 +180,7 @@ table_expand(Table *tbl) {
     return true;
 }
 
-Object
-table_set(Table *tbl, Object key, Object value) {
+Object table_set_hash(Table *tbl, Object key, Object value, uint64_t hash) {
     if (!key.type || !value.type) { return OBJ_NOTHING; }
 
     // table_expand() is run when the table fills roughly half of its buckets,
@@ -194,9 +196,13 @@ table_set(Table *tbl, Object key, Object value) {
         }
     }
 
-    uint64_t hash = object_hash(key);
     size_t index = hash_index(hash, tbl->_buckets_length);
     return bucket_set(tbl, tbl->buckets + index, hash, key, value);
+}
+
+Object
+table_set(Table *tbl, Object key, Object value) {
+    return table_set_hash(tbl, key, value, object_hash(key));
 }
 
 Object

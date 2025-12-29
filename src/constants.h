@@ -5,6 +5,7 @@
 #include "ast.h"
 #include "code.h"
 #include "object.h"
+#include "table.h"
 #include "utils.h"
 
 typedef enum {
@@ -30,7 +31,7 @@ BUFFER(Constant, Constant)
 
 typedef struct {
     // used to check for duplicates
-    ht *table;
+    Table table;
 
     // stores concrete values of [Constant]s
     ConstantBuffer buffer;

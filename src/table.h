@@ -38,8 +38,11 @@ typedef struct Table {
 void *table_init(Table *tbl);
 void table_free(Table *tbl);
 
-// Get item with [key]. Return value, or [o_Nothing Object] if not
+// Get item with [key]. Return value, or [o_Nothing Object] if not found.
 Object table_get(Table *tbl, Object key);
+
+// table_get() with given hash.
+Object table_get_hash(Table *tbl, Object key, uint64_t hash);
 
 // Returns [Null Object] if:
 // - [key] or [value] is [Null Object].
@@ -47,6 +50,9 @@ Object table_get(Table *tbl, Object key);
 // Returns previous value of [key] if present.
 // Returns [value] otherwise.
 Object table_set(Table *tbl, Object key, Object value);
+
+// table_set() with given hash.
+Object table_set_hash(Table *tbl, Object key, Object value, uint64_t hash);
 
 // Remove item with [key] and return its value or [Null Object] if not found.
 Object table_remove(Table *tbl, Object key);

@@ -3,9 +3,9 @@
 #include "builtin.h"
 #include "code.h"
 #include "errors.h"
-#include "hash-table/ht.h"
 #include "object.h"
 #include "symbol_table.h"
+#include "table.h"
 #include "utils.h"
 
 #include <assert.h>
@@ -48,9 +48,8 @@ void compiler_init(Compiler *c) {
         sym_builtin(c->current_symbol_table, builtins[i].name, i);
     }
 
-    ht *tbl = ht_create();
-    if (tbl == NULL) { die("compiler_init - create constants table:"); }
-    c->constants = (Constants){ .table = tbl, .buffer = (ConstantBuffer){0} };
+    if (table_init(&c->constants.table) == NULL) { die("compiler_init - create constants table:"); }
+    c->constants.buffer = (ConstantBuffer){0};
 
     CompiledFunction *main_fn = new_function();
 
@@ -84,7 +83,7 @@ void compiler_free(Compiler *c) {
         cur = next;
     }
 
-    ht_destroy(c->constants.table);
+    table_free(&c->constants.table);
     free(c->constants.buffer.data);
 
     for (i = 0; i < c->functions.length; i++) {
@@ -819,16 +818,17 @@ int add_constant(Compiler *c, Constant constant) {
     }
 
     long position;
-    void *res = ht_get_hash(c->constants.table, hash);
-    if (errno == ENOKEY) {
+    Object key = { .type = (ObjectType) constant.type };
+    Object res = table_get_hash(&c->constants.table, key, hash);
+    if (res.type == o_Nothing) {
         position = c->constants.buffer.length;
         ConstantBufferPush(&c->constants.buffer, constant);
 
-        ht_set_hash(c->constants.table, NULL, (void *) position, hash);
-        if (errno == ENOMEM) { die("add_constant - ht_set_hash:"); }
+        table_set_hash(&c->constants.table, key, OBJ(o_Integer, position), hash);
+        if (errno == ENOMEM) { die("add_constant - table_set_hash:"); }
 
     } else {
-        position = (long) res;
+        position = res.data.integer;
     }
 
     // code.c defines OpConstant with two bytes in the Bytecode,

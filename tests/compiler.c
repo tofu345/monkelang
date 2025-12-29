@@ -18,6 +18,7 @@ static void c_test(char *input, Tests expectedConstants,
 static void c_test_error(const char *input, const char *expected_error);
 
 #define INT(n) TEST(int, n)
+#define FLOAT(n) TEST(float, n)
 #define STR(s) TEST(str, s)
 #define INS(...) TEST(ins, _I(__VA_ARGS__))
 
@@ -29,6 +30,16 @@ void test_integer_arithmetic(void) {
             make(OpConstant, 0),
             make(OpConstant, 1),
             make(OpAdd),
+            make(OpPop)
+        )
+    );
+    c_test(
+        "0; 0.;",
+        _C( INT(0), FLOAT(0) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpPop),
+            make(OpConstant, 1),
             make(OpPop)
         )
     );
@@ -1419,6 +1430,20 @@ test_integer_constant(long expected, Constant actual) {
 }
 
 static int
+test_float_constant(double expected, Constant actual) {
+    if (!expect_constant_is(c_Float, actual)) {
+        return -1;
+    }
+
+    if (expected != actual.data.floating) {
+        printf("object has wrong value. want=%f got=%f\n",
+                expected, actual.data.floating);
+        return -1;
+    }
+    return 0;
+}
+
+static int
 test_constants(Tests expected, ConstantBuffer *actual) {
     if (actual->length != expected.length) {
         printf("wrong constants length.\nwant=%d\ngot =%d\n",
@@ -1435,6 +1460,14 @@ test_constants(Tests expected, ConstantBuffer *actual) {
         switch (exp.typ) {
             case test_int:
                 err = test_integer_constant(exp.val._int, cur);
+                if (err != 0) {
+                    printf("constant %d - test_integer_object failed\n", i);
+                    return -1;
+                }
+                break;
+
+            case test_float:
+                err = test_float_constant(exp.val._float, cur);
                 if (err != 0) {
                     printf("constant %d - test_integer_object failed\n", i);
                     return -1;
@@ -1464,7 +1497,8 @@ test_constants(Tests expected, ConstantBuffer *actual) {
                 break;
 
             default:
-                TEST_FAIL_MESSAGE("not implemented");
+                printf("test_constants - constant type %d not implemented\n", exp.typ);
+                TEST_FAIL();
         }
     }
     return 0;
