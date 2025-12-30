@@ -66,17 +66,21 @@ void table_free(Table *tbl) {
         destroy_overflows(tbl->buckets + i);
     }
     free(tbl->buckets);
+    tbl->buckets = NULL;
+    tbl->_buckets_length = 0;
 }
 
 static Object
 bucket_get_value(table_bucket *bucket, uint64_t hash, ObjectType type) {
     while (bucket != NULL) {
         for (size_t i = 0; i < N; i++) {
-            if (bucket->k_type[i] == o_Nothing)
-                return OBJ_NOTHING;
+            if (bucket->k_type[i] == o_Nothing) {
+                break;
+            }
 
-            if (bucket->hashes[i] == hash && bucket->k_type[i] == type)
+            if (bucket->hashes[i] == hash && bucket->k_type[i] == type) {
                 return (Object){ bucket->v_type[i], bucket->v_data[i] };
+            }
         }
         bucket = bucket->overflow;
     }
@@ -215,7 +219,7 @@ table_remove(Table *tbl, Object key) {
 
     while (bucket != NULL) {
         for (int i = 0; i < N; i++) {
-            if (bucket->k_type[i] == o_Nothing) break;
+            if (bucket->k_type[i] == o_Nothing) { break; }
             if (bucket->hashes[i] == hash && bucket->k_type[i] == key.type) {
                 int last = i + 1;
                 for (; last < N - 1; last++) {
