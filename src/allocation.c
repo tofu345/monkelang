@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
-// [vm_allocate()] and create [Allocation] with [type].
+// `vm_allocate()` and create `Allocation` with [type].
 static void *new_allocation(VM *vm, ObjectType type, size_t size);
 
 CharBuffer *create_string(VM *vm, const char *text, int length) {
@@ -123,6 +123,9 @@ Object object_copy(VM* vm, Object obj) {
     }
 }
 
+
+static void mark_objs(Object *objs, int len);
+
 void mark(Object obj) {
     assert(obj.type >= o_String);
 
@@ -137,14 +140,16 @@ void mark(Object obj) {
     alloc->is_marked = true;
 }
 
-static void mark_objs(Object *objs, int len);
-
 static void mark_module(Module *m) {
 #ifdef DEBUG
     printf("module: %s\n", m->name);
 #endif
 
     mark_objs(m->globals, m->num_globals);
+
+#ifdef DEBUG
+    putc('\n', stdout);
+#endif
 }
 
 static void
@@ -208,7 +213,6 @@ static void mark_objs(Object *objs, int len) {
     }
 }
 
-
 void free_allocation(Allocation *alloc) {
     assert(alloc->type >= o_String);
 
@@ -254,7 +258,14 @@ void mark_and_sweep(VM *vm) {
 #endif
     // The first frames Closure is managed by the VM, not GC.
     for (int i = 1; i <= vm->frames_index; ++i) {
-        trace_mark_object(vm->frames[i].function);
+
+        // NOTE: for now all Modules required are kept in scope for the
+        // duration of the program.
+
+        Object function = vm->frames[i].function;
+        if (function.type == o_Closure) {
+            trace_mark_object(function);
+        }
     }
 
 #ifdef DEBUG

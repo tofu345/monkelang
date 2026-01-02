@@ -700,7 +700,7 @@ vm_push_closure(VM *vm, Constant constant, int num_free) {
 }
 
 static inline void resize_vm_globals(VM *vm, int num_globals) {
-    if (num_globals > vm->num_globals) {
+    if (num_globals != vm->num_globals) {
         vm->globals = realloc(vm->globals, num_globals * sizeof(Object));
         if (vm->globals == NULL) { die("vm resize globals:"); }
     }
@@ -709,8 +709,8 @@ static inline void resize_vm_globals(VM *vm, int num_globals) {
     if (added > 0) {
         Object *globals = vm->globals + vm->num_globals;
         memset(globals, 0, added * sizeof(Object));
-        vm->num_globals = num_globals;
     }
+    vm->num_globals = num_globals;
 }
 
 error vm_run(VM *vm, Bytecode code) {
@@ -1041,8 +1041,8 @@ static error module_compile(VM *vm, Module *m, const char *source_code) {
     // create dummy file that appends writes into [buf], to return as error.
     char *buf = NULL;
     size_t buf_len = 0;
-    FILE *out = open_memstream(&buf, &buf_len);
-    if (out == NULL) {
+    FILE *fp = open_memstream(&buf, &buf_len);
+    if (fp == NULL) {
         return errorf("error loading module - %s", strerror(errno));
     }
 
@@ -1052,8 +1052,8 @@ static error module_compile(VM *vm, Module *m, const char *source_code) {
     Program program = {0};
     ParseErrorBuffer errors = parse(parser(), &l, &program);
     if (errors.length > 0) {
-        fputs(parser_error_msg, out);
-        print_parse_errors(&errors, stdout);
+        fputs(parser_error_msg, fp);
+        print_parse_errors(&errors, fp);
         program_free(&program);
         goto cleanup;
     }
@@ -1068,8 +1068,8 @@ static error module_compile(VM *vm, Module *m, const char *source_code) {
 
     error err = compile(c, &program);
     if (err) {
-        fputs(compiler_error_msg, out);
-        print_error(err, out);
+        fputs(compiler_error_msg, fp);
+        print_error(err, fp);
         free_error(err);
         compiler_reset(c);
         goto cleanup;
@@ -1087,7 +1087,7 @@ static error module_compile(VM *vm, Module *m, const char *source_code) {
     success = true;
 
 cleanup:
-    fclose(out);
+    fclose(fp);
 
     if (!success) {
         program_free(&program);
@@ -1120,7 +1120,6 @@ error require_sub_module(VM *vm, Constant constant) {
         if (err) { goto fail; }
 
         module->name = filename;
-        module->parent = vm->cur_module;
 
         err = module_compile(vm, module, module->source);
         if (err) { goto fail; }
@@ -1130,11 +1129,18 @@ error require_sub_module(VM *vm, Constant constant) {
             err = errorf("error adding module - %s", strerror(errno));
             goto fail;
         }
-    } else {
-        module->parent = vm->cur_module;
     }
 
+    module->parent = vm->cur_module;
     vm->cur_module = module;
+
+#ifdef DEBUG
+    printf("require module: ");
+    Object *args = vm->stack + vm->sp;
+    debug_print_args(OBJ(o_Module, .module = module), args, 0);
+    putc('\n', stdout);
+#endif
+
 
     err = new_frame(vm);
     if (err) { return err; }
@@ -1146,7 +1152,6 @@ fail:
     module_free(module);
     return err;
 }
-
 
 void print_vm_stack_trace(VM *vm, FILE *s) {
     Closure *prev = NULL;
