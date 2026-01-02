@@ -62,7 +62,7 @@ void test_instructions_string(void) {
     FILE *fp = open_memstream(&buf, &len);
     TEST_ASSERT_NOT_NULL_MESSAGE(fp, "open_memstream fail");
 
-    int err = fprint_instructions(fp, test);
+    int err = fprint_instructions(fp, &test);
     TEST_ASSERT_MESSAGE(err == 0, "fprint_instructions failed");
     free(test.data);
 

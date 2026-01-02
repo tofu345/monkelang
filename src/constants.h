@@ -28,11 +28,3 @@ typedef struct {
 } Constant;
 
 BUFFER(Constant, Constant)
-
-typedef struct {
-    // used to check for duplicates
-    Table table;
-
-    // stores concrete values of [Constant]s
-    ConstantBuffer buffer;
-} Constants;

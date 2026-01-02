@@ -26,15 +26,7 @@ read_char(Lexer *l) {
     }
 }
 
-void lexer_with(Lexer *l, const char *input, uint64_t length) {
-    l->input = input;
-    l->input_len = length;
-    l->position = 0;
-    l->read_position = 0;
-    read_char(l);
-}
-
-void lexer_init(Lexer *l, const char *input) {
+void lexer_init(Lexer *l, const char *input, uint64_t length) {
     *l = (Lexer) {
         .input = NULL,
         .input_len = 0,
@@ -45,8 +37,18 @@ void lexer_init(Lexer *l, const char *input) {
     };
 
     if (input) {
-        lexer_with(l, input, strlen(input));
+        l->input = input;
+        l->input_len = length;
+        read_char(l);
     }
+}
+
+void lexer_with(Lexer *l, const char *input, uint64_t length) {
+    l->input = input;
+    l->input_len = length;
+    l->position = 0;
+    l->read_position = 0;
+    read_char(l);
 }
 
 static char peek_char(Lexer *l) {

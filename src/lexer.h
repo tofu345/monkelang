@@ -19,11 +19,10 @@ typedef struct {
     int line;
 } Lexer;
 
-// Initialise Lexer and call [lexer_with(input)] if input not NULL.
-void lexer_init(Lexer *l, const char *input);
+// Initialise Lexer which input if not NULL.
+void lexer_init(Lexer *l, const char *input, uint64_t length);
 
 // Change source code under inspection to input.
-// Reset [l.position] and [l.read_position], [l.line] is not modified.
 void lexer_with(Lexer *l, const char *input, uint64_t length);
 
 Token lexer_next_token(Lexer *l);

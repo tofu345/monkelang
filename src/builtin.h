@@ -1,16 +1,19 @@
 #pragma once
 
+// This module contains builtin functions.
+
 #include "object.h"
+#include "symbol_table.h"
 #include "vm.h"
 
-// This module contains builtin functions.
+#include <stdint.h>
 
 typedef Object BuiltinFn(VM *vm, Object *args, int num_args);
 
 typedef struct Builtin {
     const char* name;
+    int name_len;
     BuiltinFn *fn;
 } Builtin;
 
-// set len if not NULL, return pointer to array of Builtins.
 const Builtin *get_builtins(int *len);

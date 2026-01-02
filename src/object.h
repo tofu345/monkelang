@@ -35,6 +35,8 @@ typedef enum __attribute__ ((__packed__)) {
     o_Array,
     o_Table,
     o_Closure,
+    o_Module, // NOTE: for now, not exposed to end users.
+              // Only Present in ObjectType to be used in vm `Frame`.
 } ObjectType;
 
 struct Object;
@@ -55,6 +57,7 @@ typedef union {
     ObjectBuffer *array;
     struct Table *table;
     struct Closure *closure;
+    struct Module *module;
 
     void *ptr; // generic pointer
 } ObjectData;
@@ -90,7 +93,6 @@ typedef struct {
     SourceMappingBuffer mappings;
 } CompiledFunction;
 
-CompiledFunction *new_function();
 void free_function(CompiledFunction *fn);
 
 typedef struct Closure {

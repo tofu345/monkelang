@@ -1,9 +1,14 @@
 #pragma once
 
 #include "token.h"
-#include "utils.h"
 
+#include <stdio.h>
 #include <stdarg.h>
+#include <stdbool.h>
+
+static const char parser_error_msg[] = "Woops! We ran into some monkey business here!\n";
+static const char compiler_error_msg[] = "Woops! Compilation failed!\n";
+static const char vm_error_msg[] = "Woops! Executing bytecode failed!\n";
 
 struct Error {
     const char *message;
@@ -13,6 +18,7 @@ struct Error {
 };
 typedef struct Error *error;
 
+error create_error(const char *message);
 error errorf(const char* format, ...);
 error verrorf(const char* format, va_list args);
 

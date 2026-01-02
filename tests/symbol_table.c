@@ -129,28 +129,6 @@ void test_resolve_nested_local(void) {
     TEST_ASSERT(test_sym_resolve(second_local, second_expected, second_len));
 }
 
-void test_define_resolve_builtins(void) {
-    global = symbol_table_new();
-    first_local = enclosed_symbol_table(global);
-    second_local = enclosed_symbol_table(global);
-
-    Symbol expected[] = {
-        {.name = "a", .scope = BuiltinScope, .index = 0},
-        {.name = "c", .scope = BuiltinScope, .index = 1},
-        {.name = "e", .scope = BuiltinScope, .index = 2},
-        {.name = "f", .scope = BuiltinScope, .index = 3},
-    };
-    int len = sizeof(expected) / sizeof(expected[0]);
-
-    for (int i = 0; i < len; i++) {
-        sym_builtin(global, expected[i].name, i);
-    }
-
-    TEST_ASSERT(test_sym_resolve(global, expected, len));
-    TEST_ASSERT(test_sym_resolve(first_local, expected, len));
-    TEST_ASSERT(test_sym_resolve(second_local, expected, len));
-}
-
 void test_resolve_free(void) {
     global = symbol_table_new();
     define(global, "a");
@@ -284,7 +262,6 @@ int main(void) {
     RUN_TEST(test_define);
     RUN_TEST(test_resolve_global);
     RUN_TEST(test_resolve_local);
-    RUN_TEST(test_define_resolve_builtins);
     RUN_TEST(test_resolve_free);
     RUN_TEST(test_resolve_unresolvable_free);
     RUN_TEST(test_define_and_resolve_function_name);
@@ -305,12 +282,11 @@ const char *scopes[] = {
     "LocalScope",
     "FunctionScope",
     "FreeScope",
-    "BuiltinScope",
 };
 
 static const char *
 show_scope(SymbolScope scope) {
-    if (scope < 0 || scope > BuiltinScope) { die("invalid scope %d", scope); }
+    if (scope < 0 || scope > FreeScope) { die("invalid scope %d", scope); }
     return scopes[scope];
 }
 

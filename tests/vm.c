@@ -928,17 +928,18 @@ test_expected_object(Test expected, Object actual) {
     }
 }
 
+VM vm;
+
 static void
 vm_test(char *input, Test *expected) {
     bool fail = false;
 
-    Program prog = test_parse(input);
-
     Compiler c;
     compiler_init(&c);
 
-    VM vm;
-    vm_init(&vm, NULL, NULL, NULL);
+    vm_init(&vm, &c);
+
+    Program prog = parse_(input);
 
     error err = compile(&c, &prog);
     if (err) {
@@ -946,11 +947,14 @@ vm_test(char *input, Test *expected) {
 
         fail = true;
         goto cleanup;
-    };
+    }
 
     // // display constants
-    // for (int i = 0; i < c.constants.length; i++) {
-    //     Constant cn = c.constants.data[i];
+    // puts("<main function> Instructions:");
+    // fprint_instructions(stdout, top_level.bytecode.main_function->instructions);
+    // const Compiler *c = compiler();
+    // for (int i = 0; i < c->constants.length; i++) {
+    //     Constant cn = c->constants.data[i];
     //     printf("CONSTANT %d ", i);
     //     switch (cn.type) {
     //         case c_Function:
@@ -1014,10 +1018,12 @@ static void
 vm_test_error(char *input, char *expected_error) {
     bool fail = false;
 
-    Program prog = test_parse(input);
-
     Compiler c;
     compiler_init(&c);
+
+    vm_init(&vm, &c);
+
+    Program prog = parse_(input);
 
     error err = compile(&c, &prog);
     if (err) {
@@ -1025,9 +1031,6 @@ vm_test_error(char *input, char *expected_error) {
         fail = true;
         goto cleanup;
     };
-
-    VM vm;
-    vm_init(&vm, NULL, NULL, NULL);
 
     err = vm_run(&vm, bytecode(&c));
     if (!err) {

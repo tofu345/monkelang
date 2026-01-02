@@ -8,45 +8,41 @@
 #include "errors.h"
 #include "token.h"
 
-typedef struct Parser Parser;
-
-typedef Node PrefixParseFn (Parser* p);
-typedef Node InfixParseFn (Parser* p, Node left);
+struct Parser;
+typedef Node PrefixParseFn(struct Parser *);
+typedef Node InfixParseFn(struct Parser *, Node left);
 
 typedef struct {
     const char *message;
+    bool allocated;
     Token token;
-    bool allocated; // lots of padding
-} ParserError;
+} ParseError;
 
-BUFFER(Error, ParserError)
+BUFFER(ParseError, ParseError)
 
-// All `parse_*` functions must return with `p->cur_token` in use or freed
-struct Parser {
-    Lexer l;
+typedef struct Parser {
+    Lexer *l;
     Token cur_token;
     Token peek_token;
 
-    ErrorBuffer errors;
+    // ParseErrors of Program being parsed.
+    ParseErrorBuffer errors;
 
     // Instead of a hashmap, each token contains a pointer to a parser function
     // for that token or NULL, which indicates it cannot be parsed.
-
     PrefixParseFn *prefix_parse_fns[t_Return + 1];
     InfixParseFn *infix_parse_fns[t_Return + 1];
-};
+} Parser;
 
+// initialize prefix and infix parse functions.
 void parser_init(Parser* p);
-void parser_free(Parser* p);
 
-// Create AST from [program], parsing until an error is encountered and stored
-// in [p.errors].  On success, [p.errors.length] is 0.
-Program parse(Parser* p, const char *program);
-Program parse_(Parser* p, const char *program, uint64_t length);
+// parse AST in Lexer until an error is encountered and returned.
+ParseErrorBuffer parse(Parser *p, Lexer *lexer, Program *program);
 
-void program_free(Program* p);
-
-void print_parser_errors(Parser *p);
+// print and free Parser errors.
+void print_parse_errors(ParseErrorBuffer *, FILE *stream);
+void free_parse_errors(ParseErrorBuffer *);
 
 enum Precedence {
     p_Lowest = 1,

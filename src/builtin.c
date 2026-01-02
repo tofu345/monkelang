@@ -186,7 +186,7 @@ builtin_type(VM *vm, Object *args, int num_args) {
     return OBJ(o_String, .string = string);
 }
 
-#define BUILTIN(fn) {#fn, builtin_##fn}
+#define BUILTIN(fn) {#fn, sizeof(#fn) - 1, builtin_##fn}
 
 const Builtin builtins[] = {
     BUILTIN(len),
@@ -199,10 +199,9 @@ const Builtin builtins[] = {
     BUILTIN(copy),
     BUILTIN(type),
 };
+int length = sizeof(builtins) / sizeof(builtins[0]);
 
 const Builtin *get_builtins(int *len) {
-    if (len) {
-        *len = sizeof(builtins) / sizeof(builtins[0]);
-    }
+    *len = length;
     return builtins;
 }

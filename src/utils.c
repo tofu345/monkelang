@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "errors.h"
 
 #include <stdarg.h>
 #include <stddef.h>
@@ -46,4 +47,37 @@ int power_of_2_ceil(int n) {
     n++;
     if (n < 4) { n = 4; }
     return n;
+}
+
+error load_file(const char *filename, char **source) {
+    FILE *fp = fopen(filename, "r");
+    if (fp == NULL) {
+        return errorf("could not open file '%s' - %s\n", filename,
+                      strerror(errno));
+    }
+
+    fseek(fp, 0, SEEK_END);
+    long src_size = ftell(fp);
+    rewind(fp);
+
+    char* buf = malloc((src_size + 1) * sizeof(char));
+    int errno_ = errno;
+    if (buf == NULL) {
+        fclose(fp);
+        return errorf("could not allocate memory for file '%s' - %s\n",
+                      filename, strerror(errno_));
+    }
+
+    size_t src_len = fread(buf, sizeof(char), src_size, fp);
+    errno_ = ferror(fp);
+    if (errno_ != 0) {
+        free(buf);
+        fclose(fp);
+        return errorf("error while reading '%s' - %s\n", filename, strerror(errno_));
+    } else {
+        buf[src_len] = '\0';
+    }
+    fclose(fp);
+    *source = buf;
+    return 0;
 }

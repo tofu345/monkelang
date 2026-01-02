@@ -2,6 +2,8 @@
 
 // This module contains utility functions.
 
+#include "errors.h"
+
 #include <stddef.h>
 #include <errno.h>
 #include <stdint.h>
@@ -68,3 +70,5 @@ static inline int fprintf_float(double f, FILE* fp) {
     if (f == (long) f) { FPRINTF(fp, ".") }
     return 0;
 }
+
+error load_file(const char *filename, char **source);

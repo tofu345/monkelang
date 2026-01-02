@@ -3,6 +3,7 @@
 // This module contains the Stack Virtual Machine.
 
 #include "compiler.h"
+#include "sub_modules.h"
 #include "object.h"
 #include "utils.h"
 
@@ -22,32 +23,23 @@ static const int NextGC = 1024;
 
 // A Function call.
 typedef struct {
-    Closure *cl;
+    Object function;
 
-    int ip; // instruction pointer
+    int ip; // instruction pointer to bytecode
 
     // Points to bottom of stack for current function.
     //
     // When returning to the previous Frame, the stack pointer is set to the
     // this value, removing all arguments, local variables and intermediate
     // objects from scope.
-    int base_pointer;
+    short base_pointer;
 } Frame;
 
-struct Allocation;
-
-typedef struct {
-    // A copy of the Bytecode Constants for (hopefully) faster retrieval.
-    ConstantBuffer constants;
-
-    // The stack, contains all Objects in scope.
+typedef struct VM {
+    // The stack, contains all non-global Objects in scope.
     Object *stack;
     int sp; // Stack pointer, points to right after the top of stack.
             // The top of stack is `stack[sp-1]`.
-
-    // Global variables, where Objects of global variables are stored.
-    Object *globals;
-    int num_globals;
 
     // The Function call stack.
     Frame *frames;
@@ -55,23 +47,29 @@ typedef struct {
 
     // The current number of bytes to allocate till before GC is run.
     int bytesTillGC;
-    // Linked list of all allocated objects.
-    struct Allocation *last;
+    struct Allocation *last; // Linked list of all allocated objects.
 
-    // The Closure of the main function.
-    Closure *main_cl;
+    // Globals, contains global variables used in `Bytecode`.
+    Object *globals;
+    int num_globals;
+
+    Module *cur_module;
+    ht *sub_modules; // "required" sub Modules.
+
+    Compiler *compiler; // to access Constants
+    Closure *closure; // for main function
 } VM;
 
-// Initialize VM. if [stack], [globals] or [frames] are NULL, allocate.
-void vm_init(VM *vm, Object *stack, Object *globals, Frame *frames);
+void vm_init(VM *, Compiler *);
+void vm_free(VM *);
 
-error vm_run(VM *vm, Bytecode bytecode);
-
-void vm_free(VM *vm);
+error vm_run(VM *vm, Bytecode);
 
 // Last object popped of the stack.
-Object vm_last_popped(VM *vm);
+Object vm_last_popped(VM *);
 
-// Print the state function call stack where [vm_run] exited, using instruction
-// pointers and SourceMapping of Frames.
+// int vm_num_globals(VM *vm);
+
+// Print the state of the function call stack where vm_run() exited, using
+// instruction pointers and SourceMapping of `Frames`.
 void print_vm_stack_trace(VM *vm, FILE *stream);

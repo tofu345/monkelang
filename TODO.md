@@ -26,7 +26,11 @@
 
 # VM
 
+- stop execution on Ctrl-C (SIGINT) instead of quitting.
+
 # Other
+
+- test requiring (sub) Modules
 
 - ErrorType
 

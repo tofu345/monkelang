@@ -117,6 +117,12 @@ fprint_call_expression(CallExpression* ce, FILE* fp) {
 }
 
 static int
+fprint_require_expression(RequireExpression *re, FILE *fp) {
+    FPRINT_TOKEN(fp, re->tok);
+    return 0;
+}
+
+static int
 _fprint_let_stmt(LetStatement *ls, int idx, FILE *fp) {
     Identifier *id = ls->names.data[idx];
     FPRINT_TOKEN(fp, id->tok);
@@ -288,6 +294,9 @@ int node_fprint(const Node n, __attribute__ ((unused)) FILE* fp) {
         case n_CallExpression:
             return fprint_call_expression(n.obj, fp);
 
+        case n_RequireExpression:
+            return fprint_require_expression(n.obj, fp);
+
         case n_LetStatement:
             return fprint_let_statement(n.obj, fp);
 
@@ -384,6 +393,17 @@ free_call_expression(CallExpression* ce) {
         free(ce->args.data);
     }
     free(ce);
+}
+
+static void
+free_require_expression(RequireExpression* re) {
+    if (re->args.data != NULL) {
+        for (int i = 0; i < re->args.length; i++) {
+            node_free(re->args.data[i]);
+        }
+        free(re->args.data);
+    }
+    free(re);
 }
 
 static void
@@ -486,6 +506,10 @@ void node_free(Node n) {
             free_call_expression(n.obj);
             return;
 
+        case n_RequireExpression:
+            free_require_expression(n.obj);
+            return;
+
         case n_LetStatement:
             free_let_statement(n.obj);
             return;
@@ -538,4 +562,11 @@ int program_fprint(Program* p, FILE* fp) {
             return -1;
     }
     return 0;
+}
+
+void program_free(Program* prog) {
+    for (int i = 0; i < prog->stmts.length; i++) {
+        node_free(prog->stmts.data[i]);
+    }
+    free(prog->stmts.data);
 }

@@ -1,7 +1,6 @@
 #include "unity/unity.h"
 #include "helpers.h"
 
-#include "../src/parser.h"
 #include "../src/code.h"
 
 #include <stdio.h>
@@ -494,73 +493,76 @@ void test_functions_without_return_value(void) {
 void test_compiler_scopes(void) {
     init();
 
-    if (c.cur_scope_index != 0) {
-        printf("scope_index wrong. got=%d, want=%d\n", c.cur_scope_index, 0);
+    enter_scope(&c);
+
+    if (c.scopes.length != 1) {
+        printf("scope_index wrong. got=%d, want=%d\n", c.scopes.length, 1);
         TEST_FAIL();
     }
 
-    SymbolTable *global_symbol_table = c.current_symbol_table;
+    SymbolTable *global_symbol_table = c.cur_symbol_table;
 
     emit(&c, OpMul);
 
     enter_scope(&c);
-    if (c.cur_scope_index != 1) {
-        printf("scope_index wrong. got=%d, want=%d\n", c.cur_scope_index, 1);
+    if (c.scopes.length != 2) {
+        printf("scope_index wrong. got=%d, want=%d\n", c.scopes.length, 2);
         TEST_FAIL();
     }
 
     emit(&c, OpSub);
 
-    if (c.current_instructions->length != 1) {
+    if (c.cur_instructions->length != 1) {
         printf("instructions length wrong. got=%d\n",
-                c.current_instructions->length);
+                c.cur_instructions->length);
         TEST_FAIL();
     }
 
-    EmittedInstruction last = c.scopes.data[c.cur_scope_index].last_instruction;
+    EmittedInstruction last = c.cur_scope->last_instruction;
     if (last.opcode != OpSub) {
         printf("last_instruction Opcode wrong. got=%d, want=%d\n",
                 last.opcode, OpSub);
         TEST_FAIL();
     }
 
-    if (c.current_symbol_table->outer != global_symbol_table) {
+    if (c.cur_symbol_table->outer != global_symbol_table) {
         TEST_FAIL_MESSAGE("compiler did not enclose symbol_table");
     }
 
     free_function(c.cur_scope->function);
-    SymbolTable *inner = leave_scope(&c);
-    symbol_table_free(inner);
+    SymbolTable *prev = c.cur_symbol_table;
+    leave_scope(&c);
+    symbol_table_free(prev);
 
-    if (c.cur_scope_index != 0) {
-        printf("scope_index wrong. got=%d, want=%d\n", c.cur_scope_index, 0);
+    if (c.scopes.length != 1) {
+        printf("scope_index wrong. got=%d, want=%d\n", c.scopes.length, 1);
         TEST_FAIL();
     }
 
-    if (c.current_symbol_table != global_symbol_table) {
+    if (c.cur_symbol_table != global_symbol_table) {
         TEST_FAIL_MESSAGE("compiler did not restore global_symbol_table");
     }
 
-    if (c.current_symbol_table->outer != NULL) {
+    if (c.cur_symbol_table->outer != NULL) {
         TEST_FAIL_MESSAGE("compiler modified global_symbol_table table incorrectly");
     }
 
     emit(&c, OpAdd);
 
-    if (c.current_instructions->length != 2) {
+    if (c.cur_instructions->length != 2) {
         printf("instructions length wrong. got=%d\n",
-                c.current_instructions->length);
+                c.cur_instructions->length);
         TEST_FAIL();
     }
 
-    last = c.scopes.data[c.cur_scope_index].last_instruction;
+    last = c.cur_scope->last_instruction;
     if (last.opcode != OpAdd) {
         printf("last_instruction Opcode wrong. got=%d, want=%d\n",
                 last.opcode, OpAdd);
         TEST_FAIL();
     }
 
-    EmittedInstruction previous = c.scopes.data[c.cur_scope_index].previous_instruction;
+    EmittedInstruction previous = c.cur_scope->previous_instruction;
     if (previous.opcode != OpMul) {
         printf("previous_instruction Opcode wrong. got=%d, want=%d\n",
                 previous.opcode, OpMul);
@@ -1118,7 +1120,7 @@ void test_return_statements(void) {
         )
     );
 
-    c_test_error("return;", "return statement outside function");
+    c_test_error("return;", "return statement outside function or sub module");
 }
 
 void test_for_statements(void) {
@@ -1240,7 +1242,7 @@ void test_source_mapping(void) {
 
     init();
 
-    prog = test_parse(input);
+    prog = parse_(input);
 
     err = compile(&c, &prog);
     if (err != 0) {
@@ -1278,7 +1280,7 @@ void test_source_mapping(void) {
 }
 
 static int test_instructions(Instructions expected, Instructions actual);
-static int test_constants(Tests expected, ConstantBuffer *actual);
+static int test_constants(Tests expected, ConstantBuffer actual);
 
 // Because each test contains multiple c_test() and c_test_error() which must
 // reinitialize before running.
@@ -1295,9 +1297,9 @@ init(void) {
 
 static void
 cleanup(void) {
-    compiler_free(&c);
     program_free(&prog);
     free_error(err);
+    compiler_free(&c);
 
     initialized = false;
 }
@@ -1314,7 +1316,7 @@ static void
 c_test_error(const char *input, const char *expected_error) {
     init();
 
-    prog = test_parse(input);
+    prog = parse_(input);
 
     err = compile(&c, &prog);
     if (!err) {
@@ -1337,7 +1339,7 @@ static void c_test(char *input, Tests expectedConstants,
                    Instructions expectedInstructions) {
     init();
 
-    prog = test_parse(input);
+    prog = parse_(input);
 
     err = compile(&c, &prog);
     if (err != 0) {
@@ -1350,7 +1352,7 @@ static void c_test(char *input, Tests expectedConstants,
     int err1 = test_instructions(expectedInstructions,
                 code.main_function->instructions);
 
-    int err2 = test_constants(expectedConstants, code.constants);
+    int err2 = test_constants(expectedConstants, c.constants);
 
     free(expectedInstructions.data);
     for (int i = 0; i < expectedConstants.length; i++) {
@@ -1372,9 +1374,9 @@ static int
 test_instructions(Instructions expected, Instructions actual) {
     if (actual.length != expected.length) {
         printf("wrong instructions length.\nwant=\n");
-        fprint_instructions(stdout, expected);
+        fprint_instructions(stdout, &expected);
         printf("got=\n");
-        fprint_instructions(stdout, actual);
+        fprint_instructions(stdout, &actual);
         return -1;
     }
 
@@ -1383,9 +1385,9 @@ test_instructions(Instructions expected, Instructions actual) {
             printf("wrong instruction at %d. want=%d, got=%d\n",
                     i, expected.data[i], actual.data[i]);
             printf("want=\n");
-            fprint_instructions(stdout, expected);
+            fprint_instructions(stdout, &expected);
             printf("got=\n");
-            fprint_instructions(stdout, actual);
+            fprint_instructions(stdout, &actual);
             return -1;
         }
     }
@@ -1444,10 +1446,10 @@ test_float_constant(double expected, Constant actual) {
 }
 
 static int
-test_constants(Tests expected, ConstantBuffer *actual) {
-    if (actual->length != expected.length) {
+test_constants(Tests expected, ConstantBuffer actual) {
+    if (actual.length != expected.length) {
         printf("wrong constants length.\nwant=%d\ngot =%d\n",
-                expected.length, actual->length);
+                expected.length, actual.length);
         return -1;
     }
 
@@ -1456,7 +1458,7 @@ test_constants(Tests expected, ConstantBuffer *actual) {
     Constant cur;
     for (int i = 0; i < expected.length; i++) {
         exp = expected.data[i];
-        cur = actual->data[i];
+        cur = actual.data[i];
         switch (exp.typ) {
             case test_int:
                 err = test_integer_constant(exp.val._int, cur);

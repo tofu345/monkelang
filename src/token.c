@@ -10,15 +10,16 @@ struct Keyword {
     int length;
     TokenType tok_typ;
 } const keywords[] = {
-    {"for", 3, t_For},
+    {"if", 2, t_If},
     {"fn", 2, t_Function},
+    {"for", 3, t_For},
     {"let", 3, t_Let},
     {"true", 4, t_True},
-    {"false", 5, t_False},
-    {"nothing", 7, t_Nothing},
-    {"if", 2, t_If},
     {"else", 4, t_Else},
+    {"false", 5, t_False},
     {"return", 6, t_Return},
+    {"require", 7, t_Require},
+    {"nothing", 7, t_Nothing},
 };
 
 TokenType lookup_ident(const char* ident, int ident_len) {
@@ -77,6 +78,7 @@ const char* token_types[] = {
     "let",
     "if",
     "else",
+    "require",
     "return",
 };
 

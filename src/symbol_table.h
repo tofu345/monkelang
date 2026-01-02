@@ -21,9 +21,6 @@ typedef enum {
 
     // Variables defined in parent functions.
     FreeScope,
-
-    // Builtin functions.
-    BuiltinScope,
 } SymbolScope;
 
 typedef struct {
@@ -53,6 +50,5 @@ void symbol_table_free(SymbolTable *st);
 Symbol *sym_define(SymbolTable *st, Token *name, uint64_t hash);
 
 Symbol *sym_function_name(SymbolTable *st, Token *name, uint64_t hash);
-Symbol *sym_builtin(SymbolTable *st, const char *name, int index);
 
 Symbol *sym_resolve(SymbolTable *st, uint64_t hash);

@@ -221,7 +221,7 @@ table_remove(Table *tbl, Object key) {
         for (int i = 0; i < N; i++) {
             if (bucket->k_type[i] == o_Nothing) { break; }
             if (bucket->hashes[i] == hash && bucket->k_type[i] == key.type) {
-                int last = i + 1;
+                int last = i;
                 for (; last < N - 1; last++) {
                     if (bucket->k_type[last + 1] == o_Nothing) {
                         break;

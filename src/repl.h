@@ -2,5 +2,5 @@
 
 #include <stdio.h>
 
-void run(char* program);
+int  run(char* filename);
 void repl(FILE* in_stream, FILE* out_stream);

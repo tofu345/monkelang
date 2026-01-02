@@ -55,6 +55,7 @@ typedef enum __attribute__ ((__packed__)) {
     t_Let,
     t_If,
     t_Else,
+    t_Require,
     t_Return,
 } TokenType;
 

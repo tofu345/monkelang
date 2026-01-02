@@ -1,32 +1,31 @@
-#include "vm.h"
+#include "allocation.h"
 #include "ast.h"
 #include "builtin.h"
 #include "code.h"
+#include "compiler.h"
+#include "constants.h"
 #include "errors.h"
+#include "hash-table/ht.h"
 #include "object.h"
+#include "shared.h"
+#include "sub_modules.h"
 #include "table.h"
 #include "utils.h"
-#include "allocation.h"
+#include "vm.h"
 
 #include <assert.h>
+#include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-// initialize `vm.frames[vm.frames_index]`
-static void
-frame_init(VM *vm, Closure *cl, int base_pointer) {
-    vm->frames[vm->frames_index] = (Frame) {
-        .cl = cl,
-        .ip = -1,
-        .base_pointer = base_pointer,
-    };
-}
+// load sub module if not done previously and add to `vm.modules`.
+error require_sub_module(VM *vm, Constant filename);
 
-static Instructions
-instructions(Frame *f) {
-    return f->cl->func->instructions;
-}
+// initialize `vm.frames[vm.frames_index]`
+static void frame_init(VM *vm, Object function, int base_pointer);
+static Instructions frame_instructions(Frame *f);
 
 static error
 error_unknown_operation(Opcode op, Object left, Object right) {
@@ -42,33 +41,34 @@ error_unknown_operation(Opcode op, Object left, Object right) {
             show_object_type(right.type));
 }
 
-void vm_init(VM *vm, Object *stack, Object *globals, Frame *frames) {
+void vm_init(VM *vm, Compiler *compiler) {
     memset(vm, 0, sizeof(VM));
+
+    vm->compiler = compiler;
+
+    vm->stack = calloc(StackSize, sizeof(Object));
+    if (vm->stack == NULL) { die("vm stack create:"); }
+
+    vm->frames = calloc(MaxFraxes, sizeof(Frame));
+    if (vm->frames == NULL) { die("vm frames create:"); }
 
     vm->bytesTillGC = NextGC;
 
-    if (stack == NULL) {
-        stack = calloc(StackSize, sizeof(Object));
-        if (stack == NULL) { die("vm stack create"); }
-    }
-    vm->stack = stack;
+    vm->cur_module = NULL;
+    vm->sub_modules = ht_create();
+    if (vm->sub_modules == NULL) { die("vm module table create:"); }
 
-    if (globals == NULL) {
-        globals = calloc(GlobalsSize, sizeof(Object));
-        if (globals == NULL) { die("vm globals create"); }
-    }
-    vm->globals = globals;
+    vm->closure = calloc(1, sizeof(Closure));
+    if (vm->closure == NULL) { die("vm closure create:"); }
+}
 
-    if (frames == NULL) {
-        frames = calloc(MaxFraxes, sizeof(Frame));
-        if (frames == NULL) { die("vm frames create"); }
-    }
-    vm->frames = frames;
-
-    if (vm->main_cl == NULL) {
-        vm->main_cl = calloc(1, sizeof(Closure));
-        if (vm->main_cl == NULL) { die("malloc"); }
-    }
+inline static void module_free(Module *m) {
+    free((char *) m->name);
+    free((char *) m->source);
+    free_function(m->main_function);
+    program_free(&m->program);
+    free(m->globals);
+    free(m);
 }
 
 void vm_free(VM *vm) {
@@ -83,9 +83,17 @@ void vm_free(VM *vm) {
         cur = next;
     }
     free(vm->stack);
-    free(vm->globals);
     free(vm->frames);
-    free(vm->main_cl);
+    free(vm->closure);
+    free(vm->globals);
+
+    hti it = ht_iterator(vm->sub_modules);
+    while (ht_next(&it)) {
+        module_free(it.current->value);
+    }
+    ht_destroy(vm->sub_modules);
+
+    memset(vm, 0, sizeof(VM));
 }
 
 // return to previous [Frame]
@@ -123,7 +131,13 @@ vm_pop(VM *vm) {
 
     // check for possible local variables overwrite
     Frame *cur = &vm->frames[vm->frames_index];
-    if (vm->sp >= cur->base_pointer + cur->cl->func->num_parameters) {
+    Object function = cur->function;
+
+    int num_args = 0;
+    if (function.type == o_Closure) {
+        num_args = function.data.closure->func->num_parameters;
+    }
+    if (vm->sp >= cur->base_pointer + num_args) {
         return vm->stack[vm->sp];
     }
 
@@ -149,6 +163,20 @@ debug_print_args(Object function, Object *args, int num_args) {
         object_fprint(args[last], stdout);
     }
     printf(")");
+}
+
+static void
+debug_print_return(Object function, Object *args, Object return_value) {
+    int num_args = 0;
+    if (function.type == o_Closure) {
+        num_args = function.data.closure->func->num_parameters;
+    }
+
+    printf("return: ");
+    debug_print_args(function, args, num_args);
+    printf(" -> ");
+    object_fprint(return_value, stdout);
+    putc('\n', stdout);
 }
 
 static void
@@ -602,7 +630,7 @@ call_closure(VM *vm, Closure *cl, int num_args) {
     if (err) { return err; }
 
     int base_pointer = vm->sp - num_args;
-    frame_init(vm, cl, base_pointer);
+    frame_init(vm, OBJ(o_Closure, .closure = cl), base_pointer);
 
     if (fn->num_locals > 0) {
         if (vm->sp + fn->num_locals >= StackSize) {
@@ -655,13 +683,7 @@ execute_call(VM *vm, int num_args) {
 }
 
 static error
-vm_push_closure(VM *vm, int const_index, int num_free) {
-    Constant constant = vm->constants.data[const_index];
-
-    if (constant.type != c_Function) {
-        return errorf("not a function: constant %d", const_index);
-    }
-
+vm_push_closure(VM *vm, Constant constant, int num_free) {
     CompiledFunction *func = constant.data.function;
     Object *free_variables = &vm->stack[vm->sp - num_free];
     Closure *closure = create_closure(vm, func, free_variables, num_free);
@@ -677,18 +699,33 @@ vm_push_closure(VM *vm, int const_index, int num_free) {
     return vm_push(vm, obj);
 }
 
-error vm_run(VM *vm, Bytecode bytecode) {
-    vm->num_globals = bytecode.num_globals;
-    vm->constants = *bytecode.constants;
+static inline void resize_vm_globals(VM *vm, int num_globals) {
+    if (num_globals > vm->num_globals) {
+        vm->globals = realloc(vm->globals, num_globals * sizeof(Object));
+        if (vm->globals == NULL) { die("vm resize globals:"); }
+    }
 
-    vm->main_cl->func = bytecode.main_function;
-    frame_init(vm, vm->main_cl, vm->sp);
+    int added = num_globals - vm->num_globals;
+    if (added > 0) {
+        Object *globals = vm->globals + vm->num_globals;
+        memset(globals, 0, added * sizeof(Object));
+        vm->num_globals = num_globals;
+    }
+}
 
-    Frame *current_frame = vm->frames;
-    Instructions ins = instructions(current_frame);
-    const Builtin *builtins = get_builtins(NULL);
+error vm_run(VM *vm, Bytecode code) {
+    resize_vm_globals(vm, code.num_globals);
+    vm->closure->func = code.main_function;
+    frame_init(vm, OBJ(o_Closure, .closure = vm->closure), 0);
+
+    // frequently accessed
+    Frame *current_frame = &vm->frames[vm->frames_index];
+    Instructions ins = code.main_function->instructions;
+    Constant *constants = vm->compiler->constants.data;
+    Object *globals = vm->globals;
 
     int ip, pos, num;
+    const Builtin *builtins = get_builtins(&pos);
     Opcode op;
     Object obj;
     error err;
@@ -704,7 +741,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 pos = read_big_endian_uint16(ins.data + ip + 1);
                 current_frame->ip += 2;
 
-                err = vm_push_constant(vm, vm->constants.data[pos]);
+                err = vm_push_constant(vm, constants[pos]);
                 if (err) { return err; };
                 break;
 
@@ -770,7 +807,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 pos = read_big_endian_uint16(ins.data + ip + 1);
                 current_frame->ip += 2;
 
-                vm->globals[pos] = vm_pop(vm);
+                globals[pos] = vm_pop(vm);
                 break;
 
             case OpGetGlobal:
@@ -778,7 +815,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 pos = read_big_endian_uint16(ins.data + ip + 1);
                 current_frame->ip += 2;
 
-                err = vm_push(vm, vm->globals[pos]);
+                err = vm_push(vm, globals[pos]);
                 if (err) { return err; };
                 break;
 
@@ -826,7 +863,21 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 if (err) { return err; };
 
                 current_frame = vm->frames + vm->frames_index;
-                ins = instructions(current_frame);
+                ins = frame_instructions(current_frame);
+                break;
+
+            case OpRequire:
+                // constants index
+                pos = read_big_endian_uint16(ins.data + ip + 1);
+                current_frame->ip += 2;
+
+                err = require_sub_module(vm, constants[pos]);
+                if (err) { return err; }
+
+                constants = vm->compiler->constants.data; // in case of realloc
+                current_frame = vm->frames + vm->frames_index;
+                globals = current_frame->function.data.module->globals;
+                ins = frame_instructions(current_frame);
                 break;
 
             case OpReturnValue:
@@ -836,18 +887,21 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 vm->sp = current_frame->base_pointer;
 
 #ifdef DEBUG
-                printf("return: ");
-                debug_print_args(
-                        OBJ(o_Closure, .closure = current_frame->cl),
-                        vm->stack + vm->sp,
-                        current_frame->cl->func->num_parameters);
-                printf(" -> ");
-                object_fprint(obj, stdout);
-                putc('\n', stdout);
+                debug_print_return(current_frame->function, vm->stack + vm->sp,
+                                   obj);
 #endif
 
+                if (current_frame->function.type == o_Module) {
+                    vm->cur_module = vm->cur_module->parent;
+                    if (vm->cur_module) {
+                        globals = vm->cur_module->globals;
+                    } else {
+                        globals = vm->globals;
+                    }
+                }
+
                 current_frame = pop_frame(vm);
-                ins = instructions(current_frame);
+                ins = frame_instructions(current_frame);
 
                 err = vm_push(vm, obj);
                 if (err) { return err; };
@@ -857,17 +911,21 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 vm->sp = current_frame->base_pointer;
 
 #ifdef DEBUG
-                printf("return: ");
-                debug_print_args(
-                        OBJ(o_Closure, .closure = current_frame->cl),
-                        vm->stack + vm->sp,
-                        current_frame->cl->func->num_parameters);
-                printf(" -> nothing");
-                putc('\n', stdout);
+                debug_print_return(current_frame->function, vm->stack + vm->sp,
+                                   OBJ_NOTHING);
 #endif
 
+                if (current_frame->function.type == o_Module) {
+                    vm->cur_module = vm->cur_module->parent;
+                    if (vm->cur_module) {
+                        globals = vm->cur_module->globals;
+                    } else {
+                        globals = vm->globals;
+                    }
+                }
+
                 current_frame = pop_frame(vm);
-                ins = instructions(current_frame);
+                ins = frame_instructions(current_frame);
 
                 err = vm_push(vm, OBJ_NOTHING);
                 if (err) { return err; };
@@ -907,7 +965,11 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 num = read_big_endian_uint8(ins.data + ip + 3);
                 current_frame->ip += 3;
 
-                err = vm_push_closure(vm, pos, num);
+                if (constants[pos].type != c_Function) {
+                    return errorf("not a function: constant %d", pos);
+                }
+
+                err = vm_push_closure(vm, constants[pos], num);
                 if (err) { return err; };
                 break;
 
@@ -916,7 +978,7 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 pos = read_big_endian_uint8(ins.data + ip + 1);
                 current_frame->ip += 1;
 
-                err = vm_push(vm, current_frame->cl->free[pos]);
+                err = vm_push(vm, current_frame->function.data.closure->free[pos]);
                 if (err) { return err; };
                 break;
             case OpSetFree:
@@ -924,12 +986,11 @@ error vm_run(VM *vm, Bytecode bytecode) {
                 pos = read_big_endian_uint8(ins.data + ip + 1);
                 current_frame->ip += 1;
 
-                current_frame->cl->free[pos] = vm_pop(vm);
+                current_frame->function.data.closure->free[pos] = vm_pop(vm);
                 break;
 
             case OpCurrentClosure:
-                err = vm_push(vm,
-                        OBJ(o_Closure, .closure = current_frame->cl));
+                err = vm_push(vm, OBJ(o_Closure, .closure = current_frame->function.data.closure));
                 if (err) { return err; };
                 break;
 
@@ -952,9 +1013,142 @@ _print_repeats(int first_idx, int cur_idx) {
     }
 }
 
-void print_vm_stack_trace(VM *vm, FILE *s) {
-    putc('\n', s);
+static void
+frame_init(VM *vm, Object function, int base_pointer) {
+    vm->frames[vm->frames_index] = (Frame) {
+        .function = function,
+        .ip = -1,
+        .base_pointer = base_pointer,
+    };
+}
 
+static Instructions
+frame_instructions(Frame *f) {
+    switch (f->function.type) {
+        case o_Closure:
+            return f->function.data.closure->func->instructions;
+        case o_Module:
+            return f->function.data.module->main_function->instructions;
+        default:
+            die("frame_instructions: Frame should not have function of type %s",
+                show_object_type(f->function.type));
+    }
+}
+
+static error module_compile(VM *vm, Module *m, const char *source_code) {
+    bool success = false;
+
+    // create dummy file that appends writes into [buf], to return as error.
+    char *buf = NULL;
+    size_t buf_len = 0;
+    FILE *out = open_memstream(&buf, &buf_len);
+    if (out == NULL) {
+        return errorf("error loading module - %s", strerror(errno));
+    }
+
+    Lexer l;
+    lexer_init(&l, source_code, strlen(source_code));
+
+    Program program = {0};
+    ParseErrorBuffer errors = parse(parser(), &l, &program);
+    if (errors.length > 0) {
+        fputs(parser_error_msg, out);
+        print_parse_errors(&errors, stdout);
+        program_free(&program);
+        goto cleanup;
+    }
+
+    Compiler *c = vm->compiler;
+
+    // Enter Independent Compilation Scope
+    SymbolTable *prev = NULL;
+    prev = c->cur_symbol_table;
+    c->cur_symbol_table = NULL;
+    enter_scope(c);
+
+    error err = compile(c, &program);
+    if (err) {
+        fputs(compiler_error_msg, out);
+        print_error(err, out);
+        free_error(err);
+        compiler_reset(c);
+        goto cleanup;
+    }
+
+    m->program = program;
+    module_bytecode(m, bytecode(c));
+
+    // Exit Independent Compilation Scope
+    c->cur_symbol_table->outer = prev;
+    SymbolTable *module_table = c->cur_symbol_table;
+    leave_scope(c);
+    symbol_table_free(module_table);
+
+    success = true;
+
+cleanup:
+    fclose(out);
+
+    if (!success) {
+        program_free(&program);
+        return create_error(buf);
+    }
+
+    free(buf);
+    return 0;
+}
+
+error require_sub_module(VM *vm, Constant constant) {
+    error err;
+
+    if (constant.type != c_String) {
+        die("require - filename constant of type %d, not c_String",
+            constant.type);
+    }
+
+    Token *string = constant.data.string;
+    uint64_t hash = hash_fnv1a_(string->start, string->length);
+    Module *module = ht_get_hash(vm->sub_modules, hash);
+    if (errno == ENOKEY) {
+        char *filename = strndup(string->start, string->length);
+        if (filename == NULL) { die("require - strndup filename:"); }
+
+        module = calloc(1, sizeof(Module));
+        if (module == NULL) { die("require - create Module"); }
+
+        err = load_file(filename, (char **) &module->source);
+        if (err) { goto fail; }
+
+        module->name = filename;
+        module->parent = vm->cur_module;
+
+        err = module_compile(vm, module, module->source);
+        if (err) { goto fail; }
+
+        ht_set_hash(vm->sub_modules, (void *) filename, module, hash);
+        if (errno == ENOMEM) {
+            err = errorf("error adding module - %s", strerror(errno));
+            goto fail;
+        }
+    } else {
+        module->parent = vm->cur_module;
+    }
+
+    vm->cur_module = module;
+
+    err = new_frame(vm);
+    if (err) { return err; }
+
+    frame_init(vm, OBJ(o_Module, .module = module), vm->sp);
+    return 0;
+
+fail:
+    module_free(module);
+    return err;
+}
+
+
+void print_vm_stack_trace(VM *vm, FILE *s) {
     Closure *prev = NULL;
     int prev_ip = -1,
         prev_idx = 0,
@@ -964,28 +1158,35 @@ void print_vm_stack_trace(VM *vm, FILE *s) {
     for (; idx <= vm->frames_index; ++idx) {
         Frame frame = vm->frames[idx];
 
-        if (frame.cl == prev && frame.ip == prev_ip) {
+        if (frame.function.data.closure == prev && frame.ip == prev_ip) {
             // [frame] stopped at the same position as previous.
             continue;
 
         } else {
-            // previous Frame if present, stopped at the same position as
-            // current.
-            mapping = find_mapping(frame.cl->func->mappings, frame.ip);
-
             _print_repeats(prev_idx, idx);
 
-            prev = frame.cl;
-            prev_idx = idx;
-            prev_ip = frame.ip;
+            // previous Frame if present, stopped at the same position as
+            // current.
+            Object func = frame.function;
+            switch (func.type) {
+                case o_Closure:
+                    mapping = find_mapping(&func.data.closure->func->mappings, frame.ip);
+
+                    prev = func.data.closure;
+                    prev_idx = idx;
+                    prev_ip = frame.ip;
+                    break;
+                case o_Module:
+                    mapping = find_mapping(&func.data.module->main_function->mappings, frame.ip);
+                    break;
+                default:
+                    die("print_vm_stack_trace: Frame should not have function of type %s",
+                        show_object_type(func.type));
+            }
+
         }
 
-        FunctionLiteral *lit = frame.cl->func->literal;
-        if (lit == NULL) {
-            fprintf(s, "<main function>");
-        } else {
-            fprint_closure(frame.cl, stdout);
-        }
+        object_fprint(frame.function, stdout);
 
         if (mapping) {
             Token *tok = node_token(mapping->node);

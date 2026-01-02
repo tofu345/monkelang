@@ -2,27 +2,27 @@
 #include "helpers.h"
 
 #include "../src/parser.h"
+#include "../src/shared.h"
 
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
-Program test_parse(const char *input) {
-    Parser p;
-    parser_init(&p);
+Program parse_(const char *input) {
+    Lexer l;
+    lexer_init(&l, input, strlen(input));
 
-    Program prog = parse(&p, input);
-    if (p.errors.length > 0) {
+    Program program = {0};
+    ParseErrorBuffer errors = parse(parser(), &l, &program);
+    if (errors.length > 0) {
         printf("test %s\n", input);
-        printf("parser had %d errors\n", p.errors.length);
-        print_parser_errors(&p);
-
-        program_free(&prog);
-        parser_free(&p);
+        printf("parser had %d errors\n", errors.length);
+        print_parse_errors(&errors, stdout);
+        program_free(&program);
         TEST_FAIL();
     }
 
-    parser_free(&p);
-    return prog;
+    return program;
 }
 
 Instructions concat(Instructions first, ...) {

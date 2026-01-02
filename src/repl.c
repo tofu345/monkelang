@@ -1,8 +1,12 @@
-#include "repl.h"
+#include "code.h"
 #include "compiler.h"
 #include "errors.h"
+#include "lexer.h"
 #include "object.h"
 #include "parser.h"
+#include "repl.h"
+#include "shared.h"
+#include "utils.h"
 #include "vm.h"
 
 #include <stdio.h>
@@ -10,80 +14,76 @@
 #include <string.h>
 #include <sys/poll.h>
 
-static const char *parser_error = "Woops! We ran into some monkey business here!\n";
-static const char *compiler_error = "Woops! Compilation failed!\n";
-static const char *vm_error = "Woops! Executing bytecode failed!\n";
+// It works, but it requires a module to explicitly `return` a value for it to
+// be exposed. not a bad idea tbh. will polish this tmr.
 
-// Evaluation, successful or not.
-typedef struct Eval {
-    char *input;
+typedef struct {
+    char *source;
     Program program;
-    struct Eval *prev;
-} Eval;
+} Input;
+
+BUFFER(Input, Input)
+DEFINE_BUFFER(Input, Input)
 
 // getline() but if there is no more data to read or the first line ends with
 // '{' or '('.  Then read and append multiple lines to [input] until a blank
 // line is encountered and there is no data left in [in_stream].
-static int multigetline(char **input, size_t *input_cap,
-                        FILE *in_stream, FILE *out_stream);
-Eval *new_eval(Eval *prev);
+static int multigetline(char **input, size_t *input_cap, FILE *in, FILE *out);
 
 void repl(FILE* in, FILE* out) {
-    Parser p;
-    parser_init(&p);
+    Lexer l;
+    lexer_init(&l, NULL, 0);
 
     Compiler c;
     compiler_init(&c);
 
     VM vm;
-    vm_init(&vm, NULL, NULL, NULL);
+    vm_init(&vm, &c);
 
-    Eval *current = NULL;
+    InputBuffer inputs = {0};
+    Program program = {0};
+    ParseErrorBuffer p_errors = {0};
 
     error err = NULL;
     char *input = NULL;
     int len;
     size_t cap = 0;
-    Program prog;
     while (1) {
         len = multigetline(&input, &cap, in, out);
         if (len == -1) {
             free(input);
             break;
 
-        // only '\n' was entered.
         } else if (len == 1) {
+            // only '\n' was entered.
             continue;
         }
 
-        prog = parse_(&p, input, len);
-        if (p.errors.length > 0) {
-            fputs(parser_error, out);
-            print_parser_errors(&p);
+        lexer_with(&l, input, len);
+        p_errors = parse(parser(), &l, &program);
+        if (p_errors.length > 0) {
+            fputs(parser_error_msg, out);
+            print_parse_errors(&p_errors, out);
             goto cleanup;
 
-        } else if (prog.stmts.length == 0) {
+        } else if (program.stmts.length == 0) {
             goto cleanup;
         }
 
-        err = compile(&c, &prog);
+        err = compile(&c, &program);
         if (err) {
-            fputs(compiler_error, out);
+            fputs(compiler_error_msg, out);
             print_error(err, out);
             goto cleanup;
         }
 
-        current = new_eval(current);
-        current->input = input;
-        current->program = prog;
-
-        // reallocate on next read
+        InputBufferPush(&inputs, (Input){ input, program });
         input = NULL;
-        prog = (Program){0};
+        program = (Program){0};
 
         err = vm_run(&vm, bytecode(&c));
         if (err) {
-            fputs(vm_error, out);
+            fputs(vm_error_msg, out);
             print_vm_stack_trace(&vm, out);
             print_error(err, out);
             goto cleanup;
@@ -96,27 +96,17 @@ void repl(FILE* in, FILE* out) {
         }
 
 cleanup:
-        program_free(&prog);
-        prog.stmts.length = 0;
-
         free_error(err);
         err = NULL;
 
-        if (c.cur_scope_index > 0) {
-            for (; c.cur_scope_index > 0; --c.cur_scope_index) {
-                // free unsuccessfully [CompiledFunctions]
-                free_function(c.scopes.data[c.cur_scope_index].function);
-            }
-            c.cur_scope = &c.scopes.data[0];
-            c.scopes.length = 1;
-
-            CompiledFunction *main_fn = c.cur_scope->function;
-            c.current_instructions = &main_fn->instructions;
-            c.cur_mappings = &main_fn->mappings;
-        } else {
-            c.current_instructions->length = 0;
-            c.cur_mappings->length = 0;
+        for (int i = 0; i < program.stmts.length; i++) {
+            node_free(program.stmts.data[i]);
         }
+        program.stmts.length = 0;
+
+        compiler_reset(&c);
+        c.cur_instructions->length = 0;
+        c.cur_mappings->length = 0;
 
         vm.sp = 0;
         vm.frames_index = 0;
@@ -125,57 +115,67 @@ cleanup:
 
     vm_free(&vm);
     compiler_free(&c);
-    parser_free(&p);
-    while (current) {
-        Eval *next = current->prev;
-        free(current->input);
-        program_free(&current->program);
-        free(current);
-        current = next;
+    free_parse_errors(&p_errors);
+    for (int i = 0; i < inputs.length; ++i) {
+        free(inputs.data[i].source);
+        program_free(&inputs.data[i].program);
     }
+    free(inputs.data);
 }
 
-void run(char* program) {
-    Parser p;
-    Program prog;
+int run(char* filename) {
+    bool success = false;
+
+    char *source;
+    error err = load_file(filename, &source);
+    if (err) {
+        print_error(err, stdout);
+        free_error(err);
+        return -1;
+    }
+
+    Lexer l;
+    lexer_init(&l, source, strlen(source));
+
     Compiler c;
-    VM vm;
-    error err = NULL;
-
-    parser_init(&p);
     compiler_init(&c);
-    vm_init(&vm, NULL, NULL, NULL);
 
-    prog = parse(&p, program);
-    if (p.errors.length > 0) {
-        fputs(parser_error, stdout);
-        print_parser_errors(&p);
-        goto cleanup;
-    } else if (prog.stmts.length == 0) {
+    VM vm;
+    vm_init(&vm, &c);
+
+    Program program = {0};
+    ParseErrorBuffer errors = parse(parser(), &l, &program);
+    if (errors.length > 0) {
+        fputs(parser_error_msg, stdout);
+        print_parse_errors(&errors, stdout);
         goto cleanup;
     }
 
-    err = compile(&c, &prog);
+    err = compile(&c, &program);
     if (err) {
-        fputs(compiler_error, stdout);
+        fputs(compiler_error_msg, stdout);
         print_error(err, stdout);
+        free_error(err);
         goto cleanup;
     }
 
     err = vm_run(&vm, bytecode(&c));
     if (err) {
-        fputs(vm_error, stdout);
+        fputs(vm_error_msg, stdout);
         print_vm_stack_trace(&vm, stdout);
         print_error(err, stdout);
-        goto cleanup;
+        free_error(err);
     }
 
+    success = true;
+
 cleanup:
-    free_error(err);
     vm_free(&vm);
     compiler_free(&c);
-    program_free(&prog);
-    parser_free(&p);
+    program_free(&program);
+    free_parse_errors(&errors);
+    free(source);
+    return success ? 0 : 1;
 }
 
 static int
@@ -250,11 +250,4 @@ multigetline(char **input, size_t *input_cap, FILE *in, FILE *out) {
 
     free(line);
     return len;
-}
-
-Eval *new_eval(Eval *prev) {
-    Eval *new = malloc(sizeof(Eval));
-    if (new == NULL) { die("new_eval:"); }
-    new->prev = prev;
-    return new;
 }

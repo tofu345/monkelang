@@ -10,26 +10,26 @@
 #include <stdlib.h>
 #include <string.h>
 
-DEFINE_BUFFER(Error, ParserError)
+// All `parse_*` functions must return with `p->cur_token` in use or freed
+
+DEFINE_BUFFER(ParseError, ParseError)
 
 #define INVALID (Node){ .obj = NULL }
 #define IS_INVALID(n) (n.obj == NULL)
 
-// `ParserError` with msg `asprintf(format, ...)` with [p.cur_token]
-static void parser_error(Parser* p, char* format, ...);
-// `ParserError` with [message] with [p.cur_token]
-static void parser_error_(Parser* p, const char* message);
+static void parse_error(Parser* p, char* format, ...);
+static void parse_error_(Parser *p, const char* message);
 
 static Node parse_statement(Parser* p);
 static Node parse_expression(Parser* p, enum Precedence precedence);
 
-// [NodeBuffer.length] is -1 on err.
+// `NodeBuffer.length` is -1 on err.
 static NodeBuffer parse_expression_list(Parser* p, TokenType end);
 
 static void *
 allocate(size_t size) {
     void* ptr = calloc(1, size);
-    if (ptr == NULL) die("parser: malloc");
+    if (ptr == NULL) { die("parser - allocate:"); }
     return ptr;
 }
 
@@ -76,19 +76,19 @@ cur_precedence(Parser* p) {
 static void
 next_token(Parser* p) {
     p->cur_token = p->peek_token;
-    p->peek_token = lexer_next_token(&p->l);
+    p->peek_token = lexer_next_token(p->l);
 }
 
 static void
 cur_tok_error(Parser* p, TokenType t) {
-    parser_error(p,
+    parse_error(p,
             "expected token to be '%s', got '%s' instead",
             show_token_type(t), show_token_type(p->cur_token.type));
 }
 
 static void
 peek_error(Parser* p, TokenType t) {
-    parser_error(p,
+    parse_error(p,
             "expected next token to be '%s', got '%s' instead",
             show_token_type(t), show_token_type(p->peek_token.type));
 }
@@ -118,7 +118,7 @@ expect_peek(Parser* p, TokenType t) {
 
 static void
 no_prefix_parse_error(Parser* p, TokenType t) {
-    parser_error(p, "unexpected token '%s'", show_token_type(t));
+    parse_error(p, "unexpected token '%s'", show_token_type(t));
 }
 
 static Node
@@ -167,7 +167,7 @@ parse_float(Parser* p) {
     errno = 0; // must reset errno
     double value = strtod(tok.start, &endptr);
     if (endptr != end || errno == ERANGE) {
-        parser_error(p,
+        parse_error(p,
                 "could not parse '%.*s' as float",
                 LITERAL(p->cur_token));
         return INVALID;
@@ -188,13 +188,13 @@ parse_integer(Parser* p) {
     errno = 0; // must reset errno
     long value = strtol(tok.start, &endptr, 0);
     if (endptr != end) {
-        parser_error(p,
+        parse_error(p,
                 "could not parse '%.*s' as integer",
                 LITERAL(p->cur_token));
         return INVALID;
 
     } else if (errno == ERANGE) {
-        parser_error(p,
+        parse_error(p,
                 "integer '%.*s' is out of range",
                 LITERAL(p->cur_token));
         return INVALID;
@@ -345,7 +345,7 @@ parse_string_literal(Parser* p) {
         --p->cur_token.position;
         p->cur_token.length = 1;
 
-        parser_error_(p, "missing closing '\"'");
+        parse_error_(p, "missing closing '\"'");
         return INVALID;
     }
 
@@ -499,7 +499,7 @@ parse_if_expression(Parser* p) {
     next_token(p);
 
     if (cur_token_is(p, t_Rparen)) {
-        parser_error_(p, "empty if statement");
+        parse_error_(p, "empty if statement");
         goto invalid;
     }
 
@@ -536,6 +536,22 @@ parse_nothing_literal(Parser *p) {
     return NODE(n_NothingLiteral, nl);
 }
 
+static Node
+parse_require_expression(Parser *p) {
+    Token tok = p->cur_token;
+    next_token(p);
+
+    NodeBuffer args = parse_expression_list(p, t_Rparen);
+    if (args.length == -1) { return INVALID; }
+
+    tok.length = (p->cur_token.position + p->cur_token.length) - tok.position;
+
+    RequireExpression* re = allocate(sizeof(RequireExpression));
+    re->tok = tok;
+    re->args = args;
+    return NODE(n_RequireExpression, re);
+}
+
 inline static int
 _parse_let_statement(Parser *p, LetStatement *ls) {
     if (!expect_peek(p, t_Ident)) { return -1; }
@@ -549,8 +565,8 @@ _parse_let_statement(Parser *p, LetStatement *ls) {
     }
 
     // (x2) next_token() to skip t_Assign
-    p->cur_token = lexer_next_token(&p->l);
-    p->peek_token = lexer_next_token(&p->l);
+    p->cur_token = lexer_next_token(p->l);
+    p->peek_token = lexer_next_token(p->l);
 
     Node value = parse_expression(p, p_Lowest);
     if (IS_INVALID(value)) { return -1; }
@@ -609,8 +625,8 @@ parse_assignment(Parser *p, Node left) {
     Token tok = p->peek_token;
 
     // (x2) next_token() to skip t_Assign
-    p->cur_token = lexer_next_token(&p->l);
-    p->peek_token = lexer_next_token(&p->l);
+    p->cur_token = lexer_next_token(p->l);
+    p->peek_token = lexer_next_token(p->l);
 
     Node right = parse_expression(p, p_Lowest);
     if (IS_INVALID(right)) { goto invalid; }
@@ -636,8 +652,8 @@ parse_operator_assignment(Parser *p, Node left) {
     Token tok = p->peek_token;
 
     // (x2) next_token() to skip t_(operator)_Assign
-    p->cur_token = lexer_next_token(&p->l);
-    p->peek_token = lexer_next_token(&p->l);
+    p->cur_token = lexer_next_token(p->l);
+    p->peek_token = lexer_next_token(p->l);
 
     Node right = parse_expression(p, p_Lowest);
     if (IS_INVALID(right)) { goto invalid; }
@@ -717,7 +733,7 @@ parse_statement_(Parser *p) {
     case t_For:
         return parse_for_statement(p);
     case t_Illegal:
-        parser_error(p,
+        parse_error(p,
                 "illegal character '%.*s'",
                 p->cur_token.length, p->cur_token.start);
         return INVALID;
@@ -761,7 +777,7 @@ peek_semicolon_or_newline(Parser *p) {
                 return true;
             default:
                 next_token(p); // highlight the statement that follows.
-                parser_error_(p,
+                parse_error_(p,
                         "multiple statements on the same line must be separated by a ';'");
                 return false;
         }
@@ -783,8 +799,6 @@ parse_statement(Parser* p) {
 void parser_init(Parser* p) {
     memset(p, 0, sizeof(Parser));
 
-    lexer_init(&p->l, NULL);
-
     p->prefix_parse_fns[t_Ident] = parse_identifier;
     p->prefix_parse_fns[t_Integer] = parse_integer;
     p->prefix_parse_fns[t_Float] = parse_float;
@@ -799,6 +813,7 @@ void parser_init(Parser* p) {
     p->prefix_parse_fns[t_Lbracket] = parse_array_literal;
     p->prefix_parse_fns[t_Lbrace] = parse_table_literal;
     p->prefix_parse_fns[t_Nothing] = parse_nothing_literal;
+    p->prefix_parse_fns[t_Require] = parse_require_expression;
 
     p->infix_parse_fns[t_Plus] = parse_infix_expression;
     p->infix_parse_fns[t_Minus] = parse_infix_expression;
@@ -812,87 +827,75 @@ void parser_init(Parser* p) {
     p->infix_parse_fns[t_Lbracket] = parse_index_expression;
 }
 
-void parser_free(Parser* p) {
-    for (int i = 0; i < p->errors.length; i++) {
-        ParserError err = p->errors.data[i];
-        if (err.allocated) {
-            free((char *) err.message);
-        }
-    }
-    free(p->errors.data);
-}
-
-void print_parser_errors(Parser *p) {
-    for (int i = 0; i < p->errors.length; i++) {
-        ParserError err = p->errors.data[i];
-
-        highlight_token(&err.token, 2, stdout);
-        printf("%s\n", err.message);
-
-        if (err.allocated) {
-            free((char *) err.message);
-        }
-    }
-    p->errors.length = 0;
-}
-
-inline static Program
-_parse(Parser *p, const char *program, uint64_t length) {
-    lexer_with(&p->l, program, length);
-    p->cur_token = lexer_next_token(&p->l);
-    p->peek_token = lexer_next_token(&p->l);
-
-    Program prog = {0};
+ParseErrorBuffer parse(Parser *p, Lexer *lexer, Program *program) {
+    p->l = lexer;
+    p->cur_token = lexer_next_token(p->l);
+    p->peek_token = lexer_next_token(p->l);
 
     while (p->cur_token.type != t_Eof) {
         Node stmt = parse_statement(p);
         if (IS_INVALID(stmt)) {
-            return prog;
+            // exit immediately on error
+            break;
         }
 
-        NodeBufferPush(&prog.stmts, stmt);
+        NodeBufferPush(&program->stmts, stmt);
         next_token(p);
     }
-    return prog;
+
+    ParseErrorBuffer errors = p->errors;
+    p->errors = (ParseErrorBuffer){0};
+    return errors;
 }
 
-Program parse(Parser* p, const char *program) {
-    return _parse(p, program, strlen(program));
-}
+void print_parse_errors(ParseErrorBuffer *errors, FILE *stream) {
+    for (int i = 0; i < errors->length; i++) {
+        ParseError err = errors->data[i];
 
-Program parse_(Parser* p, const char *program, uint64_t length) {
-    return _parse(p, program, length);
-}
+        highlight_token(&err.token, 2, stream);
+        fprintf(stream, "%s\n", err.message);
 
-void program_free(Program* p) {
-    for (int i = 0; i < p->stmts.length; i++) {
-        node_free(p->stmts.data[i]);
+        if (err.allocated) {
+            free((char *) err.message);
+        }
     }
-    free(p->stmts.data);
+    free(errors->data);
+    *errors = (ParseErrorBuffer){0};
+}
+
+void free_parse_errors(ParseErrorBuffer *errors) {
+    for (int i = 0; i < errors->length; i++) {
+        ParseError err = errors->data[i];
+        if (err.allocated) {
+            free((char *) err.message);
+        }
+    }
+    free(errors->data);
+    *errors = (ParseErrorBuffer){0};
 }
 
 static void
-parser_error_(Parser* p, const char* message) {
-    ErrorBufferPush(&p->errors, (ParserError) {
+parse_error_(Parser *p, const char* message) {
+    ParseErrorBufferPush(&p->errors, (ParseError) {
         .message = message,
-        .token = p->cur_token,
         .allocated = false,
+        .token = p->cur_token,
     });
 }
 
 static void
-parser_error(Parser* p, char* format, ...) {
+parse_error(Parser* p, char* format, ...) {
     va_list args;
     va_start(args, format);
     char* msg = NULL;
     if (vasprintf(&msg, format, args) == -1) {
-        die("parser_error vasprintf:");
+        die("parse_error vasprintf:");
     }
     va_end(args);
 
-    ErrorBufferPush(&p->errors, (ParserError) {
+    ParseErrorBufferPush(&p->errors, (ParseError) {
         .message = msg,
+        .allocated = true,
         .token = p->cur_token,
-        .allocated = true
     });
 }

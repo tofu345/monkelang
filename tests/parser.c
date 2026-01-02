@@ -4,6 +4,7 @@
 #include "../src/ast.h"
 #include "../src/parser.h"
 #include "../src/token.h"
+#include "../src/shared.h"
 
 #include <stdarg.h>
 #include <stddef.h>
@@ -14,193 +15,20 @@
 #define ASSERT_NODE_TYPE(t, n) \
     TEST_ASSERT_EQUAL_INT_MESSAGE(t, n.typ, "type not " #t);
 
-static bool
-test_token_literal(Token *tok, const char *expected) {
-    // not using strlen(expected) because of Floats
-    return strncmp(expected, tok->start, tok->length) == 0;
-}
+static bool test_token_literal(Token *tok, const char *expected);
+static bool test_integer_literal(Node n, long value);
+static bool test_float_literal(Node n, double value);
+static bool test_string_or_identifier(Node n, const char* value);
+static bool test_boolean_literal(Node n, bool exp);
+static bool test_node(Node n, Test *test);
+static void test_infix_expression(Node n, Test *left, char* operator, Test *right);
+static void test_let_statement(Node n, const char* names[], Test *values[], int num);
 
-static int
-test_integer_literal(Node n, long value) {
-    if (n.typ != n_IntegerLiteral) {
-        printf("type not IntegerLiteral got %d\n", n.typ);
-        return false;
-    }
-
-    Token *tok = node_token(n);
-    char* exp = NULL;
-    if (asprintf(&exp, "%ld", value) == -1) { die("vasprintf"); }
-    bool eq = test_token_literal(tok, exp);
-    free(exp);
-
-    if (!eq) {
-        printf("wrong IntegerLiteral.literal want %ld, got %.*s\n",
-                value, tok->length, tok->start);
-        return false;
-    }
-
-    IntegerLiteral* il = n.obj;
-    if (il->value != value) {
-        printf("wrong IntegerLiteral.value want %ld, got %ld\n",
-                value, il->value);
-        return false;
-    }
-
-    return true;
-}
-
-static int
-test_float_literal(Node n, double value) {
-    if (n.typ != n_FloatLiteral) {
-        printf("type not FloatLiteral got %d\n", n.typ);
-        return false;
-    }
-
-    Token *tok = node_token(n);
-    char* exp = NULL;
-    if (asprintf(&exp, "%f", value) == -1) { die("vasprintf"); }
-    bool eq = test_token_literal(tok, exp);
-    free(exp);
-
-    if (!eq) {
-        printf("wrong FloatLiteral.literal want %f, got %.*s\n",
-                value, tok->length, tok->start);
-        return false;
-    }
-
-    FloatLiteral* lit = n.obj;
-    if (lit->value != value) {
-        printf("wrong FloatLiteral.value want %f, got %f\n",
-                value, lit->value);
-        return false;
-    }
-
-    return true;
-}
-
-static int
-test_string_or_identifier(Node n, const char* value) {
-    if (!(n.typ == n_Identifier || n.typ == n_StringLiteral)) {
-        printf("type not Identifier or StringLiteral got %d\n", n.typ);
-        return false;
-    }
-
-    Token *tok = node_token(n);
-    if (!test_token_literal(tok, value)) {
-        printf("wrong token literal want %s, got %.*s\n",
-                value, tok->length, tok->start);
-        return false;
-    }
-
-    return true;
-}
-
-static int
-test_boolean_literal(Node n, bool exp) {
-    if (n.typ != n_BooleanLiteral) {
-        printf("type not BooleanLiteral got %d\n", n.typ);
-        return false;
-    }
-
-    BooleanLiteral* b = n.obj;
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-            b->value, exp, "wrong BooleanLiteral.value");
-
-    const char *exp_lit = exp ? "true" : "false";
-    if (!test_token_literal(&b->tok, exp_lit)) {
-        printf("wrong BooleanLiteral.Token.literal want %s, got %.*s\n",
-                exp_lit, LITERAL(b->tok));
-        return false;
-    }
-
-    return true;
-}
-
-static bool
-test_node(Node n, Test *test) {
-    switch (test->typ) {
-        case test_int:
-            return test_integer_literal(n, test->val._int);
-        case test_float:
-            return test_float_literal(n, test->val._float);
-        case test_str:
-            return test_string_or_identifier(n, test->val._str);
-        case test_bool:
-            return test_boolean_literal(n, test->val._bool);
-        case test_nothing:
-            if (n.obj == NULL) { return true; }
-            printf("test_node: node is not null\n");
-            return false;
-        default:
-            die("test_literal: type %d not handled", test->typ);
-    }
-}
-
-static void
-test_infix_expression(Node n, Test *left, char* operator, Test *right) {
-    ASSERT_NODE_TYPE(n_InfixExpression, n);
-
-    InfixExpression* ie = n.obj;
-    test_node(ie->left, left);
-    test_node(ie->right, right);
-
-    if (!test_token_literal(&ie->tok, operator)) {
-        printf("wrong InfixExpression Operator want %s, got %.*s\n",
-                operator, LITERAL(ie->tok));
-        TEST_FAIL();
-    }
-}
-
-static void
-test_let_statement(Node n, const char* names[], Test *values[], int num) {
-    ASSERT_NODE_TYPE(n_LetStatement, n);
-
-    LetStatement *ls = n.obj;
-    Token *tok = node_token(n);
-    if (!test_token_literal(tok, "let")) {
-        printf("wrong LetStatement.Token.literal want 'let' got %.*s\n",
-                tok->length, tok->start);
-        TEST_FAIL();
-    }
-
-    if (ls->values.length != num) {
-        printf("let statement has %d values expected %d\n", ls->values.length, num);
-        TEST_FAIL();
-    }
-
-    for (int i = 0; i < num; ++i) {
-        Identifier *id = ls->names.data[i];
-        tok = &id->tok;
-        if (!test_token_literal(tok, names[i])) {
-            printf("wrong LetStatement.Identifier.Token.literal want %s, got %.*s\n",
-                    names[i], tok->length, tok->start);
-            TEST_FAIL();
-        }
-
-        if (values) {
-            if (!test_node(ls->values.data[i], values[i])) {
-                printf("wrong LetStatement value for %.*s\n",
-                        tok->length, tok->start);
-                TEST_FAIL();
-            }
-        }
-    }
-}
-
-static void
-check(Parser *p, Program *prog) {
-    if (p->errors.length > 0) {
-        print_parser_errors(p);
-        TEST_FAIL();
-    }
-
-    TEST_ASSERT_MESSAGE(prog->stmts.length == 1, "wrong prog.statements length");
-}
-
-Parser p;
 Program prog;
 
-// free and reset [prog]
+inline static void check(Program *program); // expect_length(program, 1);
+static void expect_length(Program *program, int expected);
+
 static void
 _program_free(void) {
     program_free(&prog);
@@ -211,16 +39,13 @@ void setUp(void) {}
 
 void tearDown(void) {
     _program_free();
-    parser_free(&p);
-    p.errors = (ErrorBuffer){0};
 }
 
 void test_identifier_expression(void) {
     char *input = "foobar;";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -232,9 +57,8 @@ void test_identifier_expression(void) {
 void test_integer_literal_expression(void) {
     char *input = "5;";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -246,9 +70,8 @@ void test_integer_literal_expression(void) {
 void test_float_literal_expression(void) {
     char *input = "5.01;";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -270,12 +93,10 @@ void test_return_statements(void) {
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
 
-    parser_init(&p);
-
     for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        prog = parse(&p, test.input);
-        check(&p, &prog);
+        prog = parse_(test.input);
+        check(&prog);
 
         Node stmt = prog.stmts.data[0];
         ASSERT_NODE_TYPE(n_ReturnStatement, stmt);
@@ -306,12 +127,10 @@ void test_single_let_statements(void) {
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
 
-    parser_init(&p);
-
     for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        prog = parse(&p, test.input);
-        check(&p, &prog);
+        prog = parse_(test.input);
+        check(&prog);
 
         Node stmt = prog.stmts.data[0];
 
@@ -324,12 +143,8 @@ void test_single_let_statements(void) {
 void test_multiple_let_statements(void) {
     char *input = "let a = 1.5, b = 2, c; let d = \"abc\", e = \"def\", f = true;";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    if (p.errors.length > 0) {
-        print_parser_errors(&p);
-        TEST_FAIL();
-    }
+    prog = parse_(input);
+    expect_length(&prog, 2);
 
     Node n = prog.stmts.data[0];
 
@@ -353,12 +168,10 @@ void test_parsing_prefix_expressions(void) {
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
 
-    parser_init(&p);
-
     for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        prog = parse(&p, test.input);
-        check(&p, &prog);
+        prog = parse_(test.input);
+        check(&prog);
 
         Node n = prog.stmts.data[0];
         ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -399,12 +212,10 @@ void test_parsing_infix_expressions(void) {
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
 
-    parser_init(&p);
-
     for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        prog = parse(&p, test.input);
-        check(&p, &prog);
+        prog = parse_(test.input);
+        check(&prog);
 
         Node n = prog.stmts.data[0];
         ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -542,17 +353,9 @@ void test_operator_precedence_parsing(void) {
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
 
-    parser_init(&p);
-
     for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        prog = parse(&p, test.input);
-
-        // not check() because test: "3 + 4; -5 * 5" has more than one statement
-        if (p.errors.length > 0) {
-            print_parser_errors(&p);
-            TEST_FAIL();
-        }
+        prog = parse_(test.input);
 
         for (int i = 0; i < prog.stmts.length; ++i) {
             ASSERT_NODE_TYPE(n_ExpressionStatement, prog.stmts.data[i]);
@@ -587,14 +390,12 @@ void test_boolean_expression(void) {
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
 
-    parser_init(&p);
-
     for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
 
-        prog = parse(&p, test.input);
+        prog = parse_(test.input);
 
-        check(&p, &prog);
+        check(&prog);
 
         Node n = prog.stmts.data[0];
         ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -613,9 +414,8 @@ void test_boolean_expression(void) {
 void test_if_expression(void) {
     char *input = "if (x < y) { x }";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -639,9 +439,8 @@ void test_if_expression(void) {
 void test_if_else_expression(void) {
     char *input = "if (x < y) { x } else { y }";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -669,9 +468,8 @@ void test_if_else_expression(void) {
 void test_function_literal_parsing(void) {
     char *input = "fn(x, y) { x + y; }";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -699,9 +497,8 @@ void test_function_literal_parsing(void) {
 void test_function_literal_with_name(void) {
     char *input = "let myFunction = fn() { };";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
 
@@ -730,12 +527,10 @@ void test_function_parameter_parsing(void) {
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
 
-    parser_init(&p);
-
     for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        prog = parse(&p, test.input);
-        check(&p, &prog);
+        prog = parse_(test.input);
+        check(&prog);
 
         Node n = prog.stmts.data[0];
         ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -761,9 +556,8 @@ void test_function_parameter_parsing(void) {
 void test_call_expression_parsing(void) {
     char *input = "add(1, 2 * 3, 4 + 5);";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -787,9 +581,8 @@ void test_call_expression_parsing(void) {
 void test_string_literal_expression(void) {
     char *input = "\"hello world\";";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -801,9 +594,8 @@ void test_string_literal_expression(void) {
 void test_parsing_array_literals(void) {
     char *input = "[1, 2 * 2, 3 + 3]";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -823,9 +615,8 @@ void test_parsing_array_literals(void) {
 void test_parsing_index_expressions(void) {
     char *input = "myArray[1 + 1]";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -841,10 +632,9 @@ void test_parsing_index_expressions(void) {
 void test_parsing_table_literals_string_keys(void) {
     char *input = "{\"one\": 1, \"two\": 2, \"three\": 3}";
 
-    parser_init(&p);
-    prog = parse(&p, input);
+    prog = parse_(input);
 
-    check(&p, &prog);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -875,9 +665,8 @@ void test_parsing_table_literals_string_keys(void) {
 void test_parsing_empty_table_literal(void) {
     char *input = "{}";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -893,9 +682,8 @@ void test_parsing_empty_table_literal(void) {
 void test_parsing_table_literals_with_expressions(void) {
     char *input = "{\"one\": 0 + 1, \"two\": 10 - 8, \"three\": 15 / 5}";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -937,9 +725,8 @@ void test_parsing_table_literals_with_expressions(void) {
 void test_parsing_assignment(void) {
     char *input = "foobar = 0;";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_Assignment, n);
@@ -964,9 +751,8 @@ void test_parsing_assignment(void) {
 void test_parsing_index_assignment(void) {
     char *input = "foobar[12] = 69;";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_Assignment, n);
@@ -1008,12 +794,10 @@ void test_parsing_operator_assignment(void) {
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
 
-    parser_init(&p);
-
     for (int i = 0; i < tests_len; i++) {
         struct Test test = tests[i];
-        prog = parse(&p, test.input);
-        check(&p, &prog);
+        prog = parse_(test.input);
+        check(&prog);
 
         Node n = prog.stmts.data[0];
         ASSERT_NODE_TYPE(n_OperatorAssignment, n);
@@ -1033,9 +817,8 @@ void test_parsing_operator_assignment(void) {
 void test_parsing_nothing_literals(void) {
     char *input = "nothing";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
@@ -1053,9 +836,8 @@ void test_parsing_nothing_literals(void) {
 void test_for_statement(void) {
     char *input = "for (let i = 0; i < 5; i = i + 1) { i == 10; }";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_ForStatement, n);
@@ -1083,9 +865,8 @@ void test_for_statement(void) {
 void test_empty_for_statement(void) {
     char *input = "for (;;) { i == 10; }";
 
-    parser_init(&p);
-    prog = parse(&p, input);
-    check(&p, &prog);
+    prog = parse_(input);
+    check(&prog);
 
     Node n = prog.stmts.data[0];
     ASSERT_NODE_TYPE(n_ForStatement, n);
@@ -1103,6 +884,30 @@ void test_empty_for_statement(void) {
 
     ExpressionStatement* es = stmt.obj;
     test_infix_expression(es->expression, TEST(str, "i"), "==", TEST(int, 10));
+}
+
+void test_require_expression(void) {
+    char *input = "require(\"test.monke\")";
+
+    prog = parse_(input);
+    check(&prog);
+
+    Node n = prog.stmts.data[0];
+    ASSERT_NODE_TYPE(n_ExpressionStatement, n);
+    ExpressionStatement *es = n.obj;
+
+    n = es->expression;
+    ASSERT_NODE_TYPE(n_RequireExpression, n);
+    RequireExpression *re = n.obj;
+
+    if (!test_token_literal(&re->tok, "require(\"test.monke\")")) {
+        printf("wrong RequireExpression.literal, got %.*s\n", re->tok.length,
+               re->tok.start);
+        TEST_FAIL();
+    }
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, re->args.length, "wrong arguments length");
+    test_string_or_identifier(re->args.data[0], "test.monke");
 }
 
 void test_parser_errors(void) {
@@ -1154,29 +959,219 @@ void test_parser_errors(void) {
     };
     int tests_len = sizeof(tests) / sizeof(tests[0]);
 
-    parser_init(&p);
+    Lexer l;
+    ParseErrorBuffer errors;
 
     bool pass = true;
     for (int i = 0; i < tests_len; ++i) {
         struct Test test = tests[i];
-        prog = parse(&p, test.input);
+        lexer_init(&l, test.input, strlen(test.input));
 
-        if (p.errors.length == 0) {
+        prog = (Program){0};
+        errors = parse(parser(), &l, &prog);
+        if (errors.length == 0) {
             printf("expected parser error for test: %s\n", test.input);
             pass = false;
-
-        } else if (strcmp(test.error, p.errors.data[0].message) != 0) {
+        } else if (strcmp(test.error, errors.data[0].message) != 0) {
             printf("wrong parser error for test: %s\nwant= %s\ngot = %s\n",
-                    test.input, test.error, p.errors.data[0].message);
+                    test.input, test.error, errors.data[0].message);
             pass = false;
         }
 
         _program_free();
-        parser_free(&p);
-        p.errors = (ErrorBuffer){0};
+        free_parse_errors(&errors);
     }
 
     TEST_ASSERT(pass);
+}
+
+// helpers functions
+
+static bool
+test_token_literal(Token *tok, const char *expected) {
+    // not using strlen(expected) because of Floats
+    return strncmp(expected, tok->start, tok->length) == 0;
+}
+
+static bool
+test_integer_literal(Node n, long value) {
+    if (n.typ != n_IntegerLiteral) {
+        printf("type not IntegerLiteral got %d\n", n.typ);
+        return false;
+    }
+
+    Token *tok = node_token(n);
+    char* exp = NULL;
+    if (asprintf(&exp, "%ld", value) == -1) { die("vasprintf"); }
+    bool eq = test_token_literal(tok, exp);
+    free(exp);
+
+    if (!eq) {
+        printf("wrong IntegerLiteral.literal want %ld, got %.*s\n",
+                value, tok->length, tok->start);
+        return false;
+    }
+
+    IntegerLiteral* il = n.obj;
+    if (il->value != value) {
+        printf("wrong IntegerLiteral.value want %ld, got %ld\n",
+                value, il->value);
+        return false;
+    }
+
+    return true;
+}
+
+static bool
+test_float_literal(Node n, double value) {
+    if (n.typ != n_FloatLiteral) {
+        printf("type not FloatLiteral got %d\n", n.typ);
+        return false;
+    }
+
+    Token *tok = node_token(n);
+    char* exp = NULL;
+    if (asprintf(&exp, "%f", value) == -1) { die("vasprintf"); }
+    bool eq = test_token_literal(tok, exp);
+    free(exp);
+
+    if (!eq) {
+        printf("wrong FloatLiteral.literal want %f, got %.*s\n",
+                value, tok->length, tok->start);
+        return false;
+    }
+
+    FloatLiteral* lit = n.obj;
+    if (lit->value != value) {
+        printf("wrong FloatLiteral.value want %f, got %f\n",
+                value, lit->value);
+        return false;
+    }
+
+    return true;
+}
+
+static bool
+test_string_or_identifier(Node n, const char* value) {
+    if (!(n.typ == n_Identifier || n.typ == n_StringLiteral)) {
+        printf("type not Identifier or StringLiteral got %d\n", n.typ);
+        return false;
+    }
+
+    Token *tok = node_token(n);
+    if (!test_token_literal(tok, value)) {
+        printf("wrong token literal want %s, got %.*s\n",
+                value, tok->length, tok->start);
+        return false;
+    }
+
+    return true;
+}
+
+static bool
+test_boolean_literal(Node n, bool exp) {
+    if (n.typ != n_BooleanLiteral) {
+        printf("type not BooleanLiteral got %d\n", n.typ);
+        return false;
+    }
+
+    BooleanLiteral* b = n.obj;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            b->value, exp, "wrong BooleanLiteral.value");
+
+    const char *exp_lit = exp ? "true" : "false";
+    if (!test_token_literal(&b->tok, exp_lit)) {
+        printf("wrong BooleanLiteral.Token.literal want %s, got %.*s\n",
+                exp_lit, LITERAL(b->tok));
+        return false;
+    }
+
+    return true;
+}
+
+static bool
+test_node(Node n, Test *test) {
+    switch (test->typ) {
+        case test_int:
+            return test_integer_literal(n, test->val._int);
+        case test_float:
+            return test_float_literal(n, test->val._float);
+        case test_str:
+            return test_string_or_identifier(n, test->val._str);
+        case test_bool:
+            return test_boolean_literal(n, test->val._bool);
+        case test_nothing:
+            if (n.obj == NULL) { return true; }
+            printf("test_node: node is not null\n");
+            return false;
+        default:
+            die("test_literal: type %d not handled", test->typ);
+    }
+}
+
+static void
+test_infix_expression(Node n, Test *left, char* operator, Test *right) {
+    ASSERT_NODE_TYPE(n_InfixExpression, n);
+
+    InfixExpression* ie = n.obj;
+    test_node(ie->left, left);
+    test_node(ie->right, right);
+
+    if (!test_token_literal(&ie->tok, operator)) {
+        printf("wrong InfixExpression Operator want %s, got %.*s\n",
+                operator, LITERAL(ie->tok));
+        TEST_FAIL();
+    }
+}
+
+static void
+test_let_statement(Node n, const char* names[], Test *values[], int num) {
+    ASSERT_NODE_TYPE(n_LetStatement, n);
+
+    LetStatement *ls = n.obj;
+    Token *tok = node_token(n);
+    if (!test_token_literal(tok, "let")) {
+        printf("wrong LetStatement.Token.literal want 'let' got %.*s\n",
+                tok->length, tok->start);
+        TEST_FAIL();
+    }
+
+    if (ls->values.length != num) {
+        printf("let statement has %d values expected %d\n", ls->values.length, num);
+        TEST_FAIL();
+    }
+
+    for (int i = 0; i < num; ++i) {
+        Identifier *id = ls->names.data[i];
+        tok = &id->tok;
+        if (!test_token_literal(tok, names[i])) {
+            printf("wrong LetStatement.Identifier.Token.literal want %s, got %.*s\n",
+                    names[i], tok->length, tok->start);
+            TEST_FAIL();
+        }
+
+        if (values) {
+            if (!test_node(ls->values.data[i], values[i])) {
+                printf("wrong LetStatement value for %.*s\n",
+                        tok->length, tok->start);
+                TEST_FAIL();
+            }
+        }
+    }
+}
+
+static void
+expect_length(Program *program, int expected) {
+    if (program->stmts.length != expected) {
+        printf("wrong program statements length, want %d, got %d\n",
+               expected, program->stmts.length);
+        TEST_FAIL();
+    }
+}
+
+inline static void
+check(Program *program) {
+    expect_length(program, 1);
 }
 
 int main(void) {
@@ -1209,6 +1204,7 @@ int main(void) {
     RUN_TEST(test_parsing_nothing_literals);
     RUN_TEST(test_for_statement);
     RUN_TEST(test_empty_for_statement);
+    RUN_TEST(test_require_expression);
     RUN_TEST(test_parser_errors);
     return UNITY_END();
 }

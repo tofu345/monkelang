@@ -101,7 +101,6 @@ resolve(SymbolTable *st, uint64_t hash) {
 
         switch (sym->scope) {
             case GlobalScope:
-            case BuiltinScope:
                 return sym;
             default:
                 return define_free(st, sym, hash);
@@ -117,9 +116,4 @@ Symbol *sym_resolve(SymbolTable *st, uint64_t hash) {
 
 Symbol *sym_function_name(SymbolTable *st, Token *name, uint64_t hash) {
     return new_symbol(st, name, hash, 0, FunctionScope);
-}
-
-Symbol *sym_builtin(SymbolTable *st, const char *name, int index) {
-    uint64_t hash = hash_fnv1a(name);
-    return new_symbol(st, (void *) name, hash, index, BuiltinScope);
 }

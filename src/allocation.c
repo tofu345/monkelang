@@ -1,4 +1,5 @@
 #include "allocation.h"
+#include "hash-table/ht.h"
 #include "object.h"
 #include "utils.h"
 #include "vm.h"
@@ -15,6 +16,7 @@ CharBuffer *create_string(VM *vm, const char *text, int length) {
     char *data = vm_allocate(vm, length + 1);
     if (text) {
         strncpy(data, text, length);
+        data[length] = '\0';
     }
 
     CharBuffer *buf = new_allocation(vm, o_String, sizeof(CharBuffer));
@@ -47,7 +49,7 @@ ObjectBuffer *create_array(VM *vm, Object *data, int length) {
 Table *create_table(VM *vm) {
     Table *tbl = new_allocation(vm, o_Table, sizeof(Table));
     void *err = table_init(tbl);
-    if (err == NULL) { die("create_table"); }
+    if (err == NULL) { die("create_table:"); }
     return tbl;
 }
 
@@ -135,6 +137,16 @@ void mark(Object obj) {
     alloc->is_marked = true;
 }
 
+static void mark_objs(Object *objs, int len);
+
+static void mark_module(Module *m) {
+#ifdef DEBUG
+    printf("module: %s\n", m->name);
+#endif
+
+    mark_objs(m->globals, m->num_globals);
+}
+
 static void
 trace_mark_object(Object obj) {
     switch (obj.type) {
@@ -144,23 +156,23 @@ trace_mark_object(Object obj) {
         case o_Boolean:
         case o_BuiltinFunction:
         case o_Error:
-            return;
+            break;
 
         case o_String:
             mark(obj);
-            return;
+            break;
 
         case o_Closure:
             mark(obj);
             for (int i = 0; i < obj.data.closure->num_free; i++)
                 trace_mark_object(obj.data.closure->free[i]);
-            return;
+            break;
 
         case o_Array:
             mark(obj);
             for (int i = 0; i < obj.data.array->length; i++)
                 trace_mark_object(obj.data.array->data[i]);
-            return;
+            break;
 
         case o_Table:
             mark(obj);
@@ -169,13 +181,33 @@ trace_mark_object(Object obj) {
                 trace_mark_object(it.cur_key);
                 trace_mark_object(it.cur_val);
             }
-            return;
+            break;
+
+        case o_Module:
+            mark_module(obj.data.module);
+            break;
 
         default:
             die("trace_mark_object: type %s (%d) not handled",
                     show_object_type(obj.type), obj.type);
     }
 }
+
+static void mark_objs(Object *objs, int len) {
+    for (int i = 0; i < len; i++) {
+        if (objs[i].type >= o_String) {
+            trace_mark_object(objs[i]);
+        }
+#ifdef DEBUG
+        else {
+            printf("skip: ");
+            object_fprint(objs[i], stdout);
+            putc('\n', stdout);
+        }
+#endif
+    }
+}
+
 
 void free_allocation(Allocation *alloc) {
     assert(alloc->type >= o_String);
@@ -211,21 +243,6 @@ void free_allocation(Allocation *alloc) {
     free(alloc);
 }
 
-void mark_objs(Object *objs, int len) {
-    for (int i = 0; i < len; i++) {
-        if (objs[i].type >= o_String) {
-            trace_mark_object(objs[i]);
-        }
-#ifdef DEBUG
-        else {
-            printf("skip: ");
-            object_fprint(objs[i], stdout);
-            putc('\n', stdout);
-        }
-#endif
-    }
-}
-
 void mark_and_sweep(VM *vm) {
 #ifdef DEBUG
     puts("stack:");
@@ -233,16 +250,24 @@ void mark_and_sweep(VM *vm) {
     mark_objs(vm->stack, vm->sp);
 
 #ifdef DEBUG
+    puts("\nframes:");
+#endif
+    // The first frames Closure is managed by the VM, not GC.
+    for (int i = 1; i <= vm->frames_index; ++i) {
+        trace_mark_object(vm->frames[i].function);
+    }
+
+#ifdef DEBUG
     puts("\nglobals:");
 #endif
     mark_objs(vm->globals, vm->num_globals);
 
 #ifdef DEBUG
-    puts("\nframes:");
+    putc('\n', stdout);
 #endif
-    // exclude main function
-    for (int i = 1; i <= vm->frames_index; ++i) {
-        trace_mark_object(OBJ(o_Closure, .closure = vm->frames[i].cl));
+    hti it = ht_iterator(vm->sub_modules);
+    while (ht_next(&it)) {
+        mark_module(it.current->value);
     }
 
 #ifdef DEBUG
@@ -287,8 +312,8 @@ void *vm_allocate(VM *vm, size_t size) {
         vm->bytesTillGC = NextGC;
     }
 
-    void *ptr = calloc(1, size);
-    if (ptr == NULL) { die("calloc"); }
+    void *ptr = malloc(size);
+    if (ptr == NULL) { die("vm_allocate:"); }
     return ptr;
 }
 

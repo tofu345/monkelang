@@ -8,6 +8,8 @@
 
 #include <stdbool.h>
 
+Program parse_(const char *input);
+
 typedef struct {
     int *data, length;
 } IntArray;
@@ -51,7 +53,3 @@ typedef struct {
 
 Instructions concat(Instructions first, ...);
 Tests constants(Test *t, ...);
-
-Program test_parse(const char *input);
-
-void print_parser_errors(Parser *p);

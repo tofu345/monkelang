@@ -60,7 +60,8 @@ const Definition definitions[] = {
     DEF_EMPTY(OpIndex),
     DEF_EMPTY(OpSetIndex),
 
-    DEF(OpCall, one_byte), // num arguments
+    DEF(OpCall, one_byte),      // num arguments
+    DEF(OpRequire, two_bytes),  // constant index
     DEF_EMPTY(OpReturnValue),
     DEF_EMPTY(OpReturn),
 
@@ -216,14 +217,14 @@ fprint_definition_operands(FILE *out, const Definition *def, Operands operands) 
     }
 }
 
-int fprint_instructions(FILE *out, Instructions ins) {
+int fprint_instructions(FILE *out, Instructions *ins) {
     int err, read, i = 0;
     const Definition *def;
     Operands operands;
-    while (i < ins.length) {
-        def = lookup(ins.data[i]);
+    while (i < ins->length) {
+        def = lookup(ins->data[i]);
 
-        operands = read_operands(&read, def, ins.data + i);
+        operands = read_operands(&read, def, ins->data + i);
         FPRINTF(out, "%04d ", i);
 
         err = fprint_definition_operands(out, def, operands);
@@ -235,18 +236,18 @@ int fprint_instructions(FILE *out, Instructions ins) {
     return 0;
 }
 
-SourceMapping *find_mapping(SourceMappingBuffer maps, int ip) {
-    assert(maps.length > 0);
+SourceMapping *find_mapping(SourceMappingBuffer *maps, int ip) {
+    assert(maps->length > 0);
 
     int low = 0,
-        high = maps.length - 1;
+        high = maps->length - 1;
 
     while (low < high) {
         int mid = low + (high - low) / 2,
-            position = maps.data[mid].position;
+            position = maps->data[mid].position;
 
         if (position == ip) {
-            return &maps.data[mid];
+            return &maps->data[mid];
 
         } else if (position > ip) {
             high = mid - 1;
@@ -256,31 +257,30 @@ SourceMapping *find_mapping(SourceMappingBuffer maps, int ip) {
         }
     }
 
-    if (maps.data[low].position > ip) {
+    if (maps->data[low].position > ip) {
         if (low == 0) {
             return NULL;
         }
         --low;
     }
-    return &maps.data[low];
+    return &maps->data[low];
 }
 
-int
-fprint_instructions_mappings(FILE *out, SourceMappingBuffer mappings,
-                             Instructions ins) {
+int fprint_instructions_mappings(FILE *out, SourceMappingBuffer *mappings,
+                                 Instructions *ins) {
     int err, read, i = 0, current = 0;
     const Definition *def;
     Operands operands;
 
-    while (i < ins.length) {
-        for (; current < mappings.length
-                && mappings.data[current].position <= i; ++current) {
+    while (i < ins->length) {
+        for (; current < mappings->length
+                && mappings->data[current].position <= i; ++current) {
             putc('\n', out);
-            highlight_token(node_token(mappings.data[current].node), 0, out);
+            highlight_token(node_token(mappings->data[current].node), 0, out);
         }
 
-        def = lookup(ins.data[i]);
-        operands = read_operands(&read, def, ins.data + i);
+        def = lookup(ins->data[i]);
+        operands = read_operands(&read, def, ins->data + i);
         FPRINTF(out, "%04d ", i);
 
         err = fprint_definition_operands(out, def, operands);

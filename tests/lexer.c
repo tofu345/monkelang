@@ -203,10 +203,10 @@ for (let i = 0; i < 10; i = i + 1) {\
 	{t_Rbrace, "}", 1},
 	{t_Eof, "", 1},
     };
-size_t len_tests = sizeof(tests) / sizeof(tests[0]);
+    size_t len_tests = sizeof(tests) / sizeof(tests[0]);
 
     Lexer l;
-    lexer_init(&l, input);
+    lexer_init(&l, input, strlen(input));
 
     for (size_t i = 0; i < len_tests; i++) {
         struct Test test = tests[i];
@@ -286,7 +286,7 @@ let add = fn(x, y) {\n\
     size_t len_tests = sizeof(tests) / sizeof(tests[0]);
 
     Lexer l;
-    lexer_init(&l, input);
+    lexer_init(&l, input, strlen(input));
 
     for (size_t i = 0; i < len_tests; i++) {
         struct Test t = tests[i];

@@ -1,5 +1,6 @@
 #include "errors.h"
 #include "token.h"
+#include "utils.h"
 
 #include <stdarg.h>
 #include <stdbool.h>
@@ -16,17 +17,19 @@ error error_num_args(const char *name, int expected, int actual) {
                   name, expected, expected == 1 ? "" : "s", actual);
 }
 
+error create_error(const char *message) {
+    struct Error *err = calloc(1, sizeof(struct Error));
+    if (err == NULL) { die("create error:"); }
+    err->message = message;
+    return err;
+}
+
 error verrorf(const char* format, va_list args) {
     char* msg = NULL;
     if (vasprintf(&msg, format, args) == -1) {
         die("verrorf vasprintf:");
     }
-
-    struct Error *err = calloc(1, sizeof(struct Error));
-    if (err == NULL) { die("verrorf calloc error:"); }
-
-    err->message = msg;
-    return err;
+    return create_error(msg);
 }
 
 error errorf(const char* format, ...) {
@@ -35,18 +38,6 @@ error errorf(const char* format, ...) {
     error err = verrorf(format, args);
     va_end(args);
     return err;
-}
-
-void error_with(error *err, Token *tok) {
-    struct with_token {
-        struct Error err;
-        Token tok;
-    } *new_err = realloc(*err, sizeof(struct with_token));
-    if (new_err == NULL) { die("error_with:"); }
-
-    new_err->tok = *tok;
-    new_err->err.token = &new_err->tok;
-    *err = (error) new_err;
 }
 
 // returns pointer to start of line of [token.start], skip spaces

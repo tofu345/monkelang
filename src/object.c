@@ -104,9 +104,11 @@ fprint_table(Table *tbl, Buffer *seen, FILE* fp) {
 }
 
 int fprint_closure(Closure *cl, FILE *fp) {
-    FunctionLiteral *lit = cl->func->literal;
-    if (lit->name) {
-        Identifier *id = lit->name;
+    CompiledFunction *fn = cl->func;
+    if (fn == NULL || fn->literal == NULL) {
+        FPRINTF(fp, "<main function>");
+    } else if (fn->literal->name) {
+        Identifier *id = fn->literal->name;
         FPRINTF(fp, "<function: %.*s>", id->tok.length, id->tok.start);
     } else {
         FPRINTF(fp, "<anonymous function>");
@@ -123,6 +125,12 @@ fprint_builtin_function(const Builtin *builtin, FILE *fp) {
 static int
 fprint_error(error err, FILE *fp) {
     FPRINTF(fp, "<error: %s>", err->message);
+    return 0;
+}
+
+static int
+fprint_module(Module *m, FILE *fp) {
+    FPRINTF(fp, "<module: %s>", m->name);
     return 0;
 }
 
@@ -158,6 +166,9 @@ _object_fprint(Object o, Buffer *seen, FILE* fp) {
 
         case o_Closure:
             return fprint_closure(o.data.closure, fp);
+
+        case o_Module:
+            return fprint_module(o.data.module, fp);
 
         default:
             fprintf(stderr, "object_fprint: object type not handled %d\n",
@@ -242,6 +253,12 @@ Object object_eq(Object left, Object right) {
     }
 }
 
+void free_function(CompiledFunction *fn) {
+    free(fn->instructions.data);
+    free(fn->mappings.data);
+    free(fn);
+}
+
 const char* object_types[] = {
     "nothing",
     "integer",
@@ -253,6 +270,7 @@ const char* object_types[] = {
     "array",
     "table",
     "function",
+    "module",
 };
 
 const char* show_object_type(ObjectType t) {

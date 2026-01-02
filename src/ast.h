@@ -25,6 +25,7 @@ enum NodeType {
     n_InfixExpression,
     n_IfExpression,
     n_CallExpression,
+    n_RequireExpression,
     n_IndexExpression,
 
     // Statements
@@ -61,6 +62,8 @@ typedef struct {
 
 // Returns -1 on write to FILE err
 int program_fprint(Program* p, FILE* fp);
+
+void program_free(Program* p);
 
 typedef struct {
     Token tok; // the 't_Ident' token
@@ -165,7 +168,7 @@ typedef struct {
 void free_function_literal(FunctionLiteral* fl);
 
 typedef struct {
-    Token tok; // the 't_Ident' token
+    Token tok; // token of [function]
     Node function; // Identifier or FunctionLiteral
     NodeBuffer args;
 } CallExpression;
@@ -200,5 +203,11 @@ typedef struct {
 void free_table_literal(TableLiteral* hl);
 
 typedef struct {
-    Token tok; // the 'nothing' token
+    Token tok; // the 't_Nothing' token
 } NothingLiteral;
+
+typedef struct {
+    Token tok; // 'require(...)'
+    StringLiteral *filename;
+    NodeBuffer args;
+} RequireExpression;

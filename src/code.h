@@ -92,6 +92,9 @@ typedef enum {
     // arguments and an OpCall with `N` arguments.
     OpCall,
 
+    // OpRequire: "require" a sub-module.
+    OpRequire,
+
     // OpReturnValue: pop an Object of the top of stack, return to the previous
     // Frame and push the popped Object onto the stack.
     OpReturnValue,
@@ -140,7 +143,7 @@ typedef struct {
 // allocate [length] extra elements and increment [buf.length] by [length].
 void instructions_allocate(Instructions *buf, int length);
 
-int fprint_instructions(FILE *out, Instructions ins);
+int fprint_instructions(FILE *out, Instructions *ins);
 
 // Read integer operands from `ins[1:]` with Operand widths according in [def].
 Operands read_operands(int *n, const Definition *def, uint8_t *ins);
@@ -175,8 +178,8 @@ BUFFER(SourceMapping, SourceMapping)
 
 // Find [SourceMapping] [ip] occurs at, the source mapping with highest
 // [position] that is less than [ip] with binary search.
-SourceMapping *find_mapping(SourceMappingBuffer maps, int ip);
+SourceMapping *find_mapping(SourceMappingBuffer *maps, int ip);
 
 // fprint_instructions() with SourceMapping of each Instruction.
-int fprint_instructions_mappings(FILE *out, SourceMappingBuffer mappings,
-                                 Instructions ins);
+int fprint_instructions_mappings(FILE *out, SourceMappingBuffer *mappings,
+                                 Instructions *ins);

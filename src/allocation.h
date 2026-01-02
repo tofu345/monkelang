@@ -1,8 +1,8 @@
 #pragma once
 
 // This module manages the allocation and garbage collection of Compound Data
-// Types.  GC algorithm based on Boot.dev memory management in C course
-// https://youtu.be/rJrd2QMVbGM and wren.
+// Types.  Garbage collection based on the Boot.dev memory management in C
+// course https://youtu.be/rJrd2QMVbGM and wren https://github.com/wren-lang/wren.
 
 #include "object.h"
 #include "vm.h"
@@ -26,7 +26,7 @@ typedef struct Allocation {
     void *object_data[]; // used to access data after struct.
 } Allocation;
 
-// [malloc(size)] and call GC if necessary.
+// `malloc(size)` and garbage collect if necessary.
 void *vm_allocate(VM *vm, size_t size);
 
 void free_allocation(Allocation *alloc);
