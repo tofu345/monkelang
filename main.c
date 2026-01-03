@@ -1,4 +1,4 @@
-#include "src/repl.h"
+#include "src/cli.h"
 
 #include <stdio.h>
 #include <stdlib.h>

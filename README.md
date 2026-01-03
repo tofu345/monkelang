@@ -84,7 +84,7 @@ hello("dear, future Reader!"); // => Hello dear, future Reader!
 
 ```javascript
 // Modules: load, compile and execute at runtime.
-require("test.monke"); // "Hello from test"
+require("hello"); // "Hello from hello.monke"
 
 let fibonacci = fn(num) {
   let seen = {0: 0, 1: 1};

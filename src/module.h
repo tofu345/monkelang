@@ -14,6 +14,7 @@ typedef struct Module {
     const char *name;
     const char *source;
 
+    // When the file at [name] was last modified.
     time_t mtime;
 
     Program program;
