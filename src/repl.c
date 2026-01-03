@@ -1,10 +1,10 @@
+#include "repl.h"
 #include "code.h"
 #include "compiler.h"
 #include "errors.h"
 #include "lexer.h"
 #include "object.h"
 #include "parser.h"
-#include "repl.h"
 #include "shared.h"
 #include "utils.h"
 #include "vm.h"
@@ -36,6 +36,7 @@ void repl(FILE* in, FILE* out) {
 
     Compiler c;
     compiler_init(&c);
+    enter_scope(&c);
 
     VM vm;
     vm_init(&vm, &c);

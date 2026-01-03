@@ -1,8 +1,8 @@
+#include "parser.h"
 #include "ast.h"
 #include "errors.h"
 #include "utils.h"
 #include "lexer.h"
-#include "parser.h"
 #include "token.h"
 
 #include <stdarg.h>

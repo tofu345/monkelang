@@ -79,7 +79,7 @@ void compiler_reset(Compiler *c) {
     }
 
     SymbolTable *next, *cur = c->cur_symbol_table;
-    while (cur->outer) {
+    while (cur && cur->outer) {
         next = cur->outer;
         symbol_table_free(cur);
         cur = next;

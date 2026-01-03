@@ -569,4 +569,5 @@ void program_free(Program* prog) {
         node_free(prog->stmts.data[i]);
     }
     free(prog->stmts.data);
+    *prog = (Program){0};
 }
