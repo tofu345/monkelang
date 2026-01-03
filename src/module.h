@@ -1,14 +1,21 @@
 #pragma once
 
-// This file contains sub modules, other source files which are "required" 
-// i.e loaded, compiled and executed at runtime by the VM.
+// This file contains sub modules.
 
 #include "ast.h"
 #include "compiler.h"
+#include "vm.h"
 
+#include <time.h>
+
+// A source file which is "required" i.e loaded, compiled and executed at
+// runtime by the VM.
 typedef struct Module {
     const char *name;
     const char *source;
+
+    time_t mtime;
+
     Program program;
 
     Object *globals; // Global variables defined in [program].
@@ -19,4 +26,6 @@ typedef struct Module {
     struct Module *parent;
 } Module;
 
-void module_bytecode(Module *, Bytecode);
+// create Module with String `Constant`, then load, compile and add to `vm.modules`.
+error require_module(VM *vm, Constant filename);
+void  module_free(Module *m);

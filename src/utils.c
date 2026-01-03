@@ -52,7 +52,7 @@ int power_of_2_ceil(int n) {
 error load_file(const char *filename, char **source) {
     FILE *fp = fopen(filename, "r");
     if (fp == NULL) {
-        return errorf("could not open file '%s' - %s\n", filename,
+        return errorf("could not open file %s - %s\n", filename,
                       strerror(errno));
     }
 
@@ -64,7 +64,7 @@ error load_file(const char *filename, char **source) {
     int errno_ = errno;
     if (buf == NULL) {
         fclose(fp);
-        return errorf("could not allocate memory for file '%s' - %s\n",
+        return errorf("could not allocate memory for file %s - %s\n",
                       filename, strerror(errno_));
     }
 
@@ -73,7 +73,7 @@ error load_file(const char *filename, char **source) {
     if (errno_ != 0) {
         free(buf);
         fclose(fp);
-        return errorf("error while reading '%s' - %s\n", filename, strerror(errno_));
+        return errorf("error while reading %s - %s\n", filename, strerror(errno_));
     } else {
         buf[src_len] = '\0';
     }

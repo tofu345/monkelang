@@ -2,8 +2,9 @@
 #include "ast.h"
 #include "builtin.h"
 #include "errors.h"
-#include "utils.h"
+#include "module.h"
 #include "table.h"
+#include "utils.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -254,9 +255,11 @@ Object object_eq(Object left, Object right) {
 }
 
 void free_function(CompiledFunction *fn) {
-    free(fn->instructions.data);
-    free(fn->mappings.data);
-    free(fn);
+    if (fn) {
+        free(fn->instructions.data);
+        free(fn->mappings.data);
+        free(fn);
+    }
 }
 
 const char* object_types[] = {

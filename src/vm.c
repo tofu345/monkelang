@@ -1,3 +1,4 @@
+#include "vm.h"
 #include "allocation.h"
 #include "ast.h"
 #include "builtin.h"
@@ -6,26 +7,16 @@
 #include "constants.h"
 #include "errors.h"
 #include "hash-table/ht.h"
+#include "module.h"
 #include "object.h"
-#include "shared.h"
-#include "sub_modules.h"
 #include "table.h"
 #include "utils.h"
-#include "vm.h"
 
 #include <assert.h>
-#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-// load sub module if not done previously and add to `vm.modules`.
-error require_sub_module(VM *vm, Constant filename);
-
-// initialize `vm.frames[vm.frames_index]`
-static void frame_init(VM *vm, Object function, int base_pointer);
-static Instructions frame_instructions(Frame *f);
 
 static error
 error_unknown_operation(Opcode op, Object left, Object right) {
@@ -55,20 +46,11 @@ void vm_init(VM *vm, Compiler *compiler) {
     vm->bytesTillGC = NextGC;
 
     vm->cur_module = NULL;
-    vm->sub_modules = ht_create();
-    if (vm->sub_modules == NULL) { die("vm module table create:"); }
+    vm->modules = ht_create();
+    if (vm->modules == NULL) { die("vm module table create:"); }
 
     vm->closure = calloc(1, sizeof(Closure));
     if (vm->closure == NULL) { die("vm closure create:"); }
-}
-
-inline static void module_free(Module *m) {
-    free((char *) m->name);
-    free((char *) m->source);
-    free_function(m->main_function);
-    program_free(&m->program);
-    free(m->globals);
-    free(m);
 }
 
 void vm_free(VM *vm) {
@@ -87,11 +69,11 @@ void vm_free(VM *vm) {
     free(vm->closure);
     free(vm->globals);
 
-    hti it = ht_iterator(vm->sub_modules);
+    hti it = ht_iterator(vm->modules);
     while (ht_next(&it)) {
         module_free(it.current->value);
     }
-    ht_destroy(vm->sub_modules);
+    ht_destroy(vm->modules);
 
     memset(vm, 0, sizeof(VM));
 }
@@ -113,6 +95,29 @@ new_frame(VM *vm) {
     }
     return 0;
 }
+
+static void
+frame_init(VM *vm, Object function, int base_pointer) {
+    vm->frames[vm->frames_index] = (Frame) {
+        .function = function,
+        .ip = -1,
+        .base_pointer = base_pointer,
+    };
+}
+
+static Instructions
+frame_instructions(Frame *f) {
+    switch (f->function.type) {
+        case o_Closure:
+            return f->function.data.closure->func->instructions;
+        case o_Module:
+            return f->function.data.module->main_function->instructions;
+        default:
+            die("frame_instructions: Frame should not have function of type %s",
+                show_object_type(f->function.type));
+    }
+}
+
 
 static error
 vm_push(VM *vm, Object obj) {
@@ -871,8 +876,21 @@ error vm_run(VM *vm, Bytecode code) {
                 pos = read_big_endian_uint16(ins.data + ip + 1);
                 current_frame->ip += 2;
 
-                err = require_sub_module(vm, constants[pos]);
+                err = require_module(vm, constants[pos]);
                 if (err) { return err; }
+
+                obj = OBJ(o_Module, .module = vm->cur_module);
+
+#ifdef DEBUG
+                printf("require module: ");
+                object_fprint(obj, stdout);
+                putc('\n', stdout);
+#endif
+
+                err = new_frame(vm);
+                if (err) { return err; }
+
+                frame_init(vm, obj, vm->sp);
 
                 constants = vm->compiler->constants.data; // in case of realloc
                 current_frame = vm->frames + vm->frames_index;
@@ -1011,146 +1029,6 @@ _print_repeats(int first_idx, int cur_idx) {
     if (repeats > 1) {
         printf("[Previous line repeated %d more times]\n", repeats);
     }
-}
-
-static void
-frame_init(VM *vm, Object function, int base_pointer) {
-    vm->frames[vm->frames_index] = (Frame) {
-        .function = function,
-        .ip = -1,
-        .base_pointer = base_pointer,
-    };
-}
-
-static Instructions
-frame_instructions(Frame *f) {
-    switch (f->function.type) {
-        case o_Closure:
-            return f->function.data.closure->func->instructions;
-        case o_Module:
-            return f->function.data.module->main_function->instructions;
-        default:
-            die("frame_instructions: Frame should not have function of type %s",
-                show_object_type(f->function.type));
-    }
-}
-
-static error module_compile(VM *vm, Module *m, const char *source_code) {
-    bool success = false;
-
-    // create dummy file that appends writes into [buf], to return as error.
-    char *buf = NULL;
-    size_t buf_len = 0;
-    FILE *fp = open_memstream(&buf, &buf_len);
-    if (fp == NULL) {
-        return errorf("error loading module - %s", strerror(errno));
-    }
-
-    Lexer l;
-    lexer_init(&l, source_code, strlen(source_code));
-
-    Program program = {0};
-    ParseErrorBuffer errors = parse(parser(), &l, &program);
-    if (errors.length > 0) {
-        fputs(parser_error_msg, fp);
-        print_parse_errors(&errors, fp);
-        program_free(&program);
-        goto cleanup;
-    }
-
-    Compiler *c = vm->compiler;
-
-    // Enter Independent Compilation Scope
-    SymbolTable *prev = NULL;
-    prev = c->cur_symbol_table;
-    c->cur_symbol_table = NULL;
-    enter_scope(c);
-
-    error err = compile(c, &program);
-    if (err) {
-        fputs(compiler_error_msg, fp);
-        print_error(err, fp);
-        free_error(err);
-        compiler_reset(c);
-        goto cleanup;
-    }
-
-    m->program = program;
-    module_bytecode(m, bytecode(c));
-
-    // Exit Independent Compilation Scope
-    c->cur_symbol_table->outer = prev;
-    SymbolTable *module_table = c->cur_symbol_table;
-    leave_scope(c);
-    symbol_table_free(module_table);
-
-    success = true;
-
-cleanup:
-    fclose(fp);
-
-    if (!success) {
-        program_free(&program);
-        return create_error(buf);
-    }
-
-    free(buf);
-    return 0;
-}
-
-error require_sub_module(VM *vm, Constant constant) {
-    error err;
-
-    if (constant.type != c_String) {
-        die("require - filename constant of type %d, not c_String",
-            constant.type);
-    }
-
-    Token *string = constant.data.string;
-    uint64_t hash = hash_fnv1a_(string->start, string->length);
-    Module *module = ht_get_hash(vm->sub_modules, hash);
-    if (errno == ENOKEY) {
-        char *filename = strndup(string->start, string->length);
-        if (filename == NULL) { die("require - strndup filename:"); }
-
-        module = calloc(1, sizeof(Module));
-        if (module == NULL) { die("require - create Module"); }
-
-        err = load_file(filename, (char **) &module->source);
-        if (err) { goto fail; }
-
-        module->name = filename;
-
-        err = module_compile(vm, module, module->source);
-        if (err) { goto fail; }
-
-        ht_set_hash(vm->sub_modules, (void *) filename, module, hash);
-        if (errno == ENOMEM) {
-            err = errorf("error adding module - %s", strerror(errno));
-            goto fail;
-        }
-    }
-
-    module->parent = vm->cur_module;
-    vm->cur_module = module;
-
-#ifdef DEBUG
-    printf("require module: ");
-    Object *args = vm->stack + vm->sp;
-    debug_print_args(OBJ(o_Module, .module = module), args, 0);
-    putc('\n', stdout);
-#endif
-
-
-    err = new_frame(vm);
-    if (err) { return err; }
-
-    frame_init(vm, OBJ(o_Module, .module = module), vm->sp);
-    return 0;
-
-fail:
-    module_free(module);
-    return err;
 }
 
 void print_vm_stack_trace(VM *vm, FILE *s) {

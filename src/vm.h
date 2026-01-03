@@ -3,7 +3,6 @@
 // This module contains the Stack Virtual Machine.
 
 #include "compiler.h"
-#include "sub_modules.h"
 #include "object.h"
 #include "utils.h"
 
@@ -53,8 +52,9 @@ typedef struct VM {
     Object *globals;
     int num_globals;
 
-    Module *cur_module;
-    ht *sub_modules; // "required" sub Modules.
+    // Current Module.
+    struct Module *cur_module;
+    ht *modules;
 
     Compiler *compiler; // to access Constants
     Closure *closure; // for main function

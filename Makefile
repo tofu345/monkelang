@@ -7,6 +7,7 @@ DEPS = src/hash-table/ht.c
 main: $(OBJS)
 	@ $(CC) $(CFLAGS) $^ $(DEPS) main.c -o build/$@
 
+build/vm.o: src/module.*
 build/allocation.o: src/vm.h # recompile when changing DEBUG
 
 build/%.o: src/%.c src/%.h

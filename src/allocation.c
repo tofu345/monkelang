@@ -3,6 +3,7 @@
 #include "object.h"
 #include "utils.h"
 #include "vm.h"
+#include "module.h"
 #include "table.h"
 
 #include <assert.h>
@@ -276,7 +277,7 @@ void mark_and_sweep(VM *vm) {
 #ifdef DEBUG
     putc('\n', stdout);
 #endif
-    hti it = ht_iterator(vm->sub_modules);
+    hti it = ht_iterator(vm->modules);
     while (ht_next(&it)) {
         mark_module(it.current->value);
     }
