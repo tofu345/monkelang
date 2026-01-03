@@ -3,9 +3,12 @@
 #include "errors.h"
 #include "object.h"
 #include "shared.h"
+#include "token.h"
 #include "vm.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 
 static void module_bytecode(Module *m, Bytecode code) {
@@ -24,19 +27,37 @@ static void module_bytecode(Module *m, Bytecode code) {
     m->main_function = code.main_function;
 }
 
+bool has_monke_suffix(Token *t) {
+    int l = t->length;
+    const char *s = t->start;
+    return s[l - 6] == '.'
+        && s[l - 5] == 'm'
+        && s[l - 4] == 'o'
+        && s[l - 3] == 'n'
+        && s[l - 2] == 'k'
+        && s[l - 1] == 'e';
+}
+
 // load source code at [filename] into `Module`
-static error module_load(Module *module, Token *filename) {
-    char *_filename = strndup(filename->start, filename->length);
-    if (_filename == NULL) { die("create_module - strndup filename:"); }
-    module->name = _filename;
+static error module_load(Module *module, Token *name) {
+    char *filename = strndup(name->start, name->length);
+    if (filename == NULL) { die("create_module - filename:"); }
+
+    bool suffix = name->length > 6 && has_monke_suffix(name);
+    if (!suffix) {
+        filename = realloc(filename, name->length + 7);
+        if (filename == NULL) { die("create_module - filename:"); }
+        strncpy(&filename[name->length], ".monke", 7);
+    }
+    module->name = filename;
 
     struct stat mstat;
-    if (stat(_filename, &mstat) != 0) {
-        return errorf("could not open file '%s':", _filename);
+    if (stat(filename, &mstat) != 0) {
+        return errorf("could not open file '%s'", filename);
     }
     module->mtime = mstat.st_mtime;
 
-    return load_file(_filename, (char **) &module->source);
+    return load_file(filename, (char **) &module->source);
 }
 
 void module_free(Module *m) {
