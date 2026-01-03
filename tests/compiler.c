@@ -1120,7 +1120,7 @@ void test_return_statements(void) {
         )
     );
 
-    c_test_error("return;", "return statement outside function or sub module");
+    c_test_error("return;", "return statement outside function or module");
 }
 
 void test_for_statements(void) {
@@ -1277,6 +1277,14 @@ void test_source_mapping(void) {
             TEST_FAIL();
         }
     }
+}
+
+void test_modules(void) {
+    c_test_error("require()", "require() expects 1 argument of type string got 0");
+    c_test_error(
+        "require(\"a.monke\", \"b.monke\")",
+        "require() expects 1 argument of type string got 2"
+    );
 }
 
 static int test_instructions(Instructions expected, Instructions actual);
@@ -1529,5 +1537,6 @@ int main(void) {
     RUN_TEST(test_return_statements);
     RUN_TEST(test_for_statements);
     RUN_TEST(test_source_mapping);
+    RUN_TEST(test_modules);
     return UNITY_END();
 }

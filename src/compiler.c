@@ -285,7 +285,7 @@ _compile(Compiler *c, Node n) {
 
                 if (c->scopes.length == 1) {
                     return c_error(n,
-                            "return statement outside function or sub module");
+                            "return statement outside function or module");
                 }
 
                 ReturnStatement *rs = n.obj;
@@ -512,7 +512,8 @@ _compile(Compiler *c, Node n) {
                     err = _compile(c, args.data[0]);
                     if (err) { return err; }
                 } else {
-                    return c_error(n, "require() expects 1 argument of type string");
+                    return c_error(n, "require() expects 1 argument of type string got %d",
+                                   args.length);
                 }
 
                 source_map(c, n);

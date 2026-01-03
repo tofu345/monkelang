@@ -30,7 +30,7 @@
 
 # Other
 
-- test requiring (sub) Modules
+- better Module tests
 
 - ErrorType
 

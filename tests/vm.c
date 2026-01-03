@@ -740,6 +740,11 @@ test_for_statement(void) {
     );
 }
 
+static void
+test_modules(void) {
+    vm_test("require(\"tests/modules/hello.monke\")", TEST(str, "Hello, World!"));
+}
+
 static IntArray
 make_int_array(int n, ...) {
     IntArray arr = {0};
@@ -1080,5 +1085,6 @@ int main(void) {
     RUN_TEST(test_assignments);
     RUN_TEST(test_free_variable_list);
     RUN_TEST(test_for_statement);
+    RUN_TEST(test_modules);
     return UNITY_END();
 }

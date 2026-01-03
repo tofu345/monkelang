@@ -83,6 +83,9 @@ hello("dear, future Reader!"); // => Hello dear, future Reader!
 ### Differences
 
 ```javascript
+// Modules: load, compile and execute at runtime.
+require("test.monke"); // "Hello from test"
+
 let fibonacci = fn(num) {
   let seen = {0: 0, 1: 1};
   let fib = fn(num) {
