@@ -29,4 +29,7 @@ typedef struct Module {
 
 // create Module with String `Constant`, then load, compile and add to `vm.modules`.
 error require_module(VM *vm, Constant filename);
-void  module_free(Module *m);
+
+void module_free(Module *m);
+
+int fprint_module(Module *m, FILE *fp);

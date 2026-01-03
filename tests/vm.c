@@ -946,7 +946,7 @@ vm_test(char *input, Test *expected) {
 
     Program prog = parse_(input);
 
-    error err = compile(&c, &prog);
+    error err = compile(&c, &prog, 0);
     if (err) {
         print_error(err, stdout);
 
@@ -1030,7 +1030,7 @@ vm_test_error(char *input, char *expected_error) {
 
     Program prog = parse_(input);
 
-    error err = compile(&c, &prog);
+    error err = compile(&c, &prog, 0);
     if (err) {
         print_error(err, stdout);
         fail = true;

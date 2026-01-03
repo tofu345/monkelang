@@ -759,14 +759,14 @@ void leave_scope(Compiler *c) {
     c->cur_symbol_table = c->cur_symbol_table->outer;
 }
 
-error compile(Compiler *c, Program *prog) {
+error compile(Compiler *c, Program *prog, int from) {
     // Create Top Level Compilation Scope if not exists.
     if (c->scopes.length == 0) {
         enter_scope(c);
     }
 
     error err;
-    for (int i = 0; i < prog->stmts.length; i++) {
+    for (int i = from; i < prog->stmts.length; i++) {
         err = _compile(c, prog->stmts.data[i]);
         if (err) { return err; }
     }

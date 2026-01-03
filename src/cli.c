@@ -19,7 +19,6 @@
 
 typedef struct {
     char *source;
-    Program program;
 } Input;
 
 BUFFER(Input, Input)
@@ -47,9 +46,10 @@ void repl(FILE* in, FILE* out) {
 
     error err = NULL;
     char *input = NULL;
-    int len;
-    size_t cap = 0;
+    int from, len;
+    size_t cap;
     while (1) {
+        from = program.stmts.length;
         len = multigetline(&input, &cap, in, out);
         if (len == -1) {
             free(input);
@@ -71,16 +71,15 @@ void repl(FILE* in, FILE* out) {
             goto cleanup;
         }
 
-        err = compile(&c, &program);
+        err = compile(&c, &program, from);
         if (err) {
             fputs(compiler_error_msg, out);
             print_error(err, out);
             goto cleanup;
         }
 
-        InputBufferPush(&inputs, (Input){ input, program });
+        InputBufferPush(&inputs, (Input){ input });
         input = NULL;
-        program = (Program){0};
 
         err = vm_run(&vm, bytecode(&c));
         if (err) {
@@ -100,11 +99,6 @@ cleanup:
         free_error(err);
         err = NULL;
 
-        for (int i = 0; i < program.stmts.length; i++) {
-            node_free(program.stmts.data[i]);
-        }
-        program.stmts.length = 0;
-
         compiler_reset(&c);
         c.cur_instructions->length = 0;
         c.cur_mappings->length = 0;
@@ -116,10 +110,10 @@ cleanup:
 
     vm_free(&vm);
     compiler_free(&c);
+    program_free(&program);
     free_parse_errors(&p_errors);
     for (int i = 0; i < inputs.length; ++i) {
         free(inputs.data[i].source);
-        program_free(&inputs.data[i].program);
     }
     free(inputs.data);
 }
@@ -152,7 +146,7 @@ int run(char* filename) {
         goto cleanup;
     }
 
-    err = compile(&c, &program);
+    err = compile(&c, &program, 0);
     if (err) {
         fputs(compiler_error_msg, stdout);
         print_error(err, stdout);

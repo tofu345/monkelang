@@ -1,1 +1,3 @@
-puts("Hello from hello.monke");
+let message = "Hello from hello.monke!"
+puts(message)
+return message

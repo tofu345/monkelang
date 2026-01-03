@@ -130,12 +130,6 @@ fprint_error(error err, FILE *fp) {
 }
 
 static int
-fprint_module(Module *m, FILE *fp) {
-    FPRINTF(fp, "<module: %s>", m->name);
-    return 0;
-}
-
-static int
 _object_fprint(Object o, Buffer *seen, FILE* fp) {
     switch (o.type) {
         case o_Integer:

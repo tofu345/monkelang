@@ -35,9 +35,9 @@ void compiler_init(Compiler *);
 
 void compiler_free(Compiler *);
 
-// Compiles the `Program` (AST) returning `errors` if any.
+// Compile `Program` from statement [from], returning `errors` if any.
 // The Bytecode is retrieved using `bytecode()`.
-error compile(Compiler *, Program *);
+error compile(Compiler *, Program *, int from);
 
 // discard all non-global `CompilationScopes` and `SymbolTables`
 void compiler_reset(Compiler *);

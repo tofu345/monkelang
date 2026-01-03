@@ -879,18 +879,10 @@ error vm_run(VM *vm, Bytecode code) {
                 err = require_module(vm, constants[pos]);
                 if (err) { return err; }
 
-                obj = OBJ(o_Module, .module = vm->cur_module);
-
-#ifdef DEBUG
-                printf("require module: ");
-                object_fprint(obj, stdout);
-                putc('\n', stdout);
-#endif
-
                 err = new_frame(vm);
                 if (err) { return err; }
 
-                frame_init(vm, obj, vm->sp);
+                frame_init(vm, OBJ(o_Module, .module = vm->cur_module), vm->sp);
 
                 constants = vm->compiler->constants.data; // in case of realloc
                 current_frame = vm->frames + vm->frames_index;

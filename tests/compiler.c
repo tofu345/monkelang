@@ -1244,7 +1244,7 @@ void test_source_mapping(void) {
 
     prog = parse_(input);
 
-    err = compile(&c, &prog);
+    err = compile(&c, &prog, 0);
     if (err != 0) {
         print_error(err, stdout);
         TEST_FAIL();
@@ -1326,7 +1326,7 @@ c_test_error(const char *input, const char *expected_error) {
 
     prog = parse_(input);
 
-    err = compile(&c, &prog);
+    err = compile(&c, &prog, 0);
     if (!err) {
         printf("expected compiler error but received none\n");
         printf("in test: '%s'\n\n", input);
@@ -1349,7 +1349,7 @@ static void c_test(char *input, Tests expectedConstants,
 
     prog = parse_(input);
 
-    err = compile(&c, &prog);
+    err = compile(&c, &prog, 0);
     if (err != 0) {
         print_error(err, stdout);
         TEST_FAIL();

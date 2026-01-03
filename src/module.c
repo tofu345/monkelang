@@ -27,28 +27,22 @@ static void module_bytecode(Module *m, Bytecode code) {
     m->main_function = code.main_function;
 }
 
-bool has_monke_suffix(Token *t) {
-    int l = t->length;
-    const char *s = t->start;
-    return s[l - 6] == '.'
-        && s[l - 5] == 'm'
-        && s[l - 4] == 'o'
-        && s[l - 3] == 'n'
-        && s[l - 2] == 'k'
-        && s[l - 1] == 'e';
+bool has_monke_suffix(const char *str, int len) {
+    return len > 6
+        && str[len - 6] == '.'
+        && str[len - 5] == 'm'
+        && str[len - 4] == 'o'
+        && str[len - 3] == 'n'
+        && str[len - 2] == 'k'
+        && str[len - 1] == 'e';
 }
 
 // load source code at [filename] into `Module`
-static error module_load(Module *module, Token *name) {
-    char *filename = strndup(name->start, name->length);
+static error module_load(Module *module, const char *name, int length) {
+    char *filename = malloc(length + 7);
     if (filename == NULL) { die("create_module - filename:"); }
-
-    bool suffix = name->length > 6 && has_monke_suffix(name);
-    if (!suffix) {
-        filename = realloc(filename, name->length + 7);
-        if (filename == NULL) { die("create_module - filename:"); }
-        strncpy(&filename[name->length], ".monke", 7);
-    }
+    strncpy(filename, name, length);
+    strncpy(&filename[length], ".monke", 7);
     module->name = filename;
 
     struct stat mstat;
@@ -62,7 +56,7 @@ static error module_load(Module *module, Token *name) {
 
 void module_free(Module *m) {
 #ifdef DEBUG
-    printf("unload: %s\n", m->name);
+    printf("unrequire: %s\n", m->name);
 #endif
 
     free((char *) m->name);
@@ -104,7 +98,7 @@ static error module_compile(VM *vm, Module *m) {
     c->cur_symbol_table = NULL;
     enter_scope(c);
 
-    error err = compile(c, &program);
+    error err = compile(c, &program, 0);
     if (err) {
         fputs(compiler_error_msg, fp);
         print_error(err, fp);
@@ -144,14 +138,24 @@ error require_module(VM *vm, Constant constant) {
             constant.type);
     }
 
-    Token *filename = constant.data.string;
-    uint64_t hash = hash_fnv1a_(filename->start, filename->length);
+    const char *filename = constant.data.string->start;
+    int len = constant.data.string->length;
+    // remove ".monke" suffix, later added in module_load()
+    if (has_monke_suffix(filename, len)) {
+        len -= 6;
+    }
+
+#ifdef DEBUG
+    printf("require: %.*s\n", len, filename);
+#endif
+
+    uint64_t hash = hash_fnv1a_(filename, len);
     Module *module = ht_get_hash(vm->modules, hash);
     if (errno == ENOKEY) {
         module = calloc(1, sizeof(Module));
         if (module == NULL) { die("require - create Module"); }
 
-        err = module_load(module, constant.data.string);
+        err = module_load(module, filename, len);
         if (err) { goto fail; }
 
         err = module_compile(vm, module);
@@ -172,6 +176,10 @@ error require_module(VM *vm, Constant constant) {
         }
 
         if (mstat.st_mtime > module->mtime) {
+#ifdef DEBUG
+            printf("file %s was modified, reloading...\n", module->name);
+#endif
+
             free((char *) module->source);
             program_free(&module->program);
             free_function(module->main_function);
@@ -188,6 +196,12 @@ error require_module(VM *vm, Constant constant) {
         }
     }
 
+#ifdef DEBUG
+    printf("call: ");
+    object_fprint(OBJ(o_Module, .module = module), stdout);
+    putc('\n', stdout);
+#endif
+
     module->parent = vm->cur_module;
     vm->cur_module = module;
     return 0;
@@ -195,4 +209,13 @@ error require_module(VM *vm, Constant constant) {
 fail:
     module_free(module);
     return err;
+}
+
+int fprint_module(Module *m, FILE *fp) {
+    int len = strlen(m->name);
+    if (has_monke_suffix(m->name, len)) {
+        len -= 6;
+    }
+    FPRINTF(fp, "<module: %.*s>", len, m->name);
+    return 0;
 }
