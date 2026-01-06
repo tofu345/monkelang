@@ -23,6 +23,7 @@ static bool test_boolean_literal(Node n, bool exp);
 static bool test_node(Node n, Test *test);
 static void test_infix_expression(Node n, Test *left, char* operator, Test *right);
 static void test_let_statement(Node n, const char* names[], Test *values[], int num);
+static void test_table_literal(Node n, int num_pairs, char *keys[], Test *values[]);
 
 Program prog;
 
@@ -40,6 +41,8 @@ void setUp(void) {}
 void tearDown(void) {
     _program_free();
 }
+
+// tests
 
 void test_identifier_expression(void) {
     char *input = "foobar;";
@@ -640,26 +643,34 @@ void test_parsing_table_literals_string_keys(void) {
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
     ExpressionStatement* es = n.obj;
 
-    ASSERT_NODE_TYPE(n_TableLiteral, es->expression);
-    TableLiteral* hl = es->expression.obj;
+    char *keys[] = { "one", "two", "three" };
+    Test *values[] = { TEST(int, 1), TEST(int, 2), TEST(int, 3) };
+    test_table_literal(es->expression, 3, keys, values);
+}
 
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-            3, hl->pairs.length, "wrong TableLiteral.pairs length");
+void test_parsing_table_literals_variable_keys(void) {
+    char *input = "\
+    let one = 1, two = 2, three = 3;\
+    {one, two, three, \"four\": 4}";
 
-    struct {
-        char *key;
-        long value;
-    } expected[] = {
-        {"one", 1},
-        {"two", 2},
-        {"three", 3},
+    prog = parse_(input);
+
+    expect_length(&prog, 2);
+
+    ASSERT_NODE_TYPE(n_LetStatement, prog.stmts.data[0]);
+
+    Node n = prog.stmts.data[1];
+    ASSERT_NODE_TYPE(n_ExpressionStatement, n);
+    ExpressionStatement* es = n.obj;
+
+    char *keys[] = { "one", "two", "three", "four" };
+    Test *values[] = {
+        TEST(str, "one"),
+        TEST(str, "two"),
+        TEST(str, "three"),
+        TEST(int, 4)
     };
-    int expected_len = sizeof(expected) / sizeof(expected[0]);
-    for (int i = 0; i < expected_len; i++) {
-        Pair* pair = &hl->pairs.data[i];
-        TEST_ASSERT_NOT_NULL_MESSAGE(pair->val.obj, "value not found");
-        test_integer_literal(pair->val, expected[i].value);
-    }
+    test_table_literal(es->expression, 4, keys, values);
 }
 
 void test_parsing_empty_table_literal(void) {
@@ -672,11 +683,7 @@ void test_parsing_empty_table_literal(void) {
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
     ExpressionStatement* es = n.obj;
 
-    ASSERT_NODE_TYPE(n_TableLiteral, es->expression);
-    TableLiteral* hl = es->expression.obj;
-
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-            0, hl->pairs.length, "wrong TableLiteral.pairs length");
+    test_table_literal(es->expression, 0, NULL, NULL);
 }
 
 void test_parsing_table_literals_with_expressions(void) {
@@ -689,36 +696,26 @@ void test_parsing_table_literals_with_expressions(void) {
     ASSERT_NODE_TYPE(n_ExpressionStatement, n);
     ExpressionStatement* es = n.obj;
 
-    ASSERT_NODE_TYPE(n_TableLiteral, es->expression);
-    TableLiteral* hl = es->expression.obj;
+    char *keys[] = { "one", "two", "three" };
+    test_table_literal(es->expression, 3, keys, NULL);
 
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-            3, hl->pairs.length, "wrong TableLiteral.pairs length");
-
+    TableLiteral* tbl = es->expression.obj;
     struct Test {
-        char *key;
         long left;
         char *op;
         long right;
     } expected[] = {
-        {"one", 0, "+", 1},
-        {"two", 10, "-", 8},
-        {"three", 15, "/", 5},
+        {0, "+", 1},
+        {10, "-", 8},
+        {15, "/", 5},
     };
     int expected_len = sizeof(expected) / sizeof(expected[0]);
     for (int i = 0; i < expected_len; i++) {
         struct Test test = expected[i];
-
-        Pair* pair = &hl->pairs.data[i];
-        StringLiteral *str = pair->key.obj;
-        if (!test_token_literal(&str->tok, test.key)) {
-            printf("value %s not found got %.*s\n",
-                    test.key, str->tok.length, str->tok.start);
-            TEST_FAIL();
-        }
-
-        test_infix_expression(pair->val,
-                TEST(int, test.left), test.op, TEST(int, test.right));
+        test_infix_expression(tbl->pairs.data[i].val,
+                              TEST(int, test.left),
+                              test.op,
+                              TEST(int, test.right));
     }
 }
 
@@ -1161,6 +1158,30 @@ test_let_statement(Node n, const char* names[], Test *values[], int num) {
 }
 
 static void
+test_table_literal(Node n, int num_pairs, char *keys[], Test *values[]) {
+    ASSERT_NODE_TYPE(n_TableLiteral, n);
+    TableLiteral* tbl = n.obj;
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+            num_pairs, tbl->pairs.length, "wrong TableLiteral.pairs length");
+
+    for (int i = 0; i < num_pairs; i++) {
+        Pair* pair = &tbl->pairs.data[i];
+
+        StringLiteral *str = pair->key.obj;
+        if (!test_token_literal(&str->tok, keys[i])) {
+            printf("key '%s' not found at index %d, got '%.*s' instead\n",
+                    keys[i], i, str->tok.length, str->tok.start);
+            TEST_FAIL();
+        }
+
+        if (values) {
+            test_node(pair->val, values[i]);
+        }
+    }
+}
+
+static void
 expect_length(Program *program, int expected) {
     if (program->stmts.length != expected) {
         printf("wrong program statements length, want %d, got %d\n",
@@ -1196,6 +1217,7 @@ int main(void) {
     RUN_TEST(test_parsing_array_literals);
     RUN_TEST(test_parsing_index_expressions);
     RUN_TEST(test_parsing_table_literals_string_keys);
+    RUN_TEST(test_parsing_table_literals_variable_keys);
     RUN_TEST(test_parsing_empty_table_literal);
     RUN_TEST(test_parsing_table_literals_with_expressions);
     RUN_TEST(test_parsing_assignment);

@@ -377,6 +377,20 @@ parse_table_literal(Parser* p) {
         Node key = parse_expression(p, p_Lowest);
         if (IS_INVALID(key)) { goto invalid; }
 
+        TokenType peek = p->peek_token.type;
+        if (key.typ == n_Identifier && (peek == t_Comma || peek == t_Rbrace))
+        {
+            StringLiteral* str = allocate(sizeof(StringLiteral));
+            str->tok = ((Identifier *) key.obj)->tok;
+            Node str_key = NODE(n_StringLiteral, str);
+
+            PairBufferPush(&tbl->pairs, (Pair){ str_key, key });
+            if (peek == t_Comma) {
+                next_token(p);
+            }
+            continue;
+        }
+
         if (!expect_peek(p, t_Colon)) {
             node_free(key);
             goto invalid;

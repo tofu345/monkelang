@@ -394,6 +394,33 @@ void test_table_literals(void) {
             make(OpPop)
         )
     );
+    c_test(
+        "\
+        let one = 1, two = 2, three = 3;\
+        {one, two, three, \"four\": 4}",
+        _C( INT(1), INT(2), INT(3),
+            STR("one"), STR("two"), STR("three"),
+            STR("four"), INT(4) ),
+        _I(
+            make(OpConstant, 0),
+            make(OpSetGlobal, 0),
+            make(OpConstant, 1),
+            make(OpSetGlobal, 1),
+            make(OpConstant, 2),
+            make(OpSetGlobal, 2),
+
+            make(OpConstant, 3),
+            make(OpGetGlobal, 0),
+            make(OpConstant, 4),
+            make(OpGetGlobal, 1),
+            make(OpConstant, 5),
+            make(OpGetGlobal, 2),
+            make(OpConstant, 6),
+            make(OpConstant, 7),
+            make(OpTable, 8),
+            make(OpPop)
+        )
+    );
 }
 
 void test_index_expressions(void) {
