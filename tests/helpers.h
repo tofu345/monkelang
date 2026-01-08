@@ -40,7 +40,7 @@ typedef struct {
 } Test;
 
 #define TEST(t, v) &(Test){ test_##t, { ._##t = v } }
-#define TEST_NOTHING &(Test){0}
+#define NOTHING &(Test){0}
 
 typedef struct {
     Test *data;

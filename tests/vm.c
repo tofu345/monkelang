@@ -80,8 +80,8 @@ test_conditionals(void) {
     vm_test("if (1 < 2) { 10 }", TEST(int, 10));
     vm_test("if (1 < 2) { 10 } else { 20 }", TEST(int, 10));
     vm_test("if (1 > 2) { 10 } else { 20.7 }", TEST(float, 20.7));
-    vm_test("if (1 > 2) { 10 }", TEST_NOTHING);
-    vm_test("if (false) { 10 }", TEST_NOTHING);
+    vm_test("if (1 > 2) { 10 }", NOTHING);
+    vm_test("if (false) { 10 }", NOTHING);
     vm_test("!(if (false) { 5; })", TEST(bool, true));
     vm_test("if ((if (false) { 10 })) { 10 } else { 20 }", TEST(int, 20));
 }
@@ -102,11 +102,11 @@ test_truthy(void) {
     vm_test("if ({1: 2}) {1}", TEST(int, 1));
     vm_test("if (fn(){}) {1}", TEST(int, 1));
 
-    vm_test("if (false) {1}", TEST_NOTHING);
-    vm_test("if (0) {1}", TEST_NOTHING);
-    vm_test("if ([]) {1}", TEST_NOTHING);
-    vm_test("if ({}) {1}", TEST_NOTHING);
-    vm_test("if (nothing) {1}", TEST_NOTHING);
+    vm_test("if (false) {1}", NOTHING);
+    vm_test("if (0) {1}", NOTHING);
+    vm_test("if ([]) {1}", NOTHING);
+    vm_test("if ({}) {1}", NOTHING);
+    vm_test("if (nothing) {1}", NOTHING);
 }
 
 static void
@@ -124,29 +124,30 @@ test_string_expressions(void) {
     vm_test("\"mon\" + \"key\" + \"banana\"", TEST(str, "monkeybanana"));
 }
 
-// create NULL-terminated (0-terminated) array of integers.
+// 0-terminated array of integers.
 static IntArray make_int_array(int n, ...);
-#define TEST_ARR(...) TEST(arr, make_int_array(__VA_ARGS__, 0))
+#define INT_ARR(...) TEST(arr, make_int_array(__VA_ARGS__, 0))
 
 static void
 test_array_literals(void) {
-    vm_test("[]", TEST_ARR(0));
-    vm_test("[1, 2, 3]", TEST_ARR(1, 2, 3));
-    vm_test("[1 + 2, 3 * 4, 5 + 6]", TEST_ARR(3, 12, 11));
+    vm_test("[]", INT_ARR(0));
+    vm_test("[1, 2, 3]", INT_ARR(1, 2, 3));
+    vm_test("[1 + 2, 3 * 4, 5 + 6]", INT_ARR(3, 12, 11));
 
-    vm_test("[] * 3", TEST_ARR(0));
-    vm_test("[2] * 1", TEST_ARR(2));
-    vm_test("[1, 2] * 3", TEST_ARR(1, 2, 1, 2, 1, 2));
+    vm_test("[] * 3", INT_ARR(0));
+    vm_test("[2] * 1", INT_ARR(2));
+    vm_test("[1, 2] * 3", INT_ARR(1, 2, 1, 2, 1, 2));
 }
 
-#define TEST_TABLE(...) \
+// 0-terminated array of integers of key-value pairs.
+#define INT_TABLE(...) \
     &(Test){ test_table, { ._arr = make_int_array(__VA_ARGS__, 0) }}
 
 static void
 test_table_literals(void) {
-    vm_test("{}", TEST_TABLE(0));
-    vm_test("{1: 2, 2: 3}", TEST_TABLE(1, 2, 2, 3));
-    vm_test("{1 + 1: 2 * 2, 3 + 3: 4 * 4}", TEST_TABLE(2, 4, 6, 16));
+    vm_test("{}", INT_TABLE(0));
+    vm_test("{1: 2, 2: 3}", INT_TABLE(1, 2, 2, 3));
+    vm_test("{1 + 1: 2 * 2, 3 + 3: 4 * 4}", INT_TABLE(2, 4, 6, 16));
 }
 
 static void
@@ -154,13 +155,13 @@ test_index_expressions(void) {
     vm_test("[1, 2, 3][1]", TEST(int, 2));
     vm_test("[1, 2, 3][0 + 2]", TEST(int, 3));
     vm_test("[[1.5, 1, 1]][0][0]", TEST(float, 1.5));
-    vm_test("[][0]", TEST_NOTHING);
-    vm_test("[1, 2, 3][99]", TEST_NOTHING);
-    vm_test("[1][-1]", TEST_NOTHING);
+    vm_test("[][0]", NOTHING);
+    vm_test("[1, 2, 3][99]", NOTHING);
+    vm_test("[1][-1]", NOTHING);
     vm_test("{1: 1, 2: 2}[1]", TEST(int, 1));
     vm_test("{1: 1, 2: 2.1}[2]", TEST(float, 2.1));
-    vm_test("{1: 1}[0]", TEST_NOTHING);
-    vm_test("{}[0]", TEST_NOTHING);
+    vm_test("{1: 1}[0]", NOTHING);
+    vm_test("{}[0]", NOTHING);
 }
 
 static void
@@ -212,7 +213,7 @@ test_functions_without_return_value(void) {
             let noReturn = fn() { };\
             noReturn();\
         ",
-        TEST_NOTHING
+        NOTHING
     );
     vm_test(
         "\
@@ -221,7 +222,7 @@ test_functions_without_return_value(void) {
             noReturn();\
             noReturnTwo();\
         ",
-        TEST_NOTHING
+        NOTHING
     );
 
     vm_test_error(
@@ -389,14 +390,14 @@ test_builtin_functions(void) {
     vm_test("len(\"hello world\")", TEST(int, 11));
     vm_test("len([1, 2, 3])", TEST(int, 3));
     vm_test("len([])", TEST(int, 0));
-    vm_test("puts(\"hello\", \"world!\")", TEST_NOTHING);
+    vm_test("puts(\"hello\", \"world!\")", NOTHING);
     vm_test("first([1, 2, 3])", TEST(int, 1));
-    vm_test("first([])", TEST_NOTHING);
+    vm_test("first([])", NOTHING);
     vm_test("last([1, 2, 3])", TEST(int, 3));
-    vm_test("last([])", TEST_NOTHING);
-    vm_test("rest([1, 2, 3])", TEST_ARR(2, 3));
-    vm_test("rest([])", TEST_ARR(0));
-    vm_test("push([], 1)", TEST_ARR(1));
+    vm_test("last([])", NOTHING);
+    vm_test("rest([1, 2, 3])", INT_ARR(2, 3));
+    vm_test("rest([])", INT_ARR(0));
+    vm_test("push([], 1)", INT_ARR(1));
     vm_test(
         "\
         let arr = [1, 2];\
@@ -404,7 +405,7 @@ test_builtin_functions(void) {
         push(arr2, 3);\
         arr\
         ",
-        TEST_ARR(1, 2)
+        INT_ARR(1, 2)
     );
     vm_test("type([])", TEST(str, "array"));
     vm_test("type({})", TEST(str, "table"));
@@ -579,7 +580,7 @@ test_assignments(void) {
         hash[1] = nothing;\
         hash\
         ",
-        TEST_TABLE(3, 4)
+        INT_TABLE(3, 4)
     );
 
     // assign free variable
@@ -613,7 +614,7 @@ test_assignments(void) {
         var[1] += 2;\
         var;\
         ",
-        TEST_TABLE(1, 4)
+        INT_TABLE(1, 4)
     );
 
     vm_test_error(
@@ -637,7 +638,7 @@ test_free_variable_list(void) {
             arr\
         }()\
         ",
-        TEST_ARR(1)
+        INT_ARR(1)
     );
     vm_test(
         "\
@@ -647,7 +648,7 @@ test_free_variable_list(void) {
             arr\
         }()\
         ",
-        TEST_ARR(4, 2, 3)
+        INT_ARR(4, 2, 3)
     );
     vm_test(
         "\
@@ -669,7 +670,7 @@ test_free_variable_list(void) {
             arr\
         }()\
         ",
-        TEST_ARR(0) // empty
+        INT_ARR(0) // empty
     );
     vm_test(
         "\

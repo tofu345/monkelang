@@ -88,7 +88,7 @@ void test_return_statements(void) {
         const char *input;
         Test *expectedVal;
     } tests[] = {
-        {"return;", TEST_NOTHING}, // empty return statements must end with a
+        {"return;", NOTHING}, // empty return statements must end with a
                                    // semicolon.
         {"return 5;", TEST(int, 5)},
         {"return 10;", TEST(int, 10)},
@@ -122,7 +122,7 @@ void test_single_let_statements(void) {
         const char *expectedIdent;
         Test *expectedVal;
     } tests[] = {
-        {"let x;", "x", TEST_NOTHING},
+        {"let x;", "x", NOTHING},
         {"let x = 5;", "x", TEST(int, 5)},
         {"let x = 5.000;", "x", TEST(float, 5.0)},
         {"let y = true;", "y", TEST(bool, true)},
@@ -152,7 +152,7 @@ void test_multiple_let_statements(void) {
     Node n = prog.stmts.data[0];
 
     test_let_statement(n, (const char *[]){ "a", "b", "c" },
-            (Test *[]) { TEST(float, 1.5), TEST(int, 2), TEST_NOTHING }, 3);
+            (Test *[]) { TEST(float, 1.5), TEST(int, 2), NOTHING }, 3);
 
     n = prog.stmts.data[1];
 
@@ -869,9 +869,9 @@ void test_empty_for_statement(void) {
     ASSERT_NODE_TYPE(n_ForStatement, n);
     ForStatement* fs = n.obj;
 
-    test_node(fs->init, TEST_NOTHING);
-    test_node(fs->condition, TEST_NOTHING);
-    test_node(fs->update, TEST_NOTHING);
+    test_node(fs->init, NOTHING);
+    test_node(fs->condition, NOTHING);
+    test_node(fs->update, NOTHING);
 
     BlockStatement *bs = fs->body;
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, bs->stmts.length, "wrong BlockStatement length");
