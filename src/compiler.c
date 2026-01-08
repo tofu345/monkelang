@@ -269,11 +269,6 @@ _compile(Compiler *c, Node n) {
                     Symbol *symbol =
                         sym_define(c->cur_symbol_table, &id->tok, hash(id));
 
-                    if (symbol->index >= GlobalsSize) {
-                        return c_error((Node){.obj = id},
-                                "too many global variables");
-                    }
-
                     if (symbol->scope == GlobalScope) {
                         emit(c, OpSetGlobal, symbol->index);
                     } else {

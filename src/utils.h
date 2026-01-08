@@ -35,8 +35,13 @@
     }                                                                         \
                                                                               \
     void name##BufferFill(name##Buffer* buf, typ val, int length) {           \
-        if (buf->length + length > buf->capacity) {                           \
-            int capacity = power_of_2_ceil(buf->length + length);             \
+        int new_length;                                                       \
+        if (__builtin_add_overflow(buf->length, length, &new_length)) {       \
+            die("integer overflow while adding %d elements to %sBuffer",      \
+                length, #name);                                               \
+        }                                                                     \
+        if (new_length > buf->capacity) {                                     \
+            int capacity = power_of_2_ceil(new_length);                       \
             buf->data = realloc(buf->data, capacity * sizeof(typ));           \
             if (buf->data == NULL) {                                          \
                 die("realloc %sBuffer", #name);                               \

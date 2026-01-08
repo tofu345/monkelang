@@ -187,7 +187,7 @@ table_expand(Table *tbl) {
 Object table_set_hash(Table *tbl, Object key, Object value, uint64_t hash) {
     if (!key.type || !value.type) { return OBJ_NOTHING; }
 
-    // table_expand() is run when the table fills roughly half of its buckets,
+    // table_expand() is run when the table fills up half of its capacity,
     // not taking into account bucket overflows.
     //
     // Its initial max number of elements is 64 (8 buckets with 8 elements per
