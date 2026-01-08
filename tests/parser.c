@@ -185,7 +185,7 @@ void test_parsing_prefix_expressions(void) {
 
         test_node(pe->right, test.value);
 
-        if (!test_token_literal(&pe->tok, test.operator)) {
+        if (!test_token_literal(&pe->op, test.operator)) {
             puts("wrong PrefixExpression Operator");
             TEST_FAIL();
         }
@@ -459,6 +459,8 @@ void test_if_else_expression(void) {
     ASSERT_NODE_TYPE(n_ExpressionStatement, consequence.data[0]);
     ExpressionStatement* stmt = consequence.data[0].obj;
     test_string_or_identifier(stmt->expression, "x");
+
+    TEST_ASSERT_NOT_NULL_MESSAGE(ie->alternative, "Alternative is NULL");
 
     NodeBuffer alternative = ie->alternative->stmts;
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, alternative.length, "wrong Alternative length");
@@ -803,7 +805,7 @@ void test_parsing_operator_assignment(void) {
         test_string_or_identifier(stmt->left, test.ident);
 
         TEST_ASSERT_EQUAL_STRING_LEN(
-                test.operator, stmt->tok.start, strlen(test.operator));
+                test.operator, stmt->op.start, strlen(test.operator));
 
         test_node(stmt->right, test.value);
 
@@ -830,26 +832,26 @@ void test_parsing_nothing_literals(void) {
     }
 }
 
-void test_for_statement(void) {
+void test_for_loop(void) {
     char *input = "for (let i = 0; i < 5; i = i + 1) { i == 10; }";
 
     prog = parse_(input);
     check(&prog);
 
     Node n = prog.stmts.data[0];
-    ASSERT_NODE_TYPE(n_ForStatement, n);
-    ForStatement* fs = n.obj;
+    ASSERT_NODE_TYPE(n_LoopStatement, n);
+    LoopStatement* loop = n.obj;
 
-    test_let_statement(fs->init, (const char*[]){ "i" }, (Test*[]){ TEST(int, 0) }, 1);
+    test_let_statement(loop->start, (const char*[]){ "i" }, (Test*[]){ TEST(int, 0) }, 1);
 
-    test_infix_expression(fs->condition, TEST(str, "i"), "<", TEST(int, 5));
+    test_infix_expression(loop->condition, TEST(str, "i"), "<", TEST(int, 5));
 
-    ASSERT_NODE_TYPE(n_Assignment, fs->update);
-    Assignment* as = fs->update.obj;
+    ASSERT_NODE_TYPE(n_Assignment, loop->update);
+    Assignment* as = loop->update.obj;
     test_string_or_identifier(as->left, "i");
     test_infix_expression(as->right, TEST(str, "i"), "+", TEST(int, 1));
 
-    BlockStatement *bs = fs->body;
+    BlockStatement *bs = loop->body;
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, bs->stmts.length, "wrong BlockStatement length");
 
     Node stmt = bs->stmts.data[0];
@@ -859,21 +861,21 @@ void test_for_statement(void) {
     test_infix_expression(es->expression, TEST(str, "i"), "==", TEST(int, 10));
 }
 
-void test_empty_for_statement(void) {
+void test_empty_for_loop(void) {
     char *input = "for (;;) { i == 10; }";
 
     prog = parse_(input);
     check(&prog);
 
     Node n = prog.stmts.data[0];
-    ASSERT_NODE_TYPE(n_ForStatement, n);
-    ForStatement* fs = n.obj;
+    ASSERT_NODE_TYPE(n_LoopStatement, n);
+    LoopStatement* loop = n.obj;
 
-    test_node(fs->init, NOTHING);
-    test_node(fs->condition, NOTHING);
-    test_node(fs->update, NOTHING);
+    test_node(loop->start, NOTHING);
+    test_node(loop->condition, NOTHING);
+    test_node(loop->update, NOTHING);
 
-    BlockStatement *bs = fs->body;
+    BlockStatement *bs = loop->body;
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, bs->stmts.length, "wrong BlockStatement length");
 
     Node stmt = bs->stmts.data[0];
@@ -881,6 +883,56 @@ void test_empty_for_statement(void) {
 
     ExpressionStatement* es = stmt.obj;
     test_infix_expression(es->expression, TEST(str, "i"), "==", TEST(int, 10));
+}
+
+void test_break_continue_loop(void) {
+    char *input = "\
+        for (let i = 0 ;; i += 1) {\
+            if (i > 5) {\
+                break\
+            } else {\
+                continue\
+            }\
+        }\
+    ";
+
+    prog = parse_(input);
+    check(&prog);
+
+    Node n = prog.stmts.data[0];
+    ASSERT_NODE_TYPE(n_LoopStatement, n);
+    LoopStatement* loop = n.obj;
+
+    test_let_statement(loop->start, (const char*[]){ "i" }, (Test*[]){ TEST(int, 0) }, 1);
+    test_node(loop->condition, NOTHING);
+    ASSERT_NODE_TYPE(n_OperatorAssignment, loop->update);
+    OperatorAssignment* as = loop->update.obj;
+    test_string_or_identifier(as->left, "i");
+    test_integer_literal(as->right, 1);
+    if (!test_token_literal(&as->op, "+=")) {
+        printf("wrong InfixExpression Operator want +=, got %.*s\n", LITERAL(as->op));
+        TEST_FAIL();
+    }
+
+    BlockStatement *bs = loop->body;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, bs->stmts.length, "wrong For loop BlockStatement length");
+
+    n = bs->stmts.data[0];
+    ASSERT_NODE_TYPE(n_ExpressionStatement, n);
+    ExpressionStatement *stmt = n.obj;
+
+    ASSERT_NODE_TYPE(n_IfExpression, stmt->expression);
+    IfExpression *ie = stmt->expression.obj;
+    test_infix_expression(ie->condition, TEST(str, "i"), ">", TEST(int, 5));
+
+    NodeBuffer consequence = ie->consequence->stmts;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, consequence.length, "wrong Consequence length");
+    ASSERT_NODE_TYPE(n_BreakStatement, consequence.data[0]);
+
+    TEST_ASSERT_NOT_NULL_MESSAGE(ie->alternative, "Alternative is NULL");
+    NodeBuffer alternative = ie->alternative->stmts;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, alternative.length, "wrong Alternative length");
+    ASSERT_NODE_TYPE(n_ContinueStatement, alternative.data[0]);
 }
 
 void test_require_expression(void) {
@@ -916,7 +968,7 @@ void test_parser_errors(void) {
         {"let = = 1;", "expected next token to be 'Identifier', got '=' instead"},
         {
             "return let;",
-            "multiple statements on the same line must be separated by a ';'"
+            "this statement must be on a new line or come after a semicolon"
         },
 
         {"1..5", "could not parse '1..5' as float"},
@@ -1114,9 +1166,9 @@ test_infix_expression(Node n, Test *left, char* operator, Test *right) {
     test_node(ie->left, left);
     test_node(ie->right, right);
 
-    if (!test_token_literal(&ie->tok, operator)) {
+    if (!test_token_literal(&ie->op, operator)) {
         printf("wrong InfixExpression Operator want %s, got %.*s\n",
-                operator, LITERAL(ie->tok));
+                operator, LITERAL(ie->op));
         TEST_FAIL();
     }
 }
@@ -1224,8 +1276,9 @@ int main(void) {
     RUN_TEST(test_parsing_index_assignment);
     RUN_TEST(test_parsing_operator_assignment);
     RUN_TEST(test_parsing_nothing_literals);
-    RUN_TEST(test_for_statement);
-    RUN_TEST(test_empty_for_statement);
+    RUN_TEST(test_for_loop);
+    RUN_TEST(test_empty_for_loop);
+    RUN_TEST(test_break_continue_loop);
     RUN_TEST(test_require_expression);
     RUN_TEST(test_parser_errors);
     return UNITY_END();

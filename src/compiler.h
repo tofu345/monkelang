@@ -45,14 +45,28 @@ void compiler_reset(Compiler *);
 // make_into(c.cur_instructions, Opcode, `int` operands ...)
 int emit(Compiler *, Opcode, ...);
 
+typedef struct Loop {
+    // positions of break and continue statements,
+    // patched after Loop Statement body has finished compilation.
+    IntBuffer breaks, continues;
+
+    struct Loop *parent;
+} Loop;
+
 typedef struct {
     Opcode opcode;
     int position;
 } EmittedInstruction;
 
-// A Compilation of a Function.
+// A Compilation Scope of a Function.
 typedef struct CompilationScope {
     CompiledFunction *function;
+
+    // Current `Loop` being compiled
+    //
+    // NOTE: As this is attached to a compilation scope, a new function in a
+    // Loop Statement, cannot use 'break' or 'continue'.
+    Loop *loop;
 
     EmittedInstruction last_instruction;
     EmittedInstruction previous_instruction;

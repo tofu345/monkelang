@@ -51,6 +51,8 @@ typedef enum __attribute__ ((__packed__)) {
 
     // Keywords
     t_For,
+    t_Break,
+    t_Continue,
     t_Function,
     t_Let,
     t_If,

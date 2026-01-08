@@ -117,7 +117,7 @@ void highlight_token(Token *tok, int leftpad, FILE *s) {
 
     left_pad(leftpad + left, s);
     highlight(tok->length, s);
-    putc('\n', stdout);
+    putc('\n', s);
 }
 
 void print_error(error err, FILE *s) {

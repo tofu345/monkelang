@@ -33,7 +33,9 @@ enum NodeType {
     n_Assignment,
     n_OperatorAssignment,
     n_ReturnStatement,
-    n_ForStatement,
+    n_LoopStatement,
+    n_BreakStatement,
+    n_ContinueStatement,
     n_ExpressionStatement,
     n_BlockStatement,
 };
@@ -65,6 +67,7 @@ int program_fprint(Program* p, FILE* fp);
 
 void program_free(Program* p);
 
+// An identifier (variable name)
 typedef struct {
     Token tok; // the 't_Ident' token
 } Identifier;
@@ -76,6 +79,7 @@ typedef struct {
 } LetStatement;
 
 // e.g. a = 1
+// NOTE: [left], must already be defined.
 typedef struct {
     Token tok; // the token of [right]
     Node left; // Identifier or IndexExpression
@@ -83,17 +87,20 @@ typedef struct {
 } Assignment;
 
 // e.g. a += 1
+// NOTE: [left], must already be defined.
 typedef struct {
-    Token tok; // the operator
+    Token op;
     Node left;
     Node right;
 } OperatorAssignment;
 
+// Terminate execution of current Function.
 typedef struct {
     Token tok; // the 't_Return' token
     Node return_value; // expression
 } ReturnStatement;
 
+// The only statement that leaves a value on the stack.
 typedef struct {
     Token tok; // the token of [expression]
     Node expression;
@@ -111,13 +118,13 @@ typedef struct {
 
 // e.g. !true
 typedef struct {
-    Token tok; // the prefix token, e.g '!'
+    Token op; // e.g '!'
     Node right;
 } PrefixExpression;
 
 // e.g. 1 * 3
 typedef struct {
-    Token tok; // the infix token, e.g. '+'
+    Token op; // e.g. '+', '-' ...
     Node left;
     Node right;
 } InfixExpression;
@@ -135,16 +142,22 @@ typedef struct {
 void free_block_statement(BlockStatement* bs);
 int fprint_block_statement(BlockStatement* bs, FILE* fp);
 
-// for (loop) statement
 typedef struct {
-    Token tok; // the 'for' token
-    Node init; // statement
-    Node condition; // expression
-    Node update; // statement
-    BlockStatement* body;
-} ForStatement;
+    Token tok;
 
-void free_for_statement(ForStatement *fs);
+    // optional initialization statement
+    Node start;
+
+    // expression, assumed `true` if not present.
+    Node condition;
+
+    // optional update statement
+    Node update;
+
+    BlockStatement* body;
+} LoopStatement;
+
+void free_loop_statement(LoopStatement *fs);
 
 typedef struct {
     Token tok; // the 'if' token
@@ -160,7 +173,7 @@ typedef struct {
     Buffer params;
     BlockStatement* body;
 
-    // if [FunctionLiteral] is in [LetStatement] or [AssignStatement],
+    // if [FunctionLiteral] defined in [LetStatement] or [Assignment],
     // points to corresponding Identifier.
     Identifier *name;
 } FunctionLiteral;
@@ -211,3 +224,11 @@ typedef struct {
     StringLiteral *filename;
     NodeBuffer args;
 } RequireExpression;
+
+typedef struct {
+    Token tok;
+} BreakStatement;
+
+typedef struct {
+    Token tok;
+} ContinueStatement;

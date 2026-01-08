@@ -37,7 +37,7 @@ fprint_float_literal(FloatLiteral* fl, FILE* fp) {
 static int
 fprint_prefix_expression(PrefixExpression* pe, FILE* fp) {
     FPRINTF(fp, "(");
-    FPRINT_TOKEN(fp, pe->tok);
+    FPRINT_TOKEN(fp, pe->op);
     FPRINT_NODE(fp, pe->right);
     FPRINTF(fp, ")");
     return 0;
@@ -48,7 +48,7 @@ fprint_infix_expression(InfixExpression* ie, FILE* fp) {
     FPRINTF(fp, "(");
     FPRINT_NODE(fp, ie->left);
     FPRINTF(fp, " ");
-    FPRINT_TOKEN(fp, ie->tok)
+    FPRINT_TOKEN(fp, ie->op)
     FPRINTF(fp, " ");
     FPRINT_NODE(fp, ie->right);
     FPRINTF(fp, ")");
@@ -57,7 +57,8 @@ fprint_infix_expression(InfixExpression* ie, FILE* fp) {
 
 int fprint_block_statement(BlockStatement* bs, FILE* fp) {
     for (int i = 0; i < bs->stmts.length; i++) {
-        FPRINT_NODE(fp, bs->stmts.data[i]);
+        if (node_fprint(bs->stmts.data[i], fp) == -1)
+            return -1;
     }
     return 0;
 }
@@ -78,7 +79,7 @@ fprint_if_expression(IfExpression* ie, FILE* fp) {
 static int
 fprint_function_literal(FunctionLiteral* fl, FILE* fp) {
     FPRINT_TOKEN(fp, fl->tok);
-    if (fl->name != NULL) {
+    if (fl->name) {
         Identifier *id = fl->name;
         FPRINTF(fp, "<%.*s>", id->tok.length, id->tok.start);
     }
@@ -176,14 +177,27 @@ fprint_expression_statement(ExpressionStatement* es, FILE* fp) {
 }
 
 static int
-fprint_for_statement(ForStatement* fs, FILE* fp) {
-    FPRINTF(fp, "for (");
-    FPRINT_NODE(fp, fs->init);
-    FPRINT_NODE(fp, fs->condition);
+fprint_loop_statement(LoopStatement* loop, FILE* fp) {
+    FPRINTF(fp, "loop (");
+    FPRINT_NODE(fp, loop->start);
     FPRINTF(fp, ";");
-    FPRINT_NODE(fp, fs->update);
+    FPRINT_NODE(fp, loop->condition);
+    FPRINTF(fp, ";");
+    FPRINT_NODE(fp, loop->update);
     FPRINTF(fp, ")");
-    node_fprint(NODE(n_BlockStatement, fs->body), fp);
+    FPRINT_NODE(fp, NODE(n_BlockStatement, loop->body));
+    return 0;
+}
+
+static int
+fprint_break_statement(BreakStatement *bs, FILE *fp) {
+    FPRINT_TOKEN(fp, bs->tok);
+    return 0;
+}
+
+static int
+fprint_continue_statement(ContinueStatement *cs, FILE *fp) {
+    FPRINT_TOKEN(fp, cs->tok);
     return 0;
 }
 
@@ -250,18 +264,18 @@ fprint_string_literal(StringLiteral* sl, FILE* fp) {
 
 static int
 fprint_assignment(Assignment *as, FILE *fp) {
-    node_fprint(as->left, fp);
+    FPRINT_NODE(fp, as->left);
     FPRINTF(fp, " = ");
-    node_fprint(as->right, fp);
+    FPRINT_NODE(fp, as->right);
     FPRINTF(fp, ";");
     return 0;
 }
 
 static int
 fprint_operator_assignment(OperatorAssignment *stmt, FILE *fp) {
-    node_fprint(stmt->left, fp);
-    FPRINTF(fp, " %.*s= ", LITERAL(stmt->tok));
-    node_fprint(stmt->right, fp);
+    FPRINT_NODE(fp, stmt->left);
+    FPRINTF(fp, " %.*s= ", LITERAL(stmt->op));
+    FPRINT_NODE(fp, stmt->right);
     FPRINTF(fp, ";");
     return 0;
 }
@@ -312,8 +326,14 @@ int node_fprint(const Node n, __attribute__ ((unused)) FILE* fp) {
         case n_BlockStatement:
             return fprint_block_statement(n.obj, fp);
 
-        case n_ForStatement:
-            return fprint_for_statement(n.obj, fp);
+        case n_LoopStatement:
+            return fprint_loop_statement(n.obj, fp);
+
+        case n_BreakStatement:
+            return fprint_break_statement(n.obj, fp);
+
+        case n_ContinueStatement:
+            return fprint_continue_statement(n.obj, fp);
 
         case n_ArrayLiteral:
             return fprint_array_literal(n.obj, fp);
@@ -431,14 +451,14 @@ free_expression_statement(ExpressionStatement* es) {
     free(es);
 }
 
-void free_for_statement(ForStatement *fs) {
-    node_free(fs->init);
-    node_free(fs->condition);
-    node_free(fs->update);
-    if (fs->body) {
-        free_block_statement(fs->body);
+void free_loop_statement(LoopStatement *loop) {
+    node_free(loop->start);
+    node_free(loop->condition);
+    node_free(loop->update);
+    if (loop->body) {
+        free_block_statement(loop->body);
     }
-    free(fs);
+    free(loop);
 }
 
 static void
@@ -522,8 +542,8 @@ void node_free(Node n) {
             free_expression_statement(n.obj);
             return;
 
-        case n_ForStatement:
-            free_for_statement(n.obj);
+        case n_LoopStatement:
+            free_loop_statement(n.obj);
             return;
 
         case n_BlockStatement:

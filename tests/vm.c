@@ -739,6 +739,36 @@ test_for_statement(void) {
         ",
         TEST(int, 5)
     );
+
+    // these tests could be better
+    vm_test(
+        "\
+        for (let i = 0 ;; i += 1) {\
+            if (i == 6) {\
+                for (let j = 0 ;; j += 1) {\
+                    if (j == 5) {\
+                        break;\
+                    } else { continue }\
+                };\
+                i = i * j;\
+                break\
+            }\
+        };\
+        i\
+        ",
+        TEST(int, 30)
+    );
+    vm_test(
+        "\
+        for (let i = 0 ;; i += 1) {\
+            if (i == 6) {\
+                break\
+            } else { continue }\
+        };\
+        i\
+        ",
+        TEST(int, 6)
+    );
 }
 
 static void

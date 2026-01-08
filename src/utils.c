@@ -6,6 +6,7 @@
 #include <stdlib.h>
 
 DEFINE_BUFFER(, void *)
+DEFINE_BUFFER(Int, int)
 
 #define FNV_OFFSET 14695981039346656037UL
 #define FNV_PRIME 1099511628211UL

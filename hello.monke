@@ -1,3 +1,5 @@
 let message = "Hello from hello.monke!"
 puts(message)
 return message
+
+// vim:ft=javascript:

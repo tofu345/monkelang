@@ -150,9 +150,13 @@ replace_last_pop_with_return(Compiler *c) {
     replace_last_opcode_with(c, OpPop, OpReturnValue);
 }
 
+// change the operand of an `OpJump` instruction
 static void
 change_operand(Compiler *c, int op_pos, int operand) {
     Opcode op = c->cur_instructions->data[op_pos];
+
+    assert(op == OpJump || op == OpJumpNotTruthy);
+
     replace_instruction(c, op_pos, make(op, operand));
 }
 
@@ -284,8 +288,7 @@ _compile(Compiler *c, Node n) {
                 source_map(c, n);
 
                 if (c->scopes.length == 1) {
-                    return c_error(n,
-                            "return statement outside function or module");
+                    return c_error(n, "return statement outside function");
                 }
 
                 ReturnStatement *rs = n.obj;
@@ -302,27 +305,34 @@ _compile(Compiler *c, Node n) {
                 return 0;
             }
 
-        case n_ForStatement:
+        case n_LoopStatement:
             {
-                // 00 initilization statement
-                // 01 condition expression
-                // 02 JumpNotTruthy 06
+                // 00 start
+                // 01 condition
+                // 02 JumpNotTruthy 06 -> ...
                 // 03 body
-                // 04 update statement
-                // 05 Jump 01
+                // 04 update
+                // 05 Jump 01 -> condition
                 // 06 ...
+
+                Loop loop = {
+                    .breaks = (IntBuffer){0},
+                    .continues = (IntBuffer){0},
+                    .parent = c->cur_scope->loop,
+                };
+                c->cur_scope->loop = &loop;
 
                 source_map(c, n);
 
-                ForStatement *fs = n.obj;
+                LoopStatement *ls = n.obj;
 
-                err = _compile(c, fs->init);
+                err = _compile(c, ls->start);
                 if (err) { return err; }
 
                 int before_condition_pos = c->cur_instructions->length;
 
-                if (fs->condition.obj != NULL) {
-                    err = _compile(c, fs->condition);
+                if (ls->condition.obj != NULL) {
+                    err = _compile(c, ls->condition);
                     if (err) { return err; }
                 } else {
                     emit(c, OpTrue);
@@ -330,17 +340,52 @@ _compile(Compiler *c, Node n) {
 
                 int jump_not_truthy_pos = emit(c, OpJumpNotTruthy, 9999);
 
-                err = _compile(c, NODE(n_BlockStatement, fs->body));
+                err = _compile(c, NODE(n_BlockStatement, ls->body));
                 if (err) { return err; }
 
-                err = _compile(c, fs->update);
+                int before_update_pos = c->cur_instructions->length;
+
+                err = _compile(c, ls->update);
                 if (err) { return err; }
 
                 emit(c, OpJump, before_condition_pos);
 
-                int after_jump_pos = c->cur_instructions->length;
-                change_operand(c, jump_not_truthy_pos, after_jump_pos);
+                int after_loop_pos = c->cur_instructions->length;
+                change_operand(c, jump_not_truthy_pos, after_loop_pos);
 
+                c->cur_scope->loop = loop.parent;
+                for (int i = 0; i < loop.continues.length; ++i) {
+                    change_operand(c, loop.continues.data[i], before_update_pos);
+                }
+                free(loop.continues.data);
+                for (int i = 0; i < loop.breaks.length; ++i) {
+                    change_operand(c, loop.breaks.data[i], after_loop_pos);
+                }
+                free(loop.breaks.data);
+                return 0;
+            }
+
+        case n_BreakStatement:
+            {
+                Loop *loop = c->cur_scope->loop;
+                if (loop == NULL) {
+                    return c_error(n, "cannot have 'break' outside of loop");
+                }
+
+                IntBufferPush(&loop->breaks, c->cur_instructions->length);
+                emit(c, OpJump, 9999);
+                return 0;
+            }
+
+        case n_ContinueStatement:
+            {
+                Loop *loop = c->cur_scope->loop;
+                if (loop == NULL) {
+                    return c_error(n, "cannot have 'continue' outside of loop");
+                }
+
+                IntBufferPush(&loop->continues, c->cur_instructions->length);
+                emit(c, OpJump, 9999);
                 return 0;
             }
 
@@ -388,7 +433,7 @@ _compile(Compiler *c, Node n) {
                 if (err) { return err; }
 
                 source_map(c, n);
-                compile_operator(c, stmt->tok);
+                compile_operator(c, stmt->op);
 
                 source_map(c, n);
                 err = perform_assignment(c, stmt->left);
@@ -408,7 +453,7 @@ _compile(Compiler *c, Node n) {
                 if (err) { return err; }
 
                 source_map(c, n);
-                compile_operator(c, ie->tok);
+                compile_operator(c, ie->op);
 
                 return 0;
             }
@@ -421,15 +466,15 @@ _compile(Compiler *c, Node n) {
 
                 source_map(c, n);
 
-                if ('!' == pe->tok.start[0]) {
+                if ('!' == pe->op.start[0]) {
                     emit(c, OpBang);
 
-                } else if ('-' == pe->tok.start[0]) {
+                } else if ('-' == pe->op.start[0]) {
                     emit(c, OpMinus);
 
                 } else {
                     die("compiler: unknown prefix operator %.*s",
-                            LITERAL(pe->tok));
+                            LITERAL(pe->op));
                 }
 
                 return 0;
@@ -437,6 +482,14 @@ _compile(Compiler *c, Node n) {
 
         case n_IfExpression:
             {
+                // 00 condition
+                // 02 OpJumpNotTruthy 04 -> alternative
+                // 01 consequence
+                // 03 OpJump 05 -> OpPop
+                // 04 alternative
+                // 05 OpPop
+                // ...
+
                 IfExpression *ie = n.obj;
                 err = _compile(c, ie->condition);
                 if (err) { return err; }

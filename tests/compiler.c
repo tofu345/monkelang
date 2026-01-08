@@ -180,21 +180,23 @@ void test_conditionals(void) {
         "if (true) { 10 }; 3333;",
         _C( INT(10), INT(3333) ),
         _I(
-            // 0000
+            // condition
             make(OpTrue),
-            // 0001
             make(OpJumpNotTruthy, 10),
-            // 0004
+
+            // consequence
             make(OpConstant, 0),
-            // 0007
+            // skip alternative
             make(OpJump, 11),
-            // 0010
+
+            // alternative
             make(OpNothing),
-            // 0011
+
+            // end
             make(OpPop),
-            // 0012
+
+            // 3333;
             make(OpConstant, 1),
-            // 0015
             make(OpPop)
         )
     );
@@ -202,21 +204,23 @@ void test_conditionals(void) {
         "if (true) { 10 } else { 20 }; 3333;",
         _C( INT(10), INT(20), INT(3333) ),
         _I(
-            // 0000
+            // condition
             make(OpTrue),
-            // 0001
             make(OpJumpNotTruthy, 10),
-            // 0004
+
+            // consequence
             make(OpConstant, 0),
-            // 0007
+            // skip alternative
             make(OpJump, 13),
-            // 0010
+
+            // alternative
             make(OpConstant, 1),
-            // 0013
+
+            // end
             make(OpPop),
-            // 0014
+
+            // 3333;
             make(OpConstant, 2),
-            // 0017
             make(OpPop)
         )
     );
@@ -1147,10 +1151,10 @@ void test_return_statements(void) {
         )
     );
 
-    c_test_error("return;", "return statement outside function or module");
+    c_test_error("return;", "return statement outside function");
 }
 
-void test_for_statements(void) {
+void test_for_loops(void) {
     c_test(
         "\
         for (let i = 0; i < 5; i += 1) {\
@@ -1159,7 +1163,7 @@ void test_for_statements(void) {
         ",
         _C( INT(0), INT(5), STR("i:"), INT(1) ),
         _I(
-            // initialization
+            // start
             make(OpConstant, 0),    // let i = 0;
             make(OpSetGlobal, 0),
 
@@ -1194,7 +1198,7 @@ void test_for_statements(void) {
         ",
         _C( STR("i") ),
         _I(
-            // initialization
+            // start
 
             // condition
             make(OpTrue),
@@ -1212,9 +1216,133 @@ void test_for_statements(void) {
             make(OpJump, 0) // to condition
         )
     );
+
+    c_test(
+        "\
+        for (let i = 0 ;; i += 1) {\
+            if (i > 5) {\
+                break\
+            } else {\
+                continue\
+            }\
+        }\
+        ",
+        _C( INT(0), INT(5), INT(1) ),
+        _I(
+            // start
+            make(OpConstant, 0), // let i = 0;
+            make(OpSetGlobal, 0),
+
+            // condition
+            make(OpTrue),
+
+            make(OpJumpNotTruthy, 45), // to after loop
+
+            // body
+            // if statement
+            make(OpGetGlobal, 0), // i > 5
+            make(OpConstant, 1),
+            make(OpGreaterThan),
+            make(OpJumpNotTruthy, 27),
+
+            // if statement consequence
+            make(OpJump, 45), // break
+            make(OpNothing),
+            make(OpJump, 31),
+
+            // if statement alternative
+            make(OpJump, 32), // continue
+            make(OpNothing),
+            make(OpPop),
+
+            // update
+            make(OpGetGlobal, 0), // i += 1;
+            make(OpConstant, 2),
+            make(OpAdd),
+            make(OpSetGlobal, 0),
+
+            make(OpJump, 6) // to condition
+        )
+    );
+    c_test(
+        "\
+        for (let i = 0 ;; i += 1) {\
+            if (i > 5) {\
+                for (;;) {\
+                    break\
+                };\
+                break\
+            }\
+        }\
+        ",
+        _C( INT(0), INT(5), INT(1) ),
+        _I(
+            // outer loop start
+            make(OpConstant, 0), // let i = 0;
+            make(OpSetGlobal, 0),
+
+            // outer loop condition
+            make(OpTrue),
+            make(OpJumpNotTruthy, 52), // to after outer loop
+
+            // outer loop body
+            // if statement
+            make(OpGetGlobal, 0), // i > 5
+            make(OpConstant, 1),
+            make(OpGreaterThan),
+            make(OpJumpNotTruthy, 37),
+
+            // if statement consequence
+            // inner loop start
+
+            // inner loop condition
+            make(OpTrue),
+            make(OpJumpNotTruthy, 30), // to after inner loop
+
+            // inner loop body
+            make(OpJump, 30), // break inner loop
+            make(OpJump, 20), // to inner loop condition
+
+            // inner loop update
+            // inner loop end
+
+            make(OpJump, 52), // break outer loop
+            make(OpNothing),
+            make(OpJump, 38), // if statement alternative
+            make(OpNothing),
+            make(OpPop),
+
+            // outer loop update
+            make(OpGetGlobal, 0), // i += 1;
+            make(OpConstant, 2),
+            make(OpAdd),
+            make(OpSetGlobal, 0),
+
+            make(OpJump, 6) // to outer loop condition
+            // outer loop end
+        )
+    );
+
+    c_test_error("fn() { break; }", "cannot have break outside of loop");
+    c_test_error("break;", "cannot have break outside of loop");
+    c_test_error("continue;", "cannot have continue outside of loop");
+
+    // this is intended behaviour
+    c_test_error("\
+        for (;;) {\
+            fn() { break; }()\
+        }",
+        "cannot have 'break' outside of loop"
+    );
+    c_test_error("\
+        for (;;) {\
+            fn() { continue; }()\
+        }",
+        "cannot have 'continue' outside of loop"
+    );
 }
 
-void test_source_mapping(void) {
+void test_source_mappings(void) {
     char *input = "\
     let a = 0;\n\
     a += 2;\n\
@@ -1256,7 +1384,7 @@ void test_source_mapping(void) {
         { 65, NODE(n_Assignment, NULL) },           // a = !true == !(false == true);
         //                                               ^
 
-        { 68, NODE(n_ForStatement, NULL) },         // for (let i = 0; i < 5; i += 1) {}
+        { 68, NODE(n_LoopStatement, NULL) },        // for (let i = 0; i < 5; i += 1) {}
         { 68, NODE(n_Identifier, NULL) },           // for (let i = 0; i < 5; i += 1) {}
         //                                                  ^^^
         { 80, NODE(n_InfixExpression, NULL) },      // for (let i = 0; i < 5; i += 1) {}
@@ -1562,8 +1690,8 @@ int main(void) {
     RUN_TEST(test_assignments);
     RUN_TEST(test_operator_assignments);
     RUN_TEST(test_return_statements);
-    RUN_TEST(test_for_statements);
-    RUN_TEST(test_source_mapping);
+    RUN_TEST(test_for_loops);
+    RUN_TEST(test_source_mappings);
     RUN_TEST(test_modules);
     return UNITY_END();
 }

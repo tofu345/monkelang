@@ -54,6 +54,7 @@
 
 // `void *` Buffer
 BUFFER(, void *)
+BUFFER(Int, int)
 
 // from dwm :p
 _Noreturn void die(const char *fmt, ...);
@@ -66,7 +67,7 @@ int power_of_2_ceil(int n);
 
 static inline int fprintf_float(double f, FILE* fp) {
     FPRINTF(fp, "%.16g", f);
-    // %g specifier removes trailing '.' if it is followed by only zeros
+    // %g specifier removes trailing '.' in float if it is followed by only zeros
     if (f == (long) f) { FPRINTF(fp, ".") }
     return 0;
 }

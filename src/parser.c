@@ -10,8 +10,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-// All `parse_*` functions must return with `p->cur_token` in use or freed
-
 DEFINE_BUFFER(ParseError, ParseError)
 
 #define INVALID (Node){ .obj = NULL }
@@ -23,8 +21,17 @@ static void parse_error_(Parser *p, const char* message);
 static Node parse_statement(Parser* p);
 static Node parse_expression(Parser* p, enum Precedence precedence);
 
-// `NodeBuffer.length` is -1 on err.
+// returns `NodeBuffer` with length of -1 on error.
 static NodeBuffer parse_expression_list(Parser* p, TokenType end);
+
+// must be called with [p.cur_token] at t_Lbrace '{'.
+// returns NULL on error.
+static BlockStatement *parse_block_statement(Parser* p);
+
+// extend [tok] to include everything up to [p.cur_token].
+static void extend_token(Parser *p, Token *tok) {
+    tok->length = (p->cur_token.position + p->cur_token.length) - tok->position;
+}
 
 static void *
 allocate(size_t size) {
@@ -48,13 +55,11 @@ struct {
     { t_Lparen, p_Call },
     { t_Lbracket, p_Index },
 };
+const int precedences_len = sizeof(precedences) / sizeof(precedences[0]);
 
 static enum Precedence
 lookup_precedence(TokenType t) {
-    static const size_t precedences_len =
-        sizeof(precedences) / sizeof(precedences[0]);
-
-    for (size_t i = 0; i < precedences_len; i++) {
+    for (int i = 0; i < precedences_len; i++) {
         if (precedences[i].typ == t) {
             return precedences[i].precedence;
         }
@@ -103,7 +108,7 @@ peek_token_is(const Parser* p, TokenType t) {
     return p->peek_token.type == t;
 }
 
-// if peek_token.typ is [t] call [next_token] and return true,
+// if [p.peek_token.typ] is [t] then call next_token() and return true,
 // otherwise return false.
 static bool
 expect_peek(Parser* p, TokenType t) {
@@ -116,16 +121,11 @@ expect_peek(Parser* p, TokenType t) {
     }
 }
 
-static void
-no_prefix_parse_error(Parser* p, TokenType t) {
-    parse_error(p, "unexpected token '%s'", show_token_type(t));
-}
-
 static Node
 parse_expression(Parser* p, enum Precedence precedence) {
     PrefixParseFn *prefix = p->prefix_parse_fns[p->cur_token.type];
     if (prefix == NULL) {
-        no_prefix_parse_error(p, p->cur_token.type);
+        parse_error(p, "unexpected token '%s'", show_token_type(p->cur_token.type));
         return INVALID;
     }
 
@@ -164,7 +164,7 @@ parse_float(Parser* p) {
     const char *end = tok.start + tok.length;
     char *endptr;
 
-    errno = 0; // must reset errno
+    errno = 0;
     double value = strtod(tok.start, &endptr);
     if (endptr != end || errno == ERANGE) {
         parse_error(p,
@@ -185,7 +185,7 @@ parse_integer(Parser* p) {
     const char *end = tok.start + tok.length;
     char* endptr;
 
-    errno = 0; // must reset errno
+    errno = 0;
     long value = strtol(tok.start, &endptr, 0);
     if (endptr != end) {
         parse_error(p,
@@ -210,7 +210,7 @@ static Node
 parse_infix_expression(Parser* p, Node left) {
     InfixExpression* ie = allocate(sizeof(InfixExpression));
     ie->left = left;
-    ie->tok = p->cur_token;
+    ie->op = p->cur_token;
 
     enum Precedence precedence = cur_precedence(p);
     next_token(p);
@@ -227,7 +227,7 @@ parse_infix_expression(Parser* p, Node left) {
 static Node
 parse_prefix_expression(Parser* p) {
     PrefixExpression* pe = allocate(sizeof(PrefixExpression));
-    pe->tok = p->cur_token;
+    pe->op = p->cur_token;
 
     next_token(p);
 
@@ -259,9 +259,9 @@ parse_grouped_expression(Parser* p) {
     return n;
 }
 
-static BlockStatement*
+static BlockStatement *
 parse_block_statement(Parser* p) {
-    BlockStatement* bs = allocate(sizeof(BlockStatement));
+    BlockStatement *bs = allocate(sizeof(BlockStatement));
     bs->tok = p->cur_token;
 
     next_token(p);
@@ -286,7 +286,8 @@ parse_block_statement(Parser* p) {
     return bs;
 }
 
-// returns -1 on err
+// must be called with [p.cur_token] on t_Lparen '('.
+// returns -1 on error.
 static int
 parse_function_parameters(Parser* p, FunctionLiteral* fl) {
     next_token(p);
@@ -344,7 +345,6 @@ parse_string_literal(Parser* p) {
         --p->cur_token.start;
         --p->cur_token.position;
         p->cur_token.length = 1;
-
         parse_error_(p, "missing closing '\"'");
         return INVALID;
     }
@@ -380,8 +380,10 @@ parse_table_literal(Parser* p) {
         TokenType peek = p->peek_token.type;
         if (key.typ == n_Identifier && (peek == t_Comma || peek == t_Rbrace))
         {
+            // pair with identifier name and value.
+
             StringLiteral* str = allocate(sizeof(StringLiteral));
-            str->tok = ((Identifier *) key.obj)->tok;
+            str->tok = *node_token(key);
             Node str_key = NODE(n_StringLiteral, str);
 
             PairBufferPush(&tbl->pairs, (Pair){ str_key, key });
@@ -431,8 +433,7 @@ parse_call_expression(Parser* p, Node function) {
         node_free(function);
         return INVALID;
     }
-
-    tok.length = (p->cur_token.position + p->cur_token.length) - tok.position;
+    extend_token(p, &tok);
 
     CallExpression* ce = allocate(sizeof(CallExpression));
     ce->function = function;
@@ -453,8 +454,7 @@ parse_index_expression(Parser* p, Node left) {
         node_free(left);
         return INVALID;
     }
-
-    tok.length = (p->cur_token.position + p->cur_token.length) - tok.position;
+    extend_token(p, &tok);
 
     IndexExpression* ie = allocate(sizeof(IndexExpression));
     ie->left = left;
@@ -463,6 +463,7 @@ parse_index_expression(Parser* p, Node left) {
     return NODE(n_IndexExpression, ie);
 }
 
+// must be called with p.cur_token at the start token, e.g '('
 static NodeBuffer
 parse_expression_list(Parser* p, TokenType end) {
     NodeBuffer list = {0};
@@ -557,8 +558,7 @@ parse_require_expression(Parser *p) {
 
     NodeBuffer args = parse_expression_list(p, t_Rparen);
     if (args.length == -1) { return INVALID; }
-
-    tok.length = (p->cur_token.position + p->cur_token.length) - tok.position;
+    extend_token(p, &tok);
 
     RequireExpression* re = allocate(sizeof(RequireExpression));
     re->tok = tok;
@@ -673,7 +673,7 @@ parse_operator_assignment(Parser *p, Node left) {
     if (IS_INVALID(right)) { goto invalid; }
 
     OperatorAssignment *stmt = allocate(sizeof(OperatorAssignment));
-    stmt->tok = tok;
+    stmt->op = tok;
     stmt->left = left;
     stmt->right = right;
 
@@ -693,46 +693,60 @@ parse_expression_statement(__attribute__ ((unused)) Parser* p, Node left) {
 }
 
 static Node
+parse_break_statement(Parser *p) {
+    BreakStatement *bs = allocate(sizeof(BreakStatement));
+    bs->tok = p->cur_token;
+    return NODE(n_BreakStatement, bs);
+}
+
+static Node
+parse_continue_statement(Parser *p) {
+    ContinueStatement *cs = allocate(sizeof(ContinueStatement));
+    cs->tok = p->cur_token;
+    return NODE(n_ContinueStatement, cs);
+}
+
+static Node
 parse_for_statement(Parser *p) {
-    ForStatement *fs = allocate(sizeof(ForStatement));
-    fs->tok = p->cur_token;
+    LoopStatement *loop = allocate(sizeof(LoopStatement));
+    loop->tok = p->cur_token;
 
     // for ( ...
     if (!expect_peek(p, t_Lparen)) { goto invalid; }
     next_token(p);
 
-    // for ( [optional init] ; ...
+    // for ( [start] ; ...
     if (!cur_token_is(p, t_Semicolon)) {
-        fs->init = parse_statement(p);
-        if (IS_INVALID(fs->init)) { goto invalid; }
+        loop->start = parse_statement(p);
+        if (IS_INVALID(loop->start)) { goto invalid; }
     }
     next_token(p);
 
-    // ...; [optional condition] ; ...
+    // ...; [condition] ; ...
     if (!cur_token_is(p, t_Semicolon)) {
-        fs->condition = parse_expression(p, p_Lowest);
-        if (IS_INVALID(fs->condition)
+        loop->condition = parse_expression(p, p_Lowest);
+        if (IS_INVALID(loop->condition)
                 || !expect_peek(p, t_Semicolon)) { goto invalid; }
     }
 
-    // ...; [optional update] ) {
+    // ...; [update] ) {
     if (!peek_token_is(p, t_Rparen)) {
         next_token(p);
-        fs->update = parse_statement(p);
-        if (IS_INVALID(fs->update)) { goto invalid; }
+        loop->update = parse_statement(p);
+        if (IS_INVALID(loop->update)) { goto invalid; }
     }
 
     // ) {
     if (!expect_peek(p, t_Rparen)) { goto invalid; }
     next_token(p);
 
-    fs->body = parse_block_statement(p);
-    if (!fs->body) { goto invalid; }
+    loop->body = parse_block_statement(p);
+    if (!loop->body) { goto invalid; }
 
-    return NODE(n_ForStatement, fs);
+    return NODE(n_LoopStatement, loop);
 
 invalid:
-    free_for_statement(fs);
+    free_loop_statement(loop);
     return INVALID;
 }
 
@@ -746,6 +760,10 @@ parse_statement_(Parser *p) {
         return parse_return_statement(p);
     case t_For:
         return parse_for_statement(p);
+    case t_Break:
+        return parse_break_statement(p);
+    case t_Continue:
+        return parse_continue_statement(p);
     case t_Illegal:
         parse_error(p,
                 "illegal character '%.*s'",
@@ -774,6 +792,9 @@ parse_statement_(Parser *p) {
 }
 
 // inspired by https://youtu.be/6CV8HyqJ_9w?si=XJWE1RCAcCOsvzVp
+//
+// return `true` if [p.peek_token] is a `t_Semicolon` or on a new line,
+// with some exceptions.
 inline static bool
 peek_semicolon_or_newline(Parser *p) {
     if (peek_token_is(p, t_Semicolon)) {
@@ -782,17 +803,15 @@ peek_semicolon_or_newline(Parser *p) {
 
     } else if (p->peek_token.line == p->cur_token.line) {
         switch (p->peek_token.type) {
-            // the exceptions
             case t_Eof:
-            case t_Comma:
             case t_Rbracket:
             case t_Rbrace:
             case t_Rparen:
                 return true;
             default:
-                next_token(p); // highlight the statement that follows.
+                next_token(p); // make [p.peek_token] [p.cur_token]
                 parse_error_(p,
-                        "multiple statements on the same line must be separated by a ';'");
+                        "this statement must be on a new line or come after a semicolon");
                 return false;
         }
     }
@@ -862,32 +881,6 @@ ParseErrorBuffer parse(Parser *p, Lexer *lexer, Program *program) {
     return errors;
 }
 
-void print_parse_errors(ParseErrorBuffer *errors, FILE *stream) {
-    for (int i = 0; i < errors->length; i++) {
-        ParseError err = errors->data[i];
-
-        highlight_token(&err.token, 2, stream);
-        fprintf(stream, "%s\n", err.message);
-
-        if (err.allocated) {
-            free((char *) err.message);
-        }
-    }
-    free(errors->data);
-    *errors = (ParseErrorBuffer){0};
-}
-
-void free_parse_errors(ParseErrorBuffer *errors) {
-    for (int i = 0; i < errors->length; i++) {
-        ParseError err = errors->data[i];
-        if (err.allocated) {
-            free((char *) err.message);
-        }
-    }
-    free(errors->data);
-    *errors = (ParseErrorBuffer){0};
-}
-
 static void
 parse_error_(Parser *p, const char* message) {
     ParseErrorBufferPush(&p->errors, (ParseError) {
@@ -912,4 +905,30 @@ parse_error(Parser* p, char* format, ...) {
         .allocated = true,
         .token = p->cur_token,
     });
+}
+
+void print_parse_errors(ParseErrorBuffer *errors, FILE *stream) {
+    for (int i = 0; i < errors->length; i++) {
+        ParseError err = errors->data[i];
+
+        highlight_token(&err.token, 2, stream);
+        fprintf(stream, "%s\n", err.message);
+
+        if (err.allocated) {
+            free((char *) err.message);
+        }
+    }
+    free(errors->data);
+    *errors = (ParseErrorBuffer){0};
+}
+
+void free_parse_errors(ParseErrorBuffer *errors) {
+    for (int i = 0; i < errors->length; i++) {
+        ParseError err = errors->data[i];
+        if (err.allocated) {
+            free((char *) err.message);
+        }
+    }
+    free(errors->data);
+    *errors = (ParseErrorBuffer){0};
 }
