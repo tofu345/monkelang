@@ -111,7 +111,7 @@ append_return_if_not_present(Compiler *c) {
 
 // if the last statement is an Expression Statement, remove its OpPop.
 //
-// Otherwise emit an OpNull, because no other Statement should produce a value.
+// Otherwise emit an OpNothing, because no other Statement should produce a value.
 static void
 remove_last_expression_stmt_pop(Compiler *c, NodeBuffer stmts) {
     if (last_instruction_is(c, OpPop)

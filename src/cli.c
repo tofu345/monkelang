@@ -105,7 +105,7 @@ cleanup:
 
         vm.sp = 0;
         vm.frames_index = 0;
-        vm.stack[0] = (Object){0}; // remove stack_elem
+        vm.stack[0] = (Object){0};
     }
 
     vm_free(&vm);

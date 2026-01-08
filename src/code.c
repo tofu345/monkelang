@@ -40,7 +40,7 @@ const Definition definitions[] = {
 
     DEF_EMPTY(OpTrue),
     DEF_EMPTY(OpFalse),
-    DEF_EMPTY(OpNull),
+    DEF_EMPTY(OpNothing),
 
     DEF(OpJumpNotTruthy, two_bytes), // instruction index
     DEF(OpJump, two_bytes),          // instruction index

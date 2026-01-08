@@ -6,6 +6,7 @@
 #include "token.h"
 #include "vm.h"
 
+#include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,22 +28,26 @@ static void module_bytecode(Module *m, Bytecode code) {
     m->main_function = code.main_function;
 }
 
-bool has_monke_suffix(const char *str, int len) {
-    return len > 6
-        && str[len - 6] == '.'
-        && str[len - 5] == 'm'
-        && str[len - 4] == 'o'
-        && str[len - 3] == 'n'
-        && str[len - 2] == 'k'
-        && str[len - 1] == 'e';
+static bool has_extension(const char *str) {
+    for (; *str; ++str) {
+        if (*str == '.') {
+            return true;
+        }
+    }
+    return false;
 }
 
 // load source code at [filename] into `Module`
-static error module_load(Module *module, const char *name, int length) {
-    char *filename = malloc(length + 7);
-    if (filename == NULL) { die("create_module - filename:"); }
-    strncpy(filename, name, length);
-    strncpy(&filename[length], ".monke", 7);
+static error module_load(Module *module, const char *name, int len) {
+    char *filename = strndup(name, len);
+    if (filename == NULL) { die("module_load - filename:"); }
+
+    if (!has_extension(basename(filename))) {
+        filename = realloc(filename, len + 7);
+        if (filename == NULL) { die("module_load - filename"); }
+        strncpy(filename + len, ".monke", 7);
+    }
+
     module->name = filename;
 
     struct stat mstat;
@@ -138,30 +143,26 @@ error require_module(VM *vm, Constant constant) {
             constant.type);
     }
 
-    const char *filename = constant.data.string->start;
+    const char *fname = constant.data.string->start;
     int len = constant.data.string->length;
-    // remove ".monke" suffix, later added in module_load()
-    if (has_monke_suffix(filename, len)) {
-        len -= 6;
-    }
 
 #ifdef DEBUG
-    printf("require: %.*s\n", len, filename);
+    printf("require: %.*s\n", len, fname);
 #endif
 
-    uint64_t hash = hash_fnv1a_(filename, len);
+    uint64_t hash = hash_fnv1a_(fname, len);
     Module *module = ht_get_hash(vm->modules, hash);
     if (errno == ENOKEY) {
         module = calloc(1, sizeof(Module));
         if (module == NULL) { die("require - create Module"); }
 
-        err = module_load(module, filename, len);
+        err = module_load(module, fname, len);
         if (err) { goto fail; }
 
         err = module_compile(vm, module);
         if (err) { goto fail; }
 
-        ht_set_hash(vm->modules, (void *) filename, module, hash);
+        ht_set_hash(vm->modules, (void *) fname, module, hash);
         if (errno == ENOMEM) {
             err = errorf("error adding module - %s", strerror(errno));
             goto fail;
@@ -212,10 +213,6 @@ fail:
 }
 
 int fprint_module(Module *m, FILE *fp) {
-    int len = strlen(m->name);
-    if (has_monke_suffix(m->name, len)) {
-        len -= 6;
-    }
-    FPRINTF(fp, "<module: %.*s>", len, m->name);
+    FPRINTF(fp, "<module: %s>", m->name);
     return 0;
 }
