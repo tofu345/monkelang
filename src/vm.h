@@ -14,7 +14,6 @@
 // #define DEBUG
 
 static const int StackSize = 2048;
-static const int GlobalsSize = 2048;
 static const int MaxFraxes = 1024;
 
 // from wren: Number of bytes allocated before triggering GC.
