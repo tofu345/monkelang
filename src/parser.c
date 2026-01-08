@@ -750,6 +750,30 @@ invalid:
     return INVALID;
 }
 
+static Node
+parse_while_statement(Parser *p) {
+    LoopStatement *loop = allocate(sizeof(LoopStatement));
+    loop->tok = p->cur_token;
+
+    if (!expect_peek(p, t_Lparen)) { goto invalid; }
+    next_token(p);
+
+    loop->condition = parse_expression(p, p_Lowest);
+    if (IS_INVALID(loop->condition)) { goto invalid; }
+
+    if (!expect_peek(p, t_Rparen)) { goto invalid; }
+    next_token(p);
+
+    loop->body = parse_block_statement(p);
+    if (!loop->body) { goto invalid; }
+
+    return NODE(n_LoopStatement, loop);
+
+invalid:
+    free_loop_statement(loop);
+    return INVALID;
+}
+
 // on failure, return Node with `n.obj` == NULL
 inline static Node
 parse_statement_(Parser *p) {
@@ -760,6 +784,8 @@ parse_statement_(Parser *p) {
         return parse_return_statement(p);
     case t_For:
         return parse_for_statement(p);
+    case t_While:
+        return parse_while_statement(p);
     case t_Break:
         return parse_break_statement(p);
     case t_Continue:

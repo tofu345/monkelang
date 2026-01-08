@@ -935,6 +935,30 @@ void test_break_continue_loop(void) {
     ASSERT_NODE_TYPE(n_ContinueStatement, alternative.data[0]);
 }
 
+void test_while_loop(void) {
+    char *input = "while (true) { i == 10; }";
+
+    prog = parse_(input);
+    check(&prog);
+
+    Node n = prog.stmts.data[0];
+    ASSERT_NODE_TYPE(n_LoopStatement, n);
+    LoopStatement* loop = n.obj;
+
+    test_node(loop->start, NOTHING);
+    test_node(loop->condition, TEST(bool, true));
+    test_node(loop->update, NOTHING);
+
+    BlockStatement *bs = loop->body;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, bs->stmts.length, "wrong BlockStatement length");
+
+    Node stmt = bs->stmts.data[0];
+    ASSERT_NODE_TYPE(n_ExpressionStatement, stmt);
+
+    ExpressionStatement* es = stmt.obj;
+    test_infix_expression(es->expression, TEST(str, "i"), "==", TEST(int, 10));
+}
+
 void test_require_expression(void) {
     char *input = "require(\"test.monke\")";
 
@@ -1279,6 +1303,7 @@ int main(void) {
     RUN_TEST(test_for_loop);
     RUN_TEST(test_empty_for_loop);
     RUN_TEST(test_break_continue_loop);
+    RUN_TEST(test_while_loop);
     RUN_TEST(test_require_expression);
     RUN_TEST(test_parser_errors);
     return UNITY_END();

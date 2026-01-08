@@ -18,6 +18,7 @@ struct Keyword {
     {"else", 4, t_Else},
     {"false", 5, t_False},
     {"break", 5, t_Break},
+    {"while", 5, t_While},
     {"return", 6, t_Return},
     {"require", 7, t_Require},
     {"nothing", 7, t_Nothing},
@@ -76,6 +77,7 @@ const char* token_types[] = {
     "]",
 
     "for",
+    "while",
     "break",
     "continue",
     "fn",

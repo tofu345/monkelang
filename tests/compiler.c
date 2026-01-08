@@ -1154,7 +1154,7 @@ void test_return_statements(void) {
     c_test_error("return;", "return statement outside function");
 }
 
-void test_for_loops(void) {
+void test_loops(void) {
     c_test(
         "\
         for (let i = 0; i < 5; i += 1) {\
@@ -1212,6 +1212,28 @@ void test_for_loops(void) {
             make(OpPop),
 
             // update
+
+            make(OpJump, 0) // to condition
+        )
+    );
+    c_test(
+        "\
+        while (true) {\
+            puts(\"i\");\
+        }\
+        ",
+        _C( STR("i") ),
+        _I(
+            // condition
+            make(OpTrue),
+
+            make(OpJumpNotTruthy, 15), // to after loop
+
+            // body
+            make(OpConstant, 0),
+            make(OpGetBuiltin, 1),
+            make(OpCall, 1),
+            make(OpPop),
 
             make(OpJump, 0) // to condition
         )
@@ -1323,9 +1345,9 @@ void test_for_loops(void) {
         )
     );
 
-    c_test_error("fn() { break; }", "cannot have break outside of loop");
-    c_test_error("break;", "cannot have break outside of loop");
-    c_test_error("continue;", "cannot have continue outside of loop");
+    c_test_error("fn() { break; }", "cannot have 'break' outside of loop");
+    c_test_error("break;", "cannot have 'break' outside of loop");
+    c_test_error("continue;", "cannot have 'continue' outside of loop");
 
     // this is intended behaviour
     c_test_error("\
@@ -1335,7 +1357,7 @@ void test_for_loops(void) {
         "cannot have 'break' outside of loop"
     );
     c_test_error("\
-        for (;;) {\
+        while (true) {\
             fn() { continue; }()\
         }",
         "cannot have 'continue' outside of loop"
@@ -1690,7 +1712,7 @@ int main(void) {
     RUN_TEST(test_assignments);
     RUN_TEST(test_operator_assignments);
     RUN_TEST(test_return_statements);
-    RUN_TEST(test_for_loops);
+    RUN_TEST(test_loops);
     RUN_TEST(test_source_mappings);
     RUN_TEST(test_modules);
     return UNITY_END();

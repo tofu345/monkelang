@@ -685,7 +685,7 @@ test_free_variable_list(void) {
 }
 
 static void
-test_for_statement(void) {
+test_loop(void) {
     vm_test(
         "\
         let a = 5;\
@@ -718,6 +718,16 @@ test_for_statement(void) {
         "\
         let a = 0;\
         for (; a < 5; ) {\
+            a += 1;\
+        };\
+        a\
+        ",
+        TEST(int, 5)
+    );
+    vm_test(
+        "\
+        let a = 0;\
+        while (a < 5) {\
             a += 1;\
         };\
         a\
@@ -1115,7 +1125,7 @@ int main(void) {
     RUN_TEST(test_recursive_fibonacci);
     RUN_TEST(test_assignments);
     RUN_TEST(test_free_variable_list);
-    RUN_TEST(test_for_statement);
+    RUN_TEST(test_loop);
     RUN_TEST(test_modules);
     return UNITY_END();
 }
